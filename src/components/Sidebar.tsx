@@ -151,3 +151,9 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage }) => {
 };
 
 export default Sidebar;
+import SyncStatus from './SyncStatus';
+
+// Dentro do componente, adicione onde preferir:
+<div className="p-4 border-t border-gray-200">
+  <SyncStatus />
+</div>
