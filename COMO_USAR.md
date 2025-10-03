@@ -166,3 +166,5 @@ Se precisar de ajuda:
 ---
 
 **Sistema pronto para uso multi-dispositivo! 🚀**
+
+
