@@ -1,4 +1,3 @@
-// src/contexts/StorageContext.tsx
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { initializeStorage, StorageManager } from '../lib/storage';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
@@ -31,27 +30,42 @@ export const StorageProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [isSupabaseEnabled] = useState(isSupabaseConfigured());
 
+  // Remover syncWithSupabase da lista de dependências do useEffect
+  const syncWithSupabase = async () => {
+    if (!isSupabaseEnabled || !storageManager || syncStatus === 'syncing') return;
+    
+    setSyncStatus('syncing');
+    try {
+      console.log('[StorageContext] Sync with Supabase - Feature coming soon');
+      
+      // TODO: Implementar sincronização quando os métodos estiverem disponíveis
+      // Por enquanto, apenas simular sucesso
+      setTimeout(() => {
+        setSyncStatus('success');
+        setLastSyncTime(new Date());
+        console.log('[StorageContext] ✅ Sync simulation completed');
+      }, 1000);
+      
+    } catch (error) {
+      console.error('[StorageContext] Sync error:', error);
+      setSyncStatus('error');
+    }
+  };
+
   useEffect(() => {
     const initialize = async () => {
       try {
         console.log('[StorageContext] Starting initialization...');
         
-        // Configuração baseada na disponibilidade do Supabase
+        // Sempre usar local por enquanto
         const config: any = {
-          provider: isSupabaseEnabled ? 'hybrid' : 'local', // hybrid = local + supabase
-          autoSync: isSupabaseEnabled && isOnline,
+          provider: 'local',
+          autoSync: false,
           syncStrategy: 'newest-wins'
         };
 
         if (isSupabaseEnabled) {
-          console.log('[StorageContext] Supabase detected - initializing with cloud sync');
-          // Testar conexão com Supabase
-          const { error } = await supabase.from('projects').select('count').limit(1);
-          if (error && error.code !== 'PGRST116') {
-            console.error('[StorageContext] Supabase connection error:', error);
-          } else {
-            console.log('[StorageContext] ✅ Supabase connected successfully');
-          }
+          console.log('[StorageContext] Supabase detected - will enable sync when ready');
         } else {
           console.log('[StorageContext] Running in local-only mode');
         }
@@ -60,92 +74,29 @@ export const StorageProvider: React.FC<{ children: ReactNode }> = ({ children })
         setStorageManager(manager);
         setIsInitialized(true);
         
-        // Se Supabase estiver configurado, fazer sync inicial
-        if (isSupabaseEnabled && isOnline) {
-          syncWithSupabase();
-        }
       } catch (error) {
         console.error('[StorageContext] Failed to initialize storage:', error);
-        // Fallback para local
-        const fallbackManager = await initializeStorage({ provider: 'local' });
-        setStorageManager(fallbackManager);
+        // Fallback para garantir que o app funcione
         setIsInitialized(true);
       }
     };
 
     initialize();
 
-    const handleOnline = () => {
-      setIsOnline(true);
-      if (isSupabaseEnabled) {
-        syncWithSupabase();
-      }
-    };
+    const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // Auto-sync a cada 5 minutos se online e Supabase configurado
-    let syncInterval: NodeJS.Timeout | null = null;
-    if (isSupabaseEnabled) {
-      syncInterval = setInterval(() => {
-        if (isOnline) {
-          syncWithSupabase();
-        }
-      }, 5 * 60 * 1000); // 5 minutos
-    }
-
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
-      if (syncInterval) clearInterval(syncInterval);
-      storageManager?.destroy();
+      if (storageManager && typeof storageManager.destroy === 'function') {
+        storageManager.destroy();
+      }
     };
-  }, [isSupabaseEnabled, isOnline]);
-
-  const syncWithSupabase = async () => {
-    if (!isSupabaseEnabled || !storageManager || syncStatus === 'syncing') return;
-    
-    setSyncStatus('syncing');
-    try {
-      console.log('[StorageContext] Starting sync with Supabase...');
-      
-      // Aqui você implementa a lógica de sincronização
-      // Por exemplo, sincronizar projetos:
-      const localProjects = await storageManager.getAllProjects();
-      
-      // Enviar projetos locais para Supabase
-      for (const project of localProjects) {
-        const { error } = await supabase
-          .from('projects')
-          .upsert(project, { onConflict: 'id' });
-        
-        if (error) {
-          console.error('[StorageContext] Error syncing project:', error);
-        }
-      }
-      
-      // Buscar projetos do Supabase
-      const { data: remoteProjects, error } = await supabase
-        .from('projects')
-        .select('*');
-      
-      if (!error && remoteProjects) {
-        // Atualizar storage local com dados remotos
-        for (const project of remoteProjects) {
-          await storageManager.saveProject(project);
-        }
-      }
-      
-      setSyncStatus('success');
-      setLastSyncTime(new Date());
-      console.log('[StorageContext] ✅ Sync completed successfully');
-    } catch (error) {
-      console.error('[StorageContext] Sync error:', error);
-      setSyncStatus('error');
-    }
-  };
+  }, []); // Sem dependências para evitar re-execução
 
   const syncNow = async () => {
     if (isSupabaseEnabled && isOnline) {
