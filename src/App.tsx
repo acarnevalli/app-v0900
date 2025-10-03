@@ -11,7 +11,6 @@ import Settings from './pages/Settings';
 import { AppProvider } from './contexts/AppContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SettingsProvider } from './contexts/SettingsContext';
-import { StorageProvider } from './contexts/StorageContext';
 
 const AppContent: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -67,11 +66,9 @@ function App() {
   return (
     <AuthProvider>
       <SettingsProvider>
-        <StorageProvider>
-          <AppProvider>
-            <AppContent />
-          </AppProvider>
-        </StorageProvider>
+        <AppProvider>
+          <AppContent />
+        </AppProvider>
       </SettingsProvider>
     </AuthProvider>
   );
