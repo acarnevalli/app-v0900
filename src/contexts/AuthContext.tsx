@@ -1,25 +1,21 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { supabase } from '../lib/supabase';
+import { User as SupabaseUser } from '@supabase/supabase-js';
 
 export interface User {
   id: string;
-  name: string;
   email: string;
-  role: 'admin' | 'user';
-  active: boolean;
   created_at: string;
-  last_login?: string;
 }
 
 interface AuthContextType {
   user: User | null;
-  users: User[];
+  supabaseUser: SupabaseUser | null;
   isAuthenticated: boolean;
+  isLoading: boolean;
   login: (email: string, password: string) => Promise<boolean>;
-  logout: () => void;
-  addUser: (userData: Omit<User, 'id' | 'created_at'> & { password: string }) => void;
-  updateUser: (id: string, updates: Partial<User>) => void;
-  deleteUser: (id: string) => void;
-  changePassword: (userId: string, newPassword: string) => void;
+  logout: () => Promise<void>;
+  signUp: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,123 +28,128 @@ export const useAuth = () => {
   return context;
 };
 
-// Simulação de banco de dados de usuários
-const defaultUsers = [
-  {
-    id: '1',
-    name: 'Administrador',
-    email: 'admin@marcenaria.com',
-    role: 'admin' as const,
-    active: true,
-    created_at: '2024-01-01T10:00:00Z',
-    password: 'admin123'
-  },
-  {
-    id: '2',
-    name: 'João Silva',
-    email: 'joao@marcenaria.com',
-    role: 'user' as const,
-    active: true,
-    created_at: '2024-01-15T10:00:00Z',
-    password: 'user123'
-  }
-];
-
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [users, setUsers] = useState<(User & { password: string })[]>(defaultUsers);
+  const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Verificar se há usuário logado no localStorage
-    const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
-      const userData = JSON.parse(savedUser);
-      setUser(userData);
-      setIsAuthenticated(true);
-    }
+    const initAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (session?.user) {
+          setSupabaseUser(session.user);
+          setUser({
+            id: session.user.id,
+            email: session.user.email || '',
+            created_at: session.user.created_at || new Date().toISOString()
+          });
+          setIsAuthenticated(true);
+        }
+      } catch (error) {
+        console.error('[AuthContext] Error loading session:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setSupabaseUser(session.user);
+        setUser({
+          id: session.user.id,
+          email: session.user.email || '',
+          created_at: session.user.created_at || new Date().toISOString()
+        });
+        setIsAuthenticated(true);
+      } else {
+        setSupabaseUser(null);
+        setUser(null);
+        setIsAuthenticated(false);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    const foundUser = users.find(u => u.email === email && u.password === password && u.active);
-    
-    if (foundUser) {
-      const userWithoutPassword = {
-        id: foundUser.id,
-        name: foundUser.name,
-        email: foundUser.email,
-        role: foundUser.role,
-        active: foundUser.active,
-        created_at: foundUser.created_at,
-        last_login: new Date().toISOString()
-      };
-      
-      setUser(userWithoutPassword);
-      setIsAuthenticated(true);
-      localStorage.setItem('currentUser', JSON.stringify(userWithoutPassword));
-      
-      // Atualizar último login
-      setUsers(prev => prev.map(u => 
-        u.id === foundUser.id 
-          ? { ...u, last_login: new Date().toISOString() }
-          : u
-      ));
-      
-      return true;
-    }
-    
-    return false;
-  };
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
 
-  const logout = () => {
-    setUser(null);
-    setIsAuthenticated(false);
-    localStorage.removeItem('currentUser');
-  };
+      if (error) {
+        console.error('[AuthContext] Login error:', error.message);
+        return false;
+      }
 
-  const addUser = (userData: Omit<User, 'id' | 'created_at'> & { password: string }) => {
-    const newUser = {
-      ...userData,
-      id: Date.now().toString(),
-      created_at: new Date().toISOString()
-    };
-    setUsers(prev => [...prev, newUser]);
-  };
+      if (data.user) {
+        setSupabaseUser(data.user);
+        setUser({
+          id: data.user.id,
+          email: data.user.email || '',
+          created_at: data.user.created_at || new Date().toISOString()
+        });
+        setIsAuthenticated(true);
+        return true;
+      }
 
-  const updateUser = (id: string, updates: Partial<User>) => {
-    setUsers(prev => prev.map(u => 
-      u.id === id ? { ...u, ...updates } : u
-    ));
-    
-    // Se o usuário logado foi atualizado, atualizar também o estado atual
-    if (user && user.id === id) {
-      const updatedUser = { ...user, ...updates };
-      setUser(updatedUser);
-      localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+      return false;
+    } catch (error) {
+      console.error('[AuthContext] Login exception:', error);
+      return false;
     }
   };
 
-  const deleteUser = (id: string) => {
-    setUsers(prev => prev.filter(u => u.id !== id));
+  const logout = async () => {
+    try {
+      await supabase.auth.signOut();
+      setSupabaseUser(null);
+      setUser(null);
+      setIsAuthenticated(false);
+    } catch (error) {
+      console.error('[AuthContext] Logout error:', error);
+    }
   };
 
-  const changePassword = (userId: string, newPassword: string) => {
-    setUsers(prev => prev.map(u => 
-      u.id === userId ? { ...u, password: newPassword } : u
-    ));
+  const signUp = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      if (data.user) {
+        return { success: true };
+      }
+
+      return { success: false, error: 'Failed to create user' };
+    } catch (error) {
+      console.error('[AuthContext] SignUp exception:', error);
+      return { success: false, error: 'An unexpected error occurred' };
+    }
   };
 
   return (
     <AuthContext.Provider value={{
       user,
-      users: users.map(({ password, ...user }) => user), // Remove password from exposed users
+      supabaseUser,
       isAuthenticated,
+      isLoading,
       login,
       logout,
-      addUser,
-      updateUser,
-      deleteUser,
-      changePassword
+      signUp
     }}>
       {children}
     </AuthContext.Provider>

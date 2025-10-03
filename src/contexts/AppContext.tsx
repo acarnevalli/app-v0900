@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-
-const MOCK_USER_ID = 'local-user-1';
+import { supabase } from '../lib/supabase';
+import { useAuth } from './AuthContext';
 
 export interface Client {
   id: string;
@@ -18,18 +18,16 @@ export interface Client {
   complemento?: string;
   id_empresa?: string;
   fl_ativo: boolean;
-  address: {
-    country: string;
-    state: string;
-    city: string;
-    zipCode: string;
-    neighborhood: string;
-    streetType: string;
-    street: string;
-  };
+  country: string;
+  state: string;
+  city: string;
+  zip_code: string;
+  neighborhood: string;
+  street_type: string;
+  street: string;
+  user_id: string;
   created_at: string;
-  total_projects?: number;
-  total_value?: number;
+  updated_at: string;
 }
 
 export interface Product {
@@ -45,11 +43,15 @@ export interface Product {
   current_stock: number;
   min_stock: number;
   supplier?: string;
+  user_id: string;
   created_at: string;
+  updated_at: string;
 }
 
 export interface ProductComponent {
+  id?: string;
   product_id: string;
+  component_id: string;
   product_name: string;
   quantity: number;
   unit: string;
@@ -79,11 +81,13 @@ export interface Project {
   budget: number;
   start_date: string;
   end_date: string;
-  created_at: string;
   materials_cost?: number;
   labor_cost?: number;
   profit_margin?: number;
   payment_terms?: PaymentTerms;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface PaymentTerms {
@@ -103,6 +107,7 @@ export interface Transaction {
   description: string;
   amount: number;
   date: string;
+  user_id: string;
   created_at: string;
 }
 
@@ -110,13 +115,16 @@ export interface StockMovement {
   id: string;
   product_id: string;
   product_name: string;
-  type: 'entrada' | 'saida';
+  movement_type: 'entrada' | 'saida';
   quantity: number;
   unit_price?: number;
   total_value?: number;
   project_id?: string;
   project_title?: string;
+  reference_type?: 'manual' | 'project' | 'adjustment';
   date: string;
+  notes?: string;
+  user_id: string;
   created_at: string;
 }
 
@@ -127,28 +135,20 @@ interface AppContextType {
   products: Product[];
   stockMovements: StockMovement[];
   loading: boolean;
-  addClient: (client: Omit<Client, 'id' | 'created_at'>) => Promise<void>;
+  addClient: (client: Omit<Client, 'id' | 'created_at' | 'updated_at' | 'user_id'>) => Promise<void>;
   updateClient: (id: string, client: Partial<Client>) => Promise<void>;
   deleteClient: (id: string) => Promise<void>;
-  addProject: (project: Omit<Project, 'id' | 'created_at' | 'number'>) => Promise<void>;
+  addProject: (project: Omit<Project, 'id' | 'created_at' | 'updated_at' | 'number' | 'user_id'>) => Promise<void>;
   updateProject: (id: string, project: Partial<Project>) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
-  addTransaction: (transaction: Omit<Transaction, 'id' | 'created_at'>) => Promise<void>;
-  addProduct: (product: Omit<Product, 'id' | 'created_at'>) => Promise<void>;
+  addTransaction: (transaction: Omit<Transaction, 'id' | 'created_at' | 'user_id'>) => Promise<void>;
+  addProduct: (product: Omit<Product, 'id' | 'created_at' | 'updated_at' | 'user_id'>) => Promise<void>;
   updateProduct: (product: Product) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
-  addStockMovement: (movement: Omit<StockMovement, 'id' | 'created_at'>) => Promise<void>;
+  addStockMovement: (movement: Omit<StockMovement, 'id' | 'created_at' | 'user_id'>) => Promise<void>;
   processProjectStockMovement: (projectId: string, products: ProjectProduct[]) => Promise<void>;
   calculateProductCost: (productId: string) => Promise<number>;
   getAvailableComponents: () => Product[];
-  exportClientsCSV: () => void;
-  exportProductsCSV: () => void;
-  exportProjectsCSV: () => void;
-  exportTransactionsCSV: () => void;
-  importClientsCSV: (file: File) => Promise<void>;
-  importProductsCSV: (file: File) => Promise<void>;
-  importProjectsCSV: (file: File) => Promise<void>;
-  importTransactionsCSV: (file: File) => Promise<void>;
   getDashboardStats: () => {
     totalClients: number;
     activeProjects: number;
@@ -157,6 +157,7 @@ interface AppContextType {
     lowStockItems: number;
     recentActivity: any[];
   };
+  refreshData: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -169,27 +170,8 @@ export const useApp = () => {
   return context;
 };
 
-const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-const loadFromStorage = <T,>(key: string, defaultValue: T): T => {
-  try {
-    const item = localStorage.getItem(key);
-    return item ? JSON.parse(item) : defaultValue;
-  } catch (error) {
-    console.error(`Error loading ${key}:`, error);
-    return defaultValue;
-  }
-};
-
-const saveToStorage = <T,>(key: string, value: T): void => {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch (error) {
-    console.error(`Error saving ${key}:`, error);
-  }
-};
-
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -197,276 +179,505 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [stockMovements, setStockMovements] = useState<StockMovement[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const loadClients = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setClients(data || []);
+    } catch (error) {
+      console.error('[AppContext] Error loading clients:', error);
+    }
+  };
+
+  const loadProducts = async () => {
+    if (!user) return;
+
+    try {
+      const { data: productsData, error: productsError } = await supabase
+        .from('products')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (productsError) throw productsError;
+
+      const { data: componentsData, error: componentsError } = await supabase
+        .from('product_components')
+        .select(`
+          id,
+          product_id,
+          component_id,
+          quantity,
+          user_id,
+          component:products!product_components_component_id_fkey(id, name, unit, cost_price)
+        `)
+        .eq('user_id', user.id);
+
+      if (componentsError) throw componentsError;
+
+      const productsWithComponents = (productsData || []).map(product => {
+        const productComponents = (componentsData || [])
+          .filter((comp: any) => comp.product_id === product.id)
+          .map((comp: any) => ({
+            id: comp.id,
+            product_id: comp.component_id,
+            component_id: comp.component_id,
+            product_name: comp.component?.name || '',
+            quantity: comp.quantity,
+            unit: comp.component?.unit || '',
+            unit_cost: comp.component?.cost_price || 0,
+            total_cost: (comp.component?.cost_price || 0) * comp.quantity
+          }));
+
+        return {
+          ...product,
+          components: productComponents
+        };
+      });
+
+      setProducts(productsWithComponents);
+    } catch (error) {
+      console.error('[AppContext] Error loading products:', error);
+    }
+  };
+
+  const loadProjects = async () => {
+    if (!user) return;
+
+    try {
+      const { data: projectsData, error: projectsError } = await supabase
+        .from('projects')
+        .select(`
+          *,
+          client:clients(name)
+        `)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (projectsError) throw projectsError;
+
+      const { data: projectProductsData, error: projectProductsError } = await supabase
+        .from('project_products')
+        .select(`
+          *,
+          product:products(name)
+        `)
+        .eq('user_id', user.id);
+
+      if (projectProductsError) throw projectProductsError;
+
+      const projectsWithProducts = (projectsData || []).map((project: any) => {
+        const projectProducts = (projectProductsData || [])
+          .filter((pp: any) => pp.project_id === project.id)
+          .map((pp: any) => ({
+            id: pp.id,
+            product_id: pp.product_id,
+            product_name: pp.product?.name || '',
+            quantity: pp.quantity,
+            unit_price: pp.unit_price,
+            total_price: pp.total_price
+          }));
+
+        return {
+          ...project,
+          client_name: project.client?.name,
+          products: projectProducts
+        };
+      });
+
+      setProjects(projectsWithProducts);
+    } catch (error) {
+      console.error('[AppContext] Error loading projects:', error);
+    }
+  };
+
+  const loadTransactions = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select(`
+          *,
+          project:projects(title)
+        `)
+        .eq('user_id', user.id)
+        .order('date', { ascending: false });
+
+      if (error) throw error;
+
+      const transactionsWithProjects = (data || []).map((transaction: any) => ({
+        ...transaction,
+        project_title: transaction.project?.title
+      }));
+
+      setTransactions(transactionsWithProjects);
+    } catch (error) {
+      console.error('[AppContext] Error loading transactions:', error);
+    }
+  };
+
+  const loadStockMovements = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('stock_movements')
+        .select(`
+          *,
+          product:products(name),
+          project:projects(title)
+        `)
+        .eq('user_id', user.id)
+        .order('date', { ascending: false });
+
+      if (error) throw error;
+
+      const movementsWithNames = (data || []).map((movement: any) => ({
+        ...movement,
+        product_name: movement.product?.name,
+        project_title: movement.project?.title
+      }));
+
+      setStockMovements(movementsWithNames);
+    } catch (error) {
+      console.error('[AppContext] Error loading stock movements:', error);
+    }
+  };
+
+  const refreshData = async () => {
+    if (!user) return;
+
+    setLoading(true);
+    await Promise.all([
+      loadClients(),
+      loadProducts(),
+      loadProjects(),
+      loadTransactions(),
+      loadStockMovements()
+    ]);
+    setLoading(false);
+  };
+
   useEffect(() => {
-    console.log('[AppContext] Loading data from localStorage...');
-
-    const loadedClients = loadFromStorage('clients', []);
-    const loadedProjects = loadFromStorage('projects', []);
-    const loadedTransactions = loadFromStorage('transactions', []);
-    const loadedProducts = loadFromStorage('products', []);
-    const loadedStockMovements = loadFromStorage('stockMovements', []);
-
-    const isFirstTime = loadedClients.length === 0 &&
-                        loadedProjects.length === 0 &&
-                        loadedProducts.length === 0;
-
-    if (isFirstTime) {
-      console.log('[AppContext] First time setup - adding demo data...');
-
-      const demoClient: Client = {
-        id: generateId(),
-        name: 'João Silva',
-        type: 'pf',
-        cpf: '123.456.789-00',
-        email: 'joao@email.com',
-        phone: '(11) 3333-4444',
-        mobile: '(11) 98888-7777',
-        fl_ativo: true,
-        address: {
-          country: 'Brasil',
-          state: 'SP',
-          city: 'São Paulo',
-          zipCode: '01310-100',
-          neighborhood: 'Centro',
-          streetType: 'Rua',
-          street: 'Exemplo'
-        },
-        created_at: new Date().toISOString(),
-        total_projects: 0,
-        total_value: 0
-      };
-
-      const demoProduct: Product = {
-        id: generateId(),
-        name: 'Madeira Compensada',
-        description: 'Compensado 15mm',
-        category: 'Madeiras',
-        type: 'material_bruto',
-        unit: 'M²',
-        components: [],
-        cost_price: 120.00,
-        sale_price: 180.00,
-        current_stock: 50,
-        min_stock: 10,
-        created_at: new Date().toISOString()
-      };
-
-      setClients([demoClient]);
-      setProducts([demoProduct]);
+    if (!authLoading && isAuthenticated && user) {
+      refreshData();
+    } else if (!authLoading && !isAuthenticated) {
+      setClients([]);
       setProjects([]);
       setTransactions([]);
+      setProducts([]);
       setStockMovements([]);
-
-      saveToStorage('clients', [demoClient]);
-      saveToStorage('products', [demoProduct]);
-      saveToStorage('projects', []);
-      saveToStorage('transactions', []);
-      saveToStorage('stockMovements', []);
-    } else {
-      setClients(loadedClients);
-      setProjects(loadedProjects);
-      setTransactions(loadedTransactions);
-      setProducts(loadedProducts);
-      setStockMovements(loadedStockMovements);
+      setLoading(false);
     }
+  }, [user, isAuthenticated, authLoading]);
 
-    setLoading(false);
-    console.log('[AppContext] Data loaded successfully');
-  }, []);
+  const addClient = async (clientData: Omit<Client, 'id' | 'created_at' | 'updated_at' | 'user_id'>) => {
+    if (!user) throw new Error('User not authenticated');
 
-  useEffect(() => {
-    if (!loading) {
-      saveToStorage('clients', clients);
-    }
-  }, [clients, loading]);
+    const { data, error } = await supabase
+      .from('clients')
+      .insert({
+        ...clientData,
+        user_id: user.id
+      })
+      .select()
+      .single();
 
-  useEffect(() => {
-    if (!loading) {
-      saveToStorage('projects', projects);
-    }
-  }, [projects, loading]);
-
-  useEffect(() => {
-    if (!loading) {
-      saveToStorage('transactions', transactions);
-    }
-  }, [transactions, loading]);
-
-  useEffect(() => {
-    if (!loading) {
-      saveToStorage('products', products);
-    }
-  }, [products, loading]);
-
-  useEffect(() => {
-    if (!loading) {
-      saveToStorage('stockMovements', stockMovements);
-    }
-  }, [stockMovements, loading]);
-
-  const addClient = async (clientData: Omit<Client, 'id' | 'created_at'>) => {
-    const newClient: Client = {
-      ...clientData,
-      id: generateId(),
-      created_at: new Date().toISOString()
-    };
-    setClients(prev => [newClient, ...prev]);
+    if (error) throw error;
+    setClients(prev => [data, ...prev]);
   };
 
   const updateClient = async (id: string, updates: Partial<Client>) => {
-    setClients(prev => prev.map(client =>
-      client.id === id ? { ...client, ...updates } : client
-    ));
+    if (!user) throw new Error('User not authenticated');
+
+    const { data, error } = await supabase
+      .from('clients')
+      .update(updates)
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    setClients(prev => prev.map(client => client.id === id ? data : client));
   };
 
   const deleteClient = async (id: string) => {
+    if (!user) throw new Error('User not authenticated');
+
+    const { error } = await supabase
+      .from('clients')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id);
+
+    if (error) throw error;
     setClients(prev => prev.filter(client => client.id !== id));
   };
 
-  const addProject = async (projectData: Omit<Project, 'id' | 'created_at' | 'number'>) => {
-    const projectNumber = projects.length > 0
-      ? Math.max(...projects.map(p => p.number)) + 1
-      : 1;
+  const addProduct = async (productData: Omit<Product, 'id' | 'created_at' | 'updated_at' | 'user_id'>) => {
+    if (!user) throw new Error('User not authenticated');
 
-    const newProject: Project = {
-      ...projectData,
-      id: generateId(),
-      number: projectNumber,
-      created_at: new Date().toISOString()
-    };
+    const { components, ...productWithoutComponents } = productData;
 
-    setProjects(prev => [newProject, ...prev]);
+    const { data: product, error: productError } = await supabase
+      .from('products')
+      .insert({
+        ...productWithoutComponents,
+        user_id: user.id
+      })
+      .select()
+      .single();
 
-    if (projectData.type === 'venda' && projectData.status !== 'orcamento') {
-      const signalAmount = projectData.budget * 0.5;
-      await addTransaction({
-        project_id: newProject.id,
-        project_title: projectData.title,
-        type: 'entrada',
-        category: 'Sinal',
-        description: `Sinal do projeto #${projectNumber} - ${projectData.title}`,
-        amount: signalAmount,
-        date: new Date().toISOString().split('T')[0]
-      });
+    if (productError) throw productError;
 
-      if (projectData.products && projectData.products.length > 0) {
-        await processProjectStockMovement(newProject.id, projectData.products);
-      }
-    }
-  };
+    if (components && components.length > 0) {
+      const componentsToInsert = components.map(comp => ({
+        product_id: product.id,
+        component_id: comp.component_id,
+        quantity: comp.quantity,
+        user_id: user.id
+      }));
 
-  const updateProject = async (id: string, updates: Partial<Project>) => {
-    const project = projects.find(p => p.id === id);
+      const { error: componentsError } = await supabase
+        .from('product_components')
+        .insert(componentsToInsert);
 
-    setProjects(prev => prev.map(p =>
-      p.id === id ? { ...p, ...updates } : p
-    ));
-
-    if (updates.status === 'concluido' && project && project.status !== 'concluido') {
-      const remainingAmount = project.budget * 0.5;
-      await addTransaction({
-        project_id: id,
-        project_title: project.title,
-        type: 'entrada',
-        category: 'Pagamento Final',
-        description: `Pagamento final - Projeto #${project.number}`,
-        amount: remainingAmount,
-        date: new Date().toISOString().split('T')[0]
-      });
-    }
-  };
-
-  const deleteProject = async (id: string) => {
-    setProjects(prev => prev.filter(project => project.id !== id));
-    setTransactions(prev => prev.filter(t => t.project_id !== id));
-    setStockMovements(prev => prev.filter(sm => sm.project_id !== id));
-  };
-
-  const addTransaction = async (transactionData: Omit<Transaction, 'id' | 'created_at'>) => {
-    const newTransaction: Transaction = {
-      ...transactionData,
-      id: generateId(),
-      created_at: new Date().toISOString()
-    };
-    setTransactions(prev => [newTransaction, ...prev]);
-  };
-
-  const checkCircularReference = (productId: string, componentId: string): boolean => {
-    if (productId === componentId) return true;
-
-    const product = products.find(p => p.id === componentId);
-    if (!product || !product.components) return false;
-
-    for (const comp of product.components) {
-      if (checkCircularReference(productId, comp.product_id)) {
-        return true;
-      }
+      if (componentsError) throw componentsError;
     }
 
-    return false;
-  };
-
-  const addProduct = async (productData: Omit<Product, 'id' | 'created_at'>) => {
-    if (productData.components && productData.components.length > 0) {
-      const tempId = generateId();
-      for (const component of productData.components) {
-        if (checkCircularReference(tempId, component.product_id)) {
-          throw new Error('Referência circular detectada: um produto não pode usar a si mesmo como componente.');
-        }
-      }
-    }
-
-    const newProduct: Product = {
-      ...productData,
-      id: generateId(),
-      created_at: new Date().toISOString()
-    };
-    setProducts(prev => [newProduct, ...prev]);
+    await loadProducts();
   };
 
   const updateProduct = async (product: Product) => {
-    if (product.components && product.components.length > 0) {
-      for (const component of product.components) {
-        if (checkCircularReference(product.id, component.product_id)) {
-          throw new Error('Referência circular detectada: um produto não pode usar a si mesmo como componente.');
-        }
-      }
+    if (!user) throw new Error('User not authenticated');
+
+    const { components, ...productWithoutComponents } = product;
+
+    const { error: productError } = await supabase
+      .from('products')
+      .update(productWithoutComponents)
+      .eq('id', product.id)
+      .eq('user_id', user.id);
+
+    if (productError) throw productError;
+
+    const { error: deleteError } = await supabase
+      .from('product_components')
+      .delete()
+      .eq('product_id', product.id)
+      .eq('user_id', user.id);
+
+    if (deleteError) throw deleteError;
+
+    if (components && components.length > 0) {
+      const componentsToInsert = components.map(comp => ({
+        product_id: product.id,
+        component_id: comp.component_id,
+        quantity: comp.quantity,
+        user_id: user.id
+      }));
+
+      const { error: componentsError } = await supabase
+        .from('product_components')
+        .insert(componentsToInsert);
+
+      if (componentsError) throw componentsError;
     }
 
-    setProducts(prev => prev.map(p =>
-      p.id === product.id ? product : p
-    ));
+    await loadProducts();
   };
 
   const deleteProduct = async (id: string) => {
-    const usedIn = products.some(p =>
-      p.components && p.components.some(c => c.product_id === id)
-    );
+    if (!user) throw new Error('User not authenticated');
 
-    if (usedIn) {
-      throw new Error('Este produto é usado como componente em outros produtos e não pode ser excluído.');
-    }
+    const { error } = await supabase
+      .from('products')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id);
 
+    if (error) throw error;
     setProducts(prev => prev.filter(product => product.id !== id));
   };
 
-  const addStockMovement = async (movementData: Omit<StockMovement, 'id' | 'created_at'>) => {
-    const newMovement: StockMovement = {
-      ...movementData,
-      id: generateId(),
-      created_at: new Date().toISOString()
-    };
-    setStockMovements(prev => [newMovement, ...prev]);
+  const addProject = async (projectData: Omit<Project, 'id' | 'created_at' | 'updated_at' | 'number' | 'user_id'>) => {
+    if (!user) throw new Error('User not authenticated');
 
-    setProducts(prev => prev.map(p => {
-      if (p.id === movementData.product_id) {
-        const newStock = movementData.type === 'entrada'
-          ? p.current_stock + movementData.quantity
-          : p.current_stock - movementData.quantity;
-        return { ...p, current_stock: newStock };
+    const { data: maxNumberData } = await supabase
+      .from('projects')
+      .select('number')
+      .eq('user_id', user.id)
+      .order('number', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const projectNumber = (maxNumberData?.number || 0) + 1;
+
+    const { products: projectProducts, payment_terms, ...projectWithoutProducts } = projectData;
+
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .insert({
+        ...projectWithoutProducts,
+        number: projectNumber,
+        payment_installments: payment_terms?.installments || 1,
+        payment_method: payment_terms?.payment_method || null,
+        discount_percentage: payment_terms?.discount_percentage || 0,
+        user_id: user.id
+      })
+      .select()
+      .single();
+
+    if (projectError) throw projectError;
+
+    if (projectProducts && projectProducts.length > 0) {
+      const productsToInsert = projectProducts.map(pp => ({
+        project_id: project.id,
+        product_id: pp.product_id,
+        quantity: pp.quantity,
+        unit_price: pp.unit_price,
+        total_price: pp.total_price,
+        user_id: user.id
+      }));
+
+      const { error: productsError } = await supabase
+        .from('project_products')
+        .insert(productsToInsert);
+
+      if (productsError) throw productsError;
+    }
+
+    await loadProjects();
+  };
+
+  const updateProject = async (id: string, updates: Partial<Project>) => {
+    if (!user) throw new Error('User not authenticated');
+
+    const { products: projectProducts, payment_terms, ...projectWithoutProducts } = updates;
+
+    const updateData: any = { ...projectWithoutProducts };
+
+    if (payment_terms) {
+      updateData.payment_installments = payment_terms.installments;
+      updateData.payment_method = payment_terms.payment_method;
+      updateData.discount_percentage = payment_terms.discount_percentage;
+    }
+
+    const { error: projectError } = await supabase
+      .from('projects')
+      .update(updateData)
+      .eq('id', id)
+      .eq('user_id', user.id);
+
+    if (projectError) throw projectError;
+
+    if (projectProducts) {
+      const { error: deleteError } = await supabase
+        .from('project_products')
+        .delete()
+        .eq('project_id', id)
+        .eq('user_id', user.id);
+
+      if (deleteError) throw deleteError;
+
+      if (projectProducts.length > 0) {
+        const productsToInsert = projectProducts.map(pp => ({
+          project_id: id,
+          product_id: pp.product_id,
+          quantity: pp.quantity,
+          unit_price: pp.unit_price,
+          total_price: pp.total_price,
+          user_id: user.id
+        }));
+
+        const { error: productsError } = await supabase
+          .from('project_products')
+          .insert(productsToInsert);
+
+        if (productsError) throw productsError;
       }
-      return p;
-    }));
+    }
+
+    await loadProjects();
+  };
+
+  const deleteProject = async (id: string) => {
+    if (!user) throw new Error('User not authenticated');
+
+    const { error } = await supabase
+      .from('projects')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id);
+
+    if (error) throw error;
+    setProjects(prev => prev.filter(project => project.id !== id));
+  };
+
+  const addTransaction = async (transactionData: Omit<Transaction, 'id' | 'created_at' | 'user_id'>) => {
+    if (!user) throw new Error('User not authenticated');
+
+    const { data, error } = await supabase
+      .from('transactions')
+      .insert({
+        ...transactionData,
+        user_id: user.id
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    await loadTransactions();
+  };
+
+  const addStockMovement = async (movementData: Omit<StockMovement, 'id' | 'created_at' | 'user_id'>) => {
+    if (!user) throw new Error('User not authenticated');
+
+    const { data, error } = await supabase
+      .from('stock_movements')
+      .insert({
+        product_id: movementData.product_id,
+        movement_type: movementData.movement_type,
+        quantity: movementData.quantity,
+        unit_price: movementData.unit_price || 0,
+        total_value: movementData.total_value || 0,
+        project_id: movementData.project_id || null,
+        reference_type: movementData.reference_type || 'manual',
+        date: movementData.date,
+        notes: movementData.notes || null,
+        user_id: user.id
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    const product = products.find(p => p.id === movementData.product_id);
+    if (product) {
+      const newStock = movementData.movement_type === 'entrada'
+        ? product.current_stock + movementData.quantity
+        : product.current_stock - movementData.quantity;
+
+      await supabase
+        .from('products')
+        .update({ current_stock: newStock })
+        .eq('id', movementData.product_id)
+        .eq('user_id', user.id);
+
+      await loadProducts();
+    }
+
+    await loadStockMovements();
   };
 
   const processProjectStockMovement = async (projectId: string, projectProducts: ProjectProduct[]) => {
@@ -476,7 +687,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         await addStockMovement({
           product_id: product.id,
           product_name: product.name,
-          type: 'saida',
+          movement_type: 'saida',
           quantity: projectProduct.quantity,
           unit_price: projectProduct.unit_price,
           total_value: projectProduct.total_price,
@@ -488,9 +699,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           for (const component of product.components) {
             const totalQuantity = component.quantity * projectProduct.quantity;
             await addStockMovement({
-              product_id: component.product_id,
+              product_id: component.component_id,
               product_name: component.product_name,
-              type: 'saida',
+              movement_type: 'saida',
               quantity: totalQuantity,
               unit_price: component.unit_cost,
               total_value: component.total_cost * projectProduct.quantity,
@@ -513,7 +724,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     let totalCost = 0;
     for (const component of product.components) {
-      const componentCost = await calculateProductCost(component.product_id);
+      const componentCost = await calculateProductCost(component.component_id);
       totalCost += componentCost * component.quantity;
     }
 
@@ -522,271 +733,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const getAvailableComponents = (): Product[] => {
     return products;
-  };
-
-  const exportClientsCSV = () => {
-    const headers = [
-      'tipo', 'nome', 'endereco', 'tipopessoa', 'fone_comercial', 'fone_celular',
-      'cep', 'cidade', 'email', 'cpf_cnpj', 'inscricao_estadual', 'bairro',
-      'complemento', 'numero', 'isento_icms', 'razao_social', 'id_empresa', 'fl_ativo'
-    ];
-
-    const csvContent = [
-      headers.join(','),
-      ...clients.map(client => [
-        'Cliente',
-        `"${client.name}"`,
-        `"${client.address.streetType} ${client.address.street}"`,
-        client.type === 'pj' ? 'J' : 'F',
-        `"${client.phone}"`,
-        `"${client.mobile}"`,
-        `"${client.address.zipCode}"`,
-        `"${client.address.city}"`,
-        `"${client.email}"`,
-        `"${client.type === 'pj' ? client.cnpj : client.cpf}"`,
-        `"${client.inscricao_estadual || ''}"`,
-        `"${client.address.neighborhood}"`,
-        `"${client.complemento || ''}"`,
-        `"${client.numero || ''}"`,
-        client.isento_icms ? 'true' : 'false',
-        `"${client.razao_social || ''}"`,
-        `"${client.id_empresa || ''}"`,
-        client.fl_ativo ? 'true' : 'false'
-      ].join(','))
-    ].join('\n');
-
-    downloadCSV(csvContent, 'clientes.csv');
-  };
-
-  const exportProductsCSV = () => {
-    const headers = ['id', 'nome', 'descricao', 'categoria', 'tipo', 'unidade', 'custo', 'preco_venda', 'estoque_atual', 'estoque_minimo', 'componentes'];
-
-    const csvContent = [
-      headers.join(','),
-      ...products.map(product => [
-        `"${product.id}"`,
-        `"${product.name}"`,
-        `"${product.description}"`,
-        `"${product.category}"`,
-        `"${product.type}"`,
-        `"${product.unit}"`,
-        product.cost_price,
-        product.sale_price || 0,
-        product.current_stock,
-        product.min_stock,
-        `"${product.components.map(c => `${c.product_name}:${c.quantity}`).join(';')}"`
-      ].join(','))
-    ].join('\n');
-
-    downloadCSV(csvContent, 'produtos.csv');
-  };
-
-  const exportProjectsCSV = () => {
-    const headers = [
-      'numero', 'cliente', 'titulo', 'descricao', 'status', 'tipo', 'orcamento',
-      'data_inicio', 'data_fim', 'custo_materiais', 'custo_mao_obra', 'margem_lucro'
-    ];
-
-    const csvContent = [
-      headers.join(','),
-      ...projects.map(project => [
-        project.number,
-        `"${project.client_name}"`,
-        `"${project.title}"`,
-        `"${project.description}"`,
-        `"${project.status}"`,
-        `"${project.type}"`,
-        project.budget,
-        `"${project.start_date}"`,
-        `"${project.end_date}"`,
-        project.materials_cost || 0,
-        project.labor_cost || 0,
-        project.profit_margin || 0
-      ].join(','))
-    ].join('\n');
-
-    downloadCSV(csvContent, 'projetos.csv');
-  };
-
-  const exportTransactionsCSV = () => {
-    const headers = ['tipo', 'categoria', 'descricao', 'valor', 'data', 'projeto'];
-
-    const csvContent = [
-      headers.join(','),
-      ...transactions.map(transaction => [
-        `"${transaction.type}"`,
-        `"${transaction.category}"`,
-        `"${transaction.description}"`,
-        transaction.amount,
-        `"${transaction.date}"`,
-        `"${transaction.project_title || ''}"`
-      ].join(','))
-    ].join('\n');
-
-    downloadCSV(csvContent, 'transacoes.csv');
-  };
-
-  const downloadCSV = (content: string, filename: string) => {
-    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', filename);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const parseCSVLine = (line: string): string[] => {
-    const result = [];
-    let current = '';
-    let inQuotes = false;
-
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i];
-
-      if (char === '"') {
-        inQuotes = !inQuotes;
-      } else if (char === ',' && !inQuotes) {
-        result.push(current.trim());
-        current = '';
-      } else {
-        current += char;
-      }
-    }
-
-    result.push(current.trim());
-    return result;
-  };
-
-  const importClientsCSV = async (file: File): Promise<void> => {
-    const text = await file.text();
-    const lines = text.split('\n');
-
-    for (let i = 1; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (!line) continue;
-
-      const values = parseCSVLine(line);
-      if (values.length < 10) continue;
-
-      const clientData: Omit<Client, 'id' | 'created_at'> = {
-        name: values[1] || '',
-        type: values[3] === 'J' ? 'pj' : 'pf',
-        cpf: values[3] === 'F' ? values[9] : undefined,
-        cnpj: values[3] === 'J' ? values[9] : undefined,
-        email: values[8] || '',
-        phone: values[4] || '',
-        mobile: values[5] || '',
-        razao_social: values[15] || undefined,
-        inscricao_estadual: values[10] || undefined,
-        isento_icms: values[14] === 'true',
-        numero: values[13] || undefined,
-        complemento: values[12] || undefined,
-        id_empresa: values[16] || undefined,
-        fl_ativo: values[17] !== 'false',
-        address: {
-          country: 'Brasil',
-          state: '',
-          city: values[7] || '',
-          zipCode: values[6] || '',
-          neighborhood: values[11] || '',
-          streetType: 'Rua',
-          street: values[2] || ''
-        },
-        total_projects: 0,
-        total_value: 0
-      };
-
-      await addClient(clientData);
-    }
-  };
-
-  const importProductsCSV = async (file: File): Promise<void> => {
-    const text = await file.text();
-    const lines = text.split('\n');
-
-    for (let i = 1; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (!line) continue;
-
-      const values = parseCSVLine(line);
-      if (values.length < 10) continue;
-
-      const productData: Omit<Product, 'id' | 'created_at'> = {
-        name: values[1] || '',
-        description: values[2] || '',
-        category: values[3] || '',
-        type: (values[4] as any) || 'material_bruto',
-        unit: values[5] || 'UN',
-        cost_price: parseFloat(values[6]) || 0,
-        sale_price: parseFloat(values[7]) || undefined,
-        current_stock: parseFloat(values[8]) || 0,
-        min_stock: parseFloat(values[9]) || 0,
-        components: []
-      };
-
-      await addProduct(productData);
-    }
-  };
-
-  const importProjectsCSV = async (file: File): Promise<void> => {
-    const text = await file.text();
-    const lines = text.split('\n');
-
-    for (let i = 1; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (!line) continue;
-
-      const values = parseCSVLine(line);
-      if (values.length < 8) continue;
-
-      const client = clients.find(c => c.name === values[1]);
-      if (!client) continue;
-
-      const projectData: Omit<Project, 'id' | 'created_at' | 'number'> = {
-        client_id: client.id,
-        client_name: values[1],
-        title: values[2] || '',
-        description: values[3] || '',
-        status: (values[4] as any) || 'orcamento',
-        type: (values[5] as any) || 'orcamento',
-        products: [],
-        budget: parseFloat(values[6]) || 0,
-        start_date: values[7] || new Date().toISOString().split('T')[0],
-        end_date: values[8] || new Date().toISOString().split('T')[0],
-        materials_cost: parseFloat(values[9]) || 0,
-        labor_cost: parseFloat(values[10]) || 0,
-        profit_margin: parseFloat(values[11]) || 20
-      };
-
-      await addProject(projectData);
-    }
-  };
-
-  const importTransactionsCSV = async (file: File): Promise<void> => {
-    const text = await file.text();
-    const lines = text.split('\n');
-
-    for (let i = 1; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (!line) continue;
-
-      const values = parseCSVLine(line);
-      if (values.length < 5) continue;
-
-      const transactionData: Omit<Transaction, 'id' | 'created_at'> = {
-        type: (values[0] as any) || 'entrada',
-        category: values[1] || '',
-        description: values[2] || '',
-        amount: parseFloat(values[3]) || 0,
-        date: values[4] || new Date().toISOString().split('T')[0],
-        project_title: values[5] || undefined
-      };
-
-      await addTransaction(transactionData);
-    }
   };
 
   const getDashboardStats = () => {
@@ -854,15 +800,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       processProjectStockMovement,
       calculateProductCost,
       getAvailableComponents,
-      exportClientsCSV,
-      exportProductsCSV,
-      exportProjectsCSV,
-      exportTransactionsCSV,
-      importClientsCSV,
-      importProductsCSV,
-      importProjectsCSV,
-      importTransactionsCSV,
-      getDashboardStats
+      getDashboardStats,
+      refreshData
     }}>
       {children}
     </AppContext.Provider>

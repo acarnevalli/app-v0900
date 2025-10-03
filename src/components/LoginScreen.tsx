@@ -124,13 +124,11 @@ const LoginScreen: React.FC = () => {
             </button>
           </form>
 
-          {/* Credenciais de Demonstração */}
+          {/* Informação */}
           <div className="mt-8 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-            <h3 className="text-sm font-medium text-amber-800 mb-2">Credenciais de Demonstração:</h3>
-            <div className="text-xs text-amber-700 space-y-1">
-              <div><strong>Admin:</strong> admin@marcenaria.com / admin123</div>
-              <div><strong>Usuário:</strong> joao@marcenaria.com / user123</div>
-            </div>
+            <p className="text-sm text-amber-800">
+              Use suas credenciais do Supabase para acessar o sistema.
+            </p>
           </div>
         </div>
 
