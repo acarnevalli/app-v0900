@@ -7,7 +7,7 @@ interface CompanySettingsModalProps {
   onClose: () => void;
 }
 
-const CompanySettingsModal: React.FC<CompanySettingsModalProps> = ({ onClose }) => {
+const CompanySettingsModal: React.FC<CompanySettingsModalProps> = ({ isOpen, onClose }) => {
   const { companySettings, updateCompanySettings, resetCompanySettings } = useSettings();
   const [activeTab, setActiveTab] = useState<'basic' | 'address' | 'fiscal' | 'banking'>('basic');
 
