@@ -124,6 +124,7 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onClose }) => {
   };
 
   const formatCPF = (value: string) => {
+    if (!value) return '';
     return value
       .replace(/\D/g, '')
       .replace(/(\d{3})(\d)/, '$1.$2')
@@ -133,6 +134,7 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onClose }) => {
   };
 
   const formatCNPJ = (value: string) => {
+    if (!value) return '';
     return value
       .replace(/\D/g, '')
       .replace(/(\d{2})(\d)/, '$1.$2')
@@ -143,6 +145,7 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onClose }) => {
   };
 
   const formatPhone = (value: string) => {
+    if (!value) return '';
     return value
       .replace(/\D/g, '')
       .replace(/(\d{2})(\d)/, '($1) $2')
@@ -151,6 +154,7 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onClose }) => {
   };
 
   const formatMobile = (value: string) => {
+    if (!value) return '';
     return value
       .replace(/\D/g, '')
       .replace(/(\d{2})(\d)/, '($1) $2')
@@ -159,6 +163,7 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onClose }) => {
   };
 
   const formatZipCode = (value: string) => {
+    if (!value) return '';
     return value
       .replace(/\D/g, '')
       .replace(/(\d{5})(\d)/, '$1-$2')
