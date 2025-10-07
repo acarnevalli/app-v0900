@@ -12,6 +12,17 @@ import { AppProvider } from './contexts/AppContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 
+console.log('[App] Starting with env:', {
+  url: import.meta.env.VITE_SUPABASE_URL ? 'SET' : 'NOT SET',
+  key: import.meta.env.VITE_SUPABASE_ANON_KEY ? 'SET' : 'NOT SET'
+});
+window.addEventListener('error', (event) => {
+  console.error('[Global Error]', event.error);
+  if (event.error?.stack?.includes('charAt')) {
+    console.error('[charAt Error] Stack:', event.error.stack);
+  }
+});
+
 const AppContent: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
   const [currentPage, setCurrentPage] = useState('dashboard');
