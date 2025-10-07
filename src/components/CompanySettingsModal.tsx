@@ -3,12 +3,15 @@ import { X, Building, MapPin, FileText, CreditCard, RotateCcw, Phone, Mail, Glob
 import { useSettings } from '../contexts/SettingsContext';
 
 interface CompanySettingsModalProps {
+  isOpen: boolean;
   onClose: () => void;
 }
 
 const CompanySettingsModal: React.FC<CompanySettingsModalProps> = ({ onClose }) => {
   const { companySettings, updateCompanySettings, resetCompanySettings } = useSettings();
   const [activeTab, setActiveTab] = useState<'basic' | 'address' | 'fiscal' | 'banking'>('basic');
+
+   if (!isOpen) return null;
 
   const handleBasicChange = (field: string, value: string) => {
     updateCompanySettings({
@@ -53,6 +56,7 @@ const CompanySettingsModal: React.FC<CompanySettingsModalProps> = ({ onClose }) 
   };
 
   const formatCNPJ = (value: string) => {
+    if (!value) return '';
     return value
       .replace(/\D/g, '')
       .replace(/(\d{2})(\d)/, '$1.$2')
@@ -63,6 +67,7 @@ const CompanySettingsModal: React.FC<CompanySettingsModalProps> = ({ onClose }) 
   };
 
   const formatPhone = (value: string) => {
+    if (!value) return '';
     return value
       .replace(/\D/g, '')
       .replace(/(\d{2})(\d)/, '($1) $2')
@@ -71,6 +76,7 @@ const CompanySettingsModal: React.FC<CompanySettingsModalProps> = ({ onClose }) 
   };
 
   const formatZipCode = (value: string) => {
+    if (!value) return '';
     return value
       .replace(/\D/g, '')
       .replace(/(\d{5})(\d)/, '$1-$2')
