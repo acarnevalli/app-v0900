@@ -230,8 +230,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         return { success: false, error: error.message };
       }
 
-      if (data.user) {
-        console.log("[AuthContext] 🎉 Usuário cadastrado com sucesso:", email);
+      if (data.user && data.session) {
+        const localUser = await mapUser(data.user);
+        setSupabaseUser(data.user);
+        setUser(localUser);
+        setIsAuthenticated(true);
+        console.log("[AuthContext] 🎉 Usuário cadastrado e logado automaticamente:", email, `(${localUser?.role})`);
         return { success: true };
       }
 

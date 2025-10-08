@@ -21,6 +21,10 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage }) => {
   const [syncStatus, setSyncStatus] = React.useState<any>(null);
 
   React.useEffect(() => {
+    console.log('[Sidebar] User state:', user);
+  }, [user]);
+
+  React.useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
 

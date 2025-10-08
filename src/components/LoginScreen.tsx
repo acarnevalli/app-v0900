@@ -27,8 +27,7 @@ export const LoginScreen: React.FC = () => {
     } else {
       const { success, error } = await signUp(email, password);
       if (success) {
-        setSuccess("Usuário criado com sucesso. Verifique seu e-mail para confirmar o cadastro.");
-        setMode("login");
+        setSuccess("Usuário criado e logado com sucesso!");
       } else {
         setError(error ?? "Falha ao criar usuário.");
       }
