@@ -18,9 +18,9 @@ console.log('[App] Starting with env:', {
 });
 window.addEventListener('error', (event) => {
   console.error('[Global Error]', event.error);
-  if (event.error?.stack?.includes('charAt')) {
-    console.error('[charAt Error] Stack:', event.error.stack);
-  }
+  if (event.error?.stack) {
+  console.error('[CharAt Error] Stack:', event.error.stack);
+}
 });
 
 const AppContent: React.FC = () => {
