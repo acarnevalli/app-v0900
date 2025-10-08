@@ -10,11 +10,15 @@ export default defineConfig({
       '@': path.resolve(__dirname, 'src'),
     },
   },
+  
+ // Configurações para debug
+  build: {
+    sourcemap: true,  // Habilita source maps
+    minify: false,    // Temporariamente desabilita minificação
+  },
+  // Para desenvolvimento
   server: {
+    host: true,  // Permite acesso externo
     port: 5173,
-    host: true
   },
-  optimizeDeps: {
-    exclude: ['lucide-react'],
-  },
-});
+})
