@@ -2,6 +2,17 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { supabase } from "../lib/supabase";
 import { useAuth } from "./AuthContext";
 
+setClients(validateArray(data.clients));
+setProjects(validateArray(data.projects));
+setProducts(validateArray(data.products));
+
+function validateArray<T>(arr: T[] | undefined | null): T[] {
+  if (!Array.isArray(arr)) {
+    console.warn('Invalid array data received:', arr);
+    return [];
+  }
+  return arr;
+}
 // ---------------------------------------------------------------
 // Interfaces originais
 // ---------------------------------------------------------------
