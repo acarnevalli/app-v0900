@@ -2,9 +2,9 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { supabase } from "../lib/supabase";
 import { useAuth } from "./AuthContext";
 
-setClients(validateArray(data.clients));
-setProjects(validateArray(data.projects));
-setProducts(validateArray(data.products));
+// ---------------------------------------------------------------
+// Funções auxiliares
+// ---------------------------------------------------------------
 
 function validateArray<T>(arr: T[] | undefined | null): T[] {
   if (!Array.isArray(arr)) {
@@ -13,6 +13,7 @@ function validateArray<T>(arr: T[] | undefined | null): T[] {
   }
   return arr;
 }
+
 // ---------------------------------------------------------------
 // Interfaces originais
 // ---------------------------------------------------------------

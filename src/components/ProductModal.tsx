@@ -130,13 +130,13 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose }) => {
   }, [product, reset]);
 
   useEffect(() => {
-    if (watchedComponents?.length > 0 && productSettings?.automation?.autoCalculateCosts)
+    if (watchedComponents?.length > 0 && productSettings?.automation?.autoCalculateCosts) {
       const totalCost = watchedComponents.reduce((sum, comp) => sum + (comp.total_cost || 0), 0);
       if (totalCost > 0) {
         setValue("cost_price", totalCost);
       }
     }
-  }, [watchedComponents, setValue, productSettings.automation.autoCalculateCosts]);
+  }, [watchedComponents, setValue, productSettings?.automation?.autoCalculateCosts]);
 
   const handleAddComponent = () => {
     append({

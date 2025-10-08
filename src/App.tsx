@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './pages/Dashboard';
@@ -12,84 +12,26 @@ import { AppProvider } from './contexts/AppContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 
-useEffect(() => {
-  window.addEventListener('error', (event) => {
-    if (event.message.includes('charAt')) {
-      console.group('🔴 CharAt Error Details');
-      console.error('Message:', event.message);
-      console.error('Source:', event.filename);
-      console.error('Line:Column:', `${event.lineno}:${event.colno}`);
-      
-      // Tenta extrair mais contexto do erro
-      if (event.error && event.error.stack) {
-        const stackLines = event.error.stack.split('\n');
-        console.error('Stack trace:');
-        stackLines.forEach((line: string, index: number) => {
-          if (line.includes('charAt') || index < 5) {
-            console.error(`  ${line}`);
-          }
-        });
-      }
-      
-      console.groupEnd();
-    }
-  });
-}, []);
-
-useEffect(() => {
-  // Log quando o contexto muda
-  console.log('AppContext State:', {
-    clients: Array.isArray(clients) ? clients.length : 'not array',
-    projects: Array.isArray(projects) ? projects.length : 'not array',
-    products: Array.isArray(products) ? products.length : 'not array',
-  });
-}, [clients, projects, products]);
-
-// Mudanças Sugeridas por Claude Opus 4
-useEffect(() => {
-  // Handler para erros não capturados
-  window.addEventListener('error', (event) => {
-    console.error('=== ERRO DETALHADO ===');
-    console.error('Mensagem:', event.message);
-    console.error('Arquivo:', event.filename);
-    console.error('Linha:', event.lineno);
-    console.error('Coluna:', event.colno);
-    console.error('Stack:', event.error?.stack);
-    
-    // Tenta identificar se é erro de charAt
-    if (event.message.includes('charAt')) {
-      console.error('Erro relacionado a charAt detectado!');
-      // Adicione um debugger para pausar quando o erro ocorrer
-      debugger;
-    }
-  });
-
-  // Handler para promises rejeitadas
-  window.addEventListener('unhandledrejection', (event) => {
-    console.error('=== PROMISE REJEITADA ===');
-    console.error('Razão:', event.reason);
-  });
-
-  return () => {
-    window.removeEventListener('error', () => {});
-    window.removeEventListener('unhandledrejection', () => {});
-  };
-}, []);
-
-console.log('[App] Starting with env:', {
-  url: import.meta.env.VITE_SUPABASE_URL ? 'SET' : 'NOT SET',
-  key: import.meta.env.VITE_SUPABASE_ANON_KEY ? 'SET' : 'NOT SET'
-});
-window.addEventListener('error', (event) => {
-  console.error('[Global Error]', event.error);
-  if (event.error?.stack) {
-  console.error('[CharAt Error] Stack:', event.error.stack);
-}
-});
-
 const AppContent: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
   const [currentPage, setCurrentPage] = useState('dashboard');
+
+  useEffect(() => {
+    const handleError = (event: ErrorEvent) => {
+      if (event.message.includes('charAt') || event.message.includes('undefined')) {
+        console.error('[Global Error]', {
+          message: event.message,
+          filename: event.filename,
+          line: event.lineno,
+          column: event.colno,
+          stack: event.error?.stack
+        });
+      }
+    };
+
+    window.addEventListener('error', handleError);
+    return () => window.removeEventListener('error', handleError);
+  }, []);
 
   if (isLoading) {
     return (

@@ -67,8 +67,8 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage }) => {
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full flex items-center justify-center">
               <span className="text-white font-medium text-sm">
-                {user?.name && typeof user.name === 'string' && user.name.length > 0 
-                  {getInitial(user?.name)} 
+                {user?.name && typeof user.name === 'string' && user.name.length > 0
+                  ? getInitial(user.name)
                   : '?'
                 }
               </span>
