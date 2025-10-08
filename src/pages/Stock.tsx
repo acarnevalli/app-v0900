@@ -43,7 +43,7 @@ const Stock: React.FC = () => {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-red-800 flex items-center">
               <Package className="h-5 w-5 mr-2" />
-              Produtos com Estoque Baixo ({lowStockProducts.length})
+              Produtos com Estoque Baixo ({lowStockProducts?.length || 0})
             </h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
