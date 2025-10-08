@@ -13,6 +13,30 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 
 useEffect(() => {
+  window.addEventListener('error', (event) => {
+    if (event.message.includes('charAt')) {
+      console.group('🔴 CharAt Error Details');
+      console.error('Message:', event.message);
+      console.error('Source:', event.filename);
+      console.error('Line:Column:', `${event.lineno}:${event.colno}`);
+      
+      // Tenta extrair mais contexto do erro
+      if (event.error && event.error.stack) {
+        const stackLines = event.error.stack.split('\n');
+        console.error('Stack trace:');
+        stackLines.forEach((line: string, index: number) => {
+          if (line.includes('charAt') || index < 5) {
+            console.error(`  ${line}`);
+          }
+        });
+      }
+      
+      console.groupEnd();
+    }
+  });
+}, []);
+
+useEffect(() => {
   // Log quando o contexto muda
   console.log('AppContext State:', {
     clients: Array.isArray(clients) ? clients.length : 'not array',
