@@ -1,17 +1,19 @@
+import { isValidString } from './stringUtils';
+
 export const safeCharAt = (str: string | undefined | null, index: number): string => {
-  // Adicione esta verificação completa
-  if (str === null || str === undefined || typeof str !== 'string') {
+  if (!isValidString(str)) {
+    console.warn('safeCharAt: Invalid input', { str, type: typeof str });
     return '';
   }
+  
   if (index < 0 || index >= str.length) {
     return '';
   }
-  return str.charAt(index);
-};
-
-export const safeSubstring = (str: string | undefined | null, start: number, end?: number): string => {
-  if (str === null || str === undefined || typeof str !== 'string') {
+  
+  try {
+    return str.charAt(index);
+  } catch (error) {
+    console.error('charAt error in safeCharAt:', error);
     return '';
   }
-  return str.substring(start, end);
 };
