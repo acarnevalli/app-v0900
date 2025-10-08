@@ -12,6 +12,37 @@ import { AppProvider } from './contexts/AppContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 
+// Mudanças Sugeridas por Claude Opus 4
+useEffect(() => {
+  // Handler para erros não capturados
+  window.addEventListener('error', (event) => {
+    console.error('=== ERRO DETALHADO ===');
+    console.error('Mensagem:', event.message);
+    console.error('Arquivo:', event.filename);
+    console.error('Linha:', event.lineno);
+    console.error('Coluna:', event.colno);
+    console.error('Stack:', event.error?.stack);
+    
+    // Tenta identificar se é erro de charAt
+    if (event.message.includes('charAt')) {
+      console.error('Erro relacionado a charAt detectado!');
+      // Adicione um debugger para pausar quando o erro ocorrer
+      debugger;
+    }
+  });
+
+  // Handler para promises rejeitadas
+  window.addEventListener('unhandledrejection', (event) => {
+    console.error('=== PROMISE REJEITADA ===');
+    console.error('Razão:', event.reason);
+  });
+
+  return () => {
+    window.removeEventListener('error', () => {});
+    window.removeEventListener('unhandledrejection', () => {});
+  };
+}, []);
+
 console.log('[App] Starting with env:', {
   url: import.meta.env.VITE_SUPABASE_URL ? 'SET' : 'NOT SET',
   key: import.meta.env.VITE_SUPABASE_ANON_KEY ? 'SET' : 'NOT SET'
