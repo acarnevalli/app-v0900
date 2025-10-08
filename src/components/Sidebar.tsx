@@ -67,7 +67,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage }) => {
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full flex items-center justify-center">
               <span className="text-white font-medium text-sm">
-                {(user?.name && typeof user.name === 'string') ? user.name.charAt(0).toUpperCase() : ''}
+                {(user?.name? && typeof user.name === 'string') ? user.name.charAt(0).toUpperCase() : ''}
               </span>
             </div>
             <div>
