@@ -382,8 +382,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const getAvailableComponents = () => products;
 
   const getDashboardStats = () => {
-    const totalClients = clients.length;
-    const activeProjects = projects.filter((p) => ["em_producao", "aprovado"].includes(p.status)).length;
+    const totalClients = clients?.length || 0;
+    const activeProjects = projects?.filter((p) => ["em_producao", "aprovado"].includes(p.status || ""))?.length || 0;
     const month = new Date().getMonth();
     const monthlyRevenue = transactions
       .filter((t) => t.type === "entrada" && new Date(t.date).getMonth() === month)
@@ -391,7 +391,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const pendingPayments = projects
       .filter((p) => ["concluido", "entregue"].includes(p.status))
       .reduce((sum, p) => sum + p.budget * 0.5, 0);
-    const lowStockItems = products.filter((p) => p.current_stock <= p.min_stock).length;
+    const lowStockItems = products?.filter((p) => p.current_stock <= p.min_stock)?.length || 0;
 
     const recentActivity = [
       ...projects.slice(-3).map((p) => ({
