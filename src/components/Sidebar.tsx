@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Users, Briefcase, DollarSign, Hammer, Package, Wrench, BarChart3, Settings, LogOut, Wifi, WifiOff, Cloud } from 'lucide-react';
+import { Home, Users, Briefcase, DollarSign, Hammer, Package, Wrench, BarChart3, Settings, LogOut, Wifi, WifiOff, Cloud, UserCog } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { getStorageManager } from '../lib/storage';
 
@@ -7,6 +7,13 @@ interface SidebarProps {
   currentPage: string;
   setCurrentPage: (page: string) => void;
 }
+
+const getInitial = (name: string): string => {
+  if (!name || typeof name !== 'string' || name.length === 0) {
+    return '?';
+  }
+  return name.charAt(0).toUpperCase();
+};
 
 const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage }) => {
   const { user, logout } = useAuth();
@@ -46,7 +53,10 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage }) => {
     { id: 'products', label: 'Produtos', icon: Package },
     { id: 'stock', label: 'Estoque', icon: BarChart3 },
     { id: 'finance', label: 'Finanças', icon: DollarSign },
-    ...(user?.role === 'admin' ? [{ id: 'settings', label: 'Configurações', icon: Settings }] : []),
+    ...(user?.role === 'admin' ? [
+      { id: 'users', label: 'Usuários', icon: UserCog },
+      { id: 'settings', label: 'Configurações', icon: Settings }
+    ] : []),
   ];
 
   return (
@@ -154,9 +164,3 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage }) => {
 };
 
 export default Sidebar;
-import SyncStatus from './SyncStatus';
-
-// Dentro do componente, adicione onde preferir:
-<div className="p-4 border-t border-gray-200">
-  <SyncStatus />
-</div>

@@ -15,6 +15,8 @@ import { User as SupabaseUser, Session } from "@supabase/supabase-js";
 export interface User {
   id: string;
   email: string;
+  name: string;
+  role: 'admin' | 'manager' | 'user';
   created_at: string;
 }
 
@@ -61,15 +63,39 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   const [isLoading, setIsLoading] = useState(true);
 
   // ---------------------------------------------------------------------------
-  // Função auxiliar: converte SupabaseUser -> User local
+  // Função auxiliar: busca perfil do usuário e converte SupabaseUser -> User local
   // ---------------------------------------------------------------------------
-  const mapUser = (sbUser: SupabaseUser | null): User | null => {
+  const mapUser = async (sbUser: SupabaseUser | null): Promise<User | null> => {
     if (!sbUser) return null;
-    return {
-      id: sbUser.id,
-      email: sbUser.email ?? "",
-      created_at: sbUser.created_at ?? new Date().toISOString(),
-    };
+
+    try {
+      const { data: profile, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', sbUser.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error('[AuthContext] Erro ao buscar perfil:', error);
+      }
+
+      return {
+        id: sbUser.id,
+        email: sbUser.email ?? "",
+        name: profile?.name ?? "",
+        role: profile?.role ?? 'user',
+        created_at: sbUser.created_at ?? new Date().toISOString(),
+      };
+    } catch (err) {
+      console.error('[AuthContext] Exceção ao buscar perfil:', err);
+      return {
+        id: sbUser.id,
+        email: sbUser.email ?? "",
+        name: "",
+        role: 'user',
+        created_at: sbUser.created_at ?? new Date().toISOString(),
+      };
+    }
   };
 
   // ---------------------------------------------------------------------------
@@ -114,14 +140,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   // ---------------------------------------------------------------------------
   // Manipula mudanças de sessão
   // ---------------------------------------------------------------------------
-  const handleSessionChange = (session: Session | null) => {
+  const handleSessionChange = async (session: Session | null) => {
     if (session?.user) {
-      const localUser = mapUser(session.user);
+      const localUser = await mapUser(session.user);
       setSupabaseUser(session.user);
       setUser(localUser);
       setIsAuthenticated(true);
-      // Log opcional
-      console.log(`[AuthContext] ✅ Sessão ativa para ${localUser?.email}`);
+      console.log(`[AuthContext] ✅ Sessão ativa para ${localUser?.email} (${localUser?.role})`);
     } else {
       setSupabaseUser(null);
       setUser(null);
@@ -151,11 +176,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       }
 
       if (data.user) {
-        const localUser = mapUser(data.user);
+        const localUser = await mapUser(data.user);
         setSupabaseUser(data.user);
         setUser(localUser);
         setIsAuthenticated(true);
-        console.log(`[AuthContext] 👋 Login bem-sucedido: ${localUser.email}`);
+        console.log(`[AuthContext] 👋 Login bem-sucedido: ${localUser?.email} (${localUser?.role})`);
         return { success: true };
       }
 

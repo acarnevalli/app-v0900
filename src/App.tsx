@@ -8,6 +8,7 @@ import Finance from './pages/Finance';
 import Products from './pages/Products';
 import Stock from './pages/Stock';
 import Settings from './pages/Settings';
+import Users from './pages/Users';
 import { AppProvider } from './contexts/AppContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SettingsProvider } from './contexts/SettingsContext';
@@ -62,6 +63,8 @@ const AppContent: React.FC = () => {
         return <Products />;
       case 'stock':
         return <Stock />;
+      case 'users':
+        return <Users />;
       case 'settings':
         return <Settings />;
       default:
