@@ -12,6 +12,15 @@ import { AppProvider } from './contexts/AppContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 
+useEffect(() => {
+  // Log quando o contexto muda
+  console.log('AppContext State:', {
+    clients: Array.isArray(clients) ? clients.length : 'not array',
+    projects: Array.isArray(projects) ? projects.length : 'not array',
+    products: Array.isArray(products) ? products.length : 'not array',
+  });
+}, [clients, projects, products]);
+
 // Mudanças Sugeridas por Claude Opus 4
 useEffect(() => {
   // Handler para erros não capturados
