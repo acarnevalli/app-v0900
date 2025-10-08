@@ -267,7 +267,7 @@ const Projects: React.FC = () => {
     const splitDescription = doc.splitTextToSize(project.description, 170);
     doc.text(splitDescription, 20, 92);
     
-    let yPosition = 92 + (splitDescription.length * 4) + 10;
+    let yPosition = 92 + ((splitDescription?.length || 0) * 4) + 10;
     
     // Produtos/Serviços
     if (project.products && project.products.length > 0) {
