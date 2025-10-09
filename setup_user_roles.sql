@@ -153,7 +153,12 @@ BEGIN
       v_user_role,
       now(),
       now()
-    );
+    )
+    ON CONFLICT (id) DO UPDATE SET
+      email = EXCLUDED.email,
+      name = EXCLUDED.name,
+      role = EXCLUDED.role,
+      updated_at = now();
 
     RAISE NOTICE '✅ Usuário criado com sucesso!';
     RAISE NOTICE '📧 Email: %', v_email;
