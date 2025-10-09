@@ -121,8 +121,7 @@ BEGIN
       provider,
       last_sign_in_at,
       created_at,
-      updated_at,
-      email
+      updated_at
     ) VALUES (
       v_user_id::text,
       gen_random_uuid(),
@@ -136,8 +135,7 @@ BEGIN
       'email',
       now(),
       now(),
-      now(),
-      v_email
+      now()
     );
 
     -- Criar perfil do usuário na tabela user_profiles
