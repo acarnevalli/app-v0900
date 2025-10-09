@@ -1,198 +1,156 @@
--- ============================================================================
--- SCRIPT DE CONFIGURAÇÃO DO SISTEMA DE GERENCIAMENTO DE USUÁRIOS
--- Execute este script no SQL Editor do Supabase
--- ============================================================================
-
--- ----------------------------------------------------------------------------
--- 1. CRIAR TABELA DE PERFIS DE USUÁRIOS
--- ----------------------------------------------------------------------------
-
--- Criar tabela de perfis de usuários
-CREATE TABLE IF NOT EXISTS user_profiles (
-  id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  email text NOT NULL,
-  name text NOT NULL DEFAULT '',
-  role text NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'manager', 'user')),
-  created_at timestamptz DEFAULT now() NOT NULL,
-  updated_at timestamptz DEFAULT now() NOT NULL
-);
-
--- Criar índices para melhor performance
-CREATE INDEX IF NOT EXISTS idx_user_profiles_email ON user_profiles(email);
-CREATE INDEX IF NOT EXISTS idx_user_profiles_role ON user_profiles(role);
-
--- ----------------------------------------------------------------------------
--- 2. CONFIGURAR ROW LEVEL SECURITY (RLS)
--- ----------------------------------------------------------------------------
-
--- Habilitar RLS
-ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
-
--- Remover políticas existentes (se houver)
-DROP POLICY IF EXISTS "Users can read own profile" ON user_profiles;
-DROP POLICY IF EXISTS "Admins can read all profiles" ON user_profiles;
-DROP POLICY IF EXISTS "Admins can update profiles" ON user_profiles;
-DROP POLICY IF EXISTS "Users can update own name" ON user_profiles;
-DROP POLICY IF EXISTS "Allow profile creation" ON user_profiles;
-
--- Política: usuários podem ler seu próprio perfil
-CREATE POLICY "Users can read own profile"
-  ON user_profiles
-  FOR SELECT
-  TO authenticated
-  USING (auth.uid() = id);
-
--- Política: administradores podem ler todos os perfis
-CREATE POLICY "Admins can read all profiles"
-  ON user_profiles
-  FOR SELECT
-  TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM user_profiles
-      WHERE user_profiles.id = auth.uid()
-      AND user_profiles.role = 'admin'
-    )
-  );
-
--- Política: administradores podem atualizar perfis
-CREATE POLICY "Admins can update profiles"
-  ON user_profiles
-  FOR UPDATE
-  TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM user_profiles
-      WHERE user_profiles.id = auth.uid()
-      AND user_profiles.role = 'admin'
-    )
-  )
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM user_profiles
-      WHERE user_profiles.id = auth.uid()
-      AND user_profiles.role = 'admin'
-    )
-  );
-
--- Política: usuários podem atualizar seu próprio nome (mas não o role)
-CREATE POLICY "Users can update own name"
-  ON user_profiles
-  FOR UPDATE
-  TO authenticated
-  USING (auth.uid() = id)
-  WITH CHECK (
-    auth.uid() = id AND
-    role = (SELECT role FROM user_profiles WHERE id = auth.uid())
-  );
-
--- Política: permitir inserção de perfil (para o trigger)
-CREATE POLICY "Allow profile creation"
-  ON user_profiles
-  FOR INSERT
-  TO authenticated
-  WITH CHECK (auth.uid() = id);
-
--- ----------------------------------------------------------------------------
--- 3. CRIAR FUNÇÕES E TRIGGERS
--- ----------------------------------------------------------------------------
-
--- Função para criar perfil automaticamente quando usuário é criado
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS trigger AS $$
-BEGIN
-  INSERT INTO public.user_profiles (id, email, name, role)
-  VALUES (
-    NEW.id,
-    NEW.email,
-    COALESCE(NEW.raw_user_meta_data->>'name', ''),
-    CASE
-      -- O primeiro usuário será admin
-      WHEN (SELECT COUNT(*) FROM public.user_profiles) = 0 THEN 'admin'
-      ELSE 'user'
-    END
-  );
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Trigger para criar perfil quando usuário é criado
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
-
--- Função para atualizar updated_at automaticamente
-CREATE OR REPLACE FUNCTION public.handle_updated_at()
-RETURNS trigger AS $$
-BEGIN
-  NEW.updated_at = now();
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- Trigger para atualizar updated_at
-DROP TRIGGER IF EXISTS on_user_profile_updated ON user_profiles;
-CREATE TRIGGER on_user_profile_updated
-  BEFORE UPDATE ON user_profiles
-  FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
-
--- ----------------------------------------------------------------------------
--- 4. CRIAR PERFIS PARA USUÁRIOS EXISTENTES (SE HOUVER)
--- ----------------------------------------------------------------------------
-
--- Inserir perfis para usuários que já existem mas não têm perfil
-INSERT INTO user_profiles (id, email, name, role)
-SELECT
-  au.id,
-  au.email,
-  COALESCE(au.raw_user_meta_data->>'name', ''),
-  CASE
-    -- Se não há nenhum perfil ainda, o primeiro usuário vira admin
-    WHEN (SELECT COUNT(*) FROM user_profiles) = 0 THEN 'admin'
-    ELSE 'user'
-  END
-FROM auth.users au
-WHERE NOT EXISTS (
-  SELECT 1 FROM user_profiles up WHERE up.id = au.id
-)
-ORDER BY au.created_at ASC;
-
--- ----------------------------------------------------------------------------
--- 5. VERIFICAÇÃO E RESUMO
--- ----------------------------------------------------------------------------
-
--- Mostrar todos os perfis criados
-SELECT
-  email,
-  name,
-  role,
-  created_at,
-  'Perfil criado com sucesso' as status
-FROM user_profiles
-ORDER BY created_at ASC;
-
--- Contar usuários por papel
-SELECT
-  role,
-  COUNT(*) as total
-FROM user_profiles
-GROUP BY role
-ORDER BY
-  CASE role
-    WHEN 'admin' THEN 1
-    WHEN 'manager' THEN 2
-    WHEN 'user' THEN 3
-  END;
-
--- ============================================================================
--- SCRIPT CONCLUÍDO
--- ============================================================================
+-- =============================================
+-- SCRIPT DE CRIAÇÃO DE USUÁRIOS
+-- Sistema de Gestão de Marcenaria
+-- =============================================
 --
--- PRÓXIMOS PASSOS:
--- 1. Verifique os resultados das queries acima
--- 2. Certifique-se de que existe pelo menos 1 administrador
--- 3. Se necessário, promova um usuário a admin manualmente:
---    UPDATE user_profiles SET role = 'admin' WHERE email = 'seu-email@exemplo.com';
+-- INSTRUÇÕES:
+-- 1. Acesse o Supabase Dashboard
+-- 2. Vá em SQL Editor
+-- 3. Copie e cole todo este script
+-- 4. EDITE os dados do usuário (email, senha, nome)
+-- 5. Execute (RUN)
 --
--- ============================================================================
+-- IMPORTANTE: Este script cria usuários diretamente no banco
+-- sem necessidade de SMTP ou convites por email.
+-- =============================================
+
+-- =============================================
+-- CRIAR USUÁRIO
+-- =============================================
+-- EDITE OS VALORES ABAIXO:
+
+DO $$
+DECLARE
+  v_user_id uuid;
+  v_email text := 'carnevalli.esquadrias@gmail.com'; -- ⚠️ EDITE AQUI
+  v_password text := 'SenhaSegura123!'; -- ⚠️ EDITE AQUI
+  v_full_name text := 'Usuario Teste'; -- ⚠️ EDITE AQUI (opcional)
+BEGIN
+  -- Verificar se usuário já existe
+  SELECT id INTO v_user_id
+  FROM auth.users
+  WHERE email = v_email;
+
+  IF v_user_id IS NOT NULL THEN
+    RAISE NOTICE '⚠️  Usuário com email % já existe (ID: %)', v_email, v_user_id;
+  ELSE
+    -- Criar novo usuário
+    INSERT INTO auth.users (
+      instance_id,
+      id,
+      aud,
+      role,
+      email,
+      encrypted_password,
+      email_confirmed_at,
+      invited_at,
+      confirmation_token,
+      confirmation_sent_at,
+      recovery_token,
+      recovery_sent_at,
+      email_change_token_new,
+      email_change,
+      email_change_sent_at,
+      last_sign_in_at,
+      raw_app_meta_data,
+      raw_user_meta_data,
+      is_super_admin,
+      created_at,
+      updated_at,
+      phone,
+      phone_confirmed_at,
+      phone_change,
+      phone_change_token,
+      phone_change_sent_at,
+      email_change_token_current,
+      email_change_confirm_status,
+      banned_until,
+      reauthentication_token,
+      reauthentication_sent_at,
+      is_sso_user,
+      deleted_at
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000000',
+      gen_random_uuid(),
+      'authenticated',
+      'authenticated',
+      v_email,
+      crypt(v_password, gen_salt('bf')), -- Hash da senha
+      now(), -- Email confirmado imediatamente
+      now(),
+      '',
+      now(),
+      '',
+      now(),
+      '',
+      '',
+      now(),
+      now(),
+      '{"provider":"email","providers":["email"]}',
+      jsonb_build_object('full_name', v_full_name),
+      false,
+      now(),
+      now(),
+      null,
+      null,
+      '',
+      '',
+      now(),
+      '',
+      0,
+      null,
+      '',
+      now(),
+      false,
+      null
+    )
+    RETURNING id INTO v_user_id;
+
+    -- Criar identity para o usuário
+    INSERT INTO auth.identities (
+      id,
+      user_id,
+      identity_data,
+      provider,
+      last_sign_in_at,
+      created_at,
+      updated_at
+    ) VALUES (
+      gen_random_uuid(),
+      v_user_id,
+      jsonb_build_object(
+        'sub', v_user_id::text,
+        'email', v_email
+      ),
+      'email',
+      now(),
+      now(),
+      now()
+    );
+
+    RAISE NOTICE '✅ Usuário criado com sucesso!';
+    RAISE NOTICE '📧 Email: %', v_email;
+    RAISE NOTICE '🆔 ID: %', v_user_id;
+    RAISE NOTICE '';
+    RAISE NOTICE '🔑 Credenciais de acesso:';
+    RAISE NOTICE '   Email: %', v_email;
+    RAISE NOTICE '   Senha: (a que você definiu)';
+    RAISE NOTICE '';
+    RAISE NOTICE '🚀 Próximo passo:';
+    RAISE NOTICE '   Faça login no sistema usando essas credenciais';
+  END IF;
+END $$;
+
+-- =============================================
+-- VERIFICAR USUÁRIOS CADASTRADOS
+-- =============================================
+-- Descomente as linhas abaixo para ver todos os usuários:
+
+-- SELECT
+--   id,
+--   email,
+--   raw_user_meta_data->>'full_name' as nome,
+--   email_confirmed_at,
+--   created_at
+-- FROM auth.users
+-- ORDER BY created_at DESC;
