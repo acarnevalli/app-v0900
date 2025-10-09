@@ -25,7 +25,13 @@ DECLARE
   v_email text := 'carnevalli.esquadrias@gmail.com'; -- ⚠️ EDITE AQUI
   v_password text := 'SenhaSegura123!'; -- ⚠️ EDITE AQUI
   v_full_name text := 'Usuario Teste'; -- ⚠️ EDITE AQUI (opcional)
+  v_user_role text := 'user'; -- ⚠️ EDITE AQUI: 'admin', 'manager' ou 'user'
 BEGIN
+  -- Validar role
+  IF v_user_role NOT IN ('admin', 'manager', 'user') THEN
+    RAISE EXCEPTION 'Role inválido. Use: admin, manager ou user';
+  END IF;
+
   -- Verificar se usuário já existe
   SELECT id INTO v_user_id
   FROM auth.users
@@ -128,9 +134,27 @@ BEGIN
       now()
     );
 
+    -- Criar perfil do usuário na tabela user_profiles
+    INSERT INTO public.user_profiles (
+      id,
+      email,
+      name,
+      role,
+      created_at,
+      updated_at
+    ) VALUES (
+      v_user_id,
+      v_email,
+      v_full_name,
+      v_user_role,
+      now(),
+      now()
+    );
+
     RAISE NOTICE '✅ Usuário criado com sucesso!';
     RAISE NOTICE '📧 Email: %', v_email;
     RAISE NOTICE '🆔 ID: %', v_user_id;
+    RAISE NOTICE '👤 Role: %', v_user_role;
     RAISE NOTICE '';
     RAISE NOTICE '🔑 Credenciais de acesso:';
     RAISE NOTICE '   Email: %', v_email;
@@ -147,10 +171,12 @@ END $$;
 -- Descomente as linhas abaixo para ver todos os usuários:
 
 -- SELECT
---   id,
---   email,
---   raw_user_meta_data->>'full_name' as nome,
---   email_confirmed_at,
---   created_at
--- FROM auth.users
--- ORDER BY created_at DESC;
+--   u.id,
+--   u.email,
+--   p.name,
+--   p.role,
+--   u.email_confirmed_at,
+--   u.created_at
+-- FROM auth.users u
+-- LEFT JOIN public.user_profiles p ON u.id = p.id
+-- ORDER BY u.created_at DESC;
