@@ -69,6 +69,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     if (!sbUser) return null;
 
     try {
+      console.log('[AuthContext] Buscando perfil para usuário:', sbUser.id, sbUser.email);
+
       const { data: profile, error } = await supabase
         .from('user_profiles')
         .select('*')
@@ -79,13 +81,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         console.error('[AuthContext] Erro ao buscar perfil:', error);
       }
 
-      return {
+      console.log('[AuthContext] Perfil encontrado:', profile);
+
+      const user = {
         id: sbUser.id,
         email: sbUser.email ?? "",
         name: profile?.name ?? "",
         role: profile?.role ?? 'user',
         created_at: sbUser.created_at ?? new Date().toISOString(),
       };
+
+      console.log('[AuthContext] Usuário mapeado:', user);
+
+      return user;
     } catch (err) {
       console.error('[AuthContext] Exceção ao buscar perfil:', err);
       return {
