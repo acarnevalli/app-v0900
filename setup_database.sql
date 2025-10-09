@@ -28,6 +28,111 @@ END;
 $$ language 'plpgsql';
 
 -- =============================================
+-- TABELA: user_profiles
+-- Perfis de usuários com sistema de papéis
+-- =============================================
+CREATE TABLE IF NOT EXISTS user_profiles (
+  id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  email text NOT NULL,
+  name text NOT NULL DEFAULT '',
+  role text NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'manager', 'user')),
+  created_at timestamptz DEFAULT now() NOT NULL,
+  updated_at timestamptz DEFAULT now() NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_profiles_email ON user_profiles(email);
+CREATE INDEX IF NOT EXISTS idx_user_profiles_role ON user_profiles(role);
+
+ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can read own profile" ON user_profiles;
+CREATE POLICY "Users can read own profile"
+  ON user_profiles
+  FOR SELECT
+  TO authenticated
+  USING (auth.uid() = id);
+
+DROP POLICY IF EXISTS "Admins can read all profiles" ON user_profiles;
+CREATE POLICY "Admins can read all profiles"
+  ON user_profiles
+  FOR SELECT
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM user_profiles
+      WHERE user_profiles.id = auth.uid()
+      AND user_profiles.role = 'admin'
+    )
+  );
+
+DROP POLICY IF EXISTS "Admins can update profiles" ON user_profiles;
+CREATE POLICY "Admins can update profiles"
+  ON user_profiles
+  FOR UPDATE
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM user_profiles
+      WHERE user_profiles.id = auth.uid()
+      AND user_profiles.role = 'admin'
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM user_profiles
+      WHERE user_profiles.id = auth.uid()
+      AND user_profiles.role = 'admin'
+    )
+  );
+
+DROP POLICY IF EXISTS "Users can update own name" ON user_profiles;
+CREATE POLICY "Users can update own name"
+  ON user_profiles
+  FOR UPDATE
+  TO authenticated
+  USING (auth.uid() = id)
+  WITH CHECK (
+    auth.uid() = id AND
+    role = (SELECT role FROM user_profiles WHERE id = auth.uid())
+  );
+
+DROP POLICY IF EXISTS "Allow profile creation" ON user_profiles;
+CREATE POLICY "Allow profile creation"
+  ON user_profiles
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (auth.uid() = id);
+
+DROP TRIGGER IF EXISTS update_user_profiles_updated_at ON user_profiles;
+CREATE TRIGGER update_user_profiles_updated_at
+  BEFORE UPDATE ON user_profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+-- Função para criar perfil automaticamente quando usuário é criado
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.user_profiles (id, email, name, role)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    COALESCE(NEW.raw_user_meta_data->>'name', ''),
+    CASE
+      WHEN (SELECT COUNT(*) FROM public.user_profiles) = 0 THEN 'admin'
+      ELSE 'user'
+    END
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- =============================================
 -- TABELA: products
 -- Armazena produtos (materiais, partes, produtos prontos)
 -- =============================================
@@ -422,12 +527,13 @@ CREATE POLICY "Users can delete own transactions"
 DO $$
 BEGIN
   RAISE NOTICE '✅ Script executado com sucesso!';
-  RAISE NOTICE '📊 Tabelas criadas: products, product_components, clients, projects, project_products, stock_movements, transactions';
+  RAISE NOTICE '📊 Tabelas criadas: user_profiles, products, product_components, clients, projects, project_products, stock_movements, transactions';
   RAISE NOTICE '🔒 Row Level Security (RLS) habilitado em todas as tabelas';
   RAISE NOTICE '✔️ Todas as políticas de segurança configuradas';
+  RAISE NOTICE '👤 Sistema de perfis de usuários (admin, manager, user) configurado';
   RAISE NOTICE '';
   RAISE NOTICE '🚀 Próximos passos:';
   RAISE NOTICE '   1. Configure as variáveis de ambiente no seu .env';
-  RAISE NOTICE '   2. Crie sua conta de usuário no app';
+  RAISE NOTICE '   2. Crie sua conta de usuário no app (o primeiro usuário será admin automaticamente)';
   RAISE NOTICE '   3. Comece a usar o sistema!';
 END $$;
