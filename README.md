@@ -4,6 +4,12 @@ Um sistema completo de gerenciamento para empresas de marcenaria sob medida, com
 
 ## 🚀 Funcionalidades
 
+### Autenticação e Controle de Acesso
+- Sistema de login seguro com Supabase
+- Três níveis de permissão (Admin, Manager, User)
+- Primeiro usuário cadastrado é automaticamente Admin
+- Gestão de usuários e permissões
+
 ### Dashboard Executivo
 - Métricas em tempo real
 - Gráficos de status dos projetos
@@ -34,6 +40,7 @@ Um sistema completo de gerenciamento para empresas de marcenaria sob medida, com
 - **TypeScript** - Tipagem estática
 - **Tailwind CSS** - Estilização
 - **Vite** - Build tool
+- **Supabase** - Backend, banco de dados e autenticação
 - **Lucide React** - Ícones
 - **Context API** - Gerenciamento de estado
 
@@ -52,25 +59,38 @@ Um sistema completo de gerenciamento para empresas de marcenaria sob medida, com
    cd sistema-marcenaria
    ```
 
-2. **Instale as dependências**
+2. **Configure o Supabase**
+   - Crie uma conta em [supabase.com](https://supabase.com)
+   - Crie um novo projeto
+   - Copie as credenciais (URL e ANON_KEY)
+   - Crie um arquivo `.env` na raiz do projeto:
+     ```
+     VITE_SUPABASE_URL=sua-url-aqui
+     VITE_SUPABASE_ANON_KEY=sua-chave-aqui
+     ```
+
+3. **Instale as dependências**
    ```bash
    npm install
    # ou
    yarn install
-   # e 
-   npm
    ```
 
-3. **Execute o projeto em modo de desenvolvimento**
+4. **Execute o projeto em modo de desenvolvimento**
    ```bash
    npm run dev
    # ou
    yarn dev
    ```
 
-4. **Abra no navegador**
+5. **Abra no navegador**
    - O sistema estará disponível em: `http://localhost:5173`
    - O terminal mostrará a URL exata
+
+6. **Primeiro acesso**
+   - Cadastre-se no sistema
+   - O primeiro usuário será automaticamente Admin
+   - Para promover outros usuários, veja: `COMO_TORNAR_USUARIO_ADMIN.md`
 
 ### Comandos disponíveis:
 
@@ -81,27 +101,37 @@ Um sistema completo de gerenciamento para empresas de marcenaria sob medida, com
 
 ## 🎯 Como usar o sistema
 
-### 1. Dashboard
+### 1. Login e Autenticação
+- Faça login com suas credenciais
+- Primeiro cadastro é automaticamente Admin
+- Veja `COMO_TORNAR_USUARIO_ADMIN.md` para promover usuários
+
+### 2. Dashboard
 - Visualize métricas gerais do negócio
 - Acompanhe atividades recentes
 - Monitore alertas importantes
 
-### 2. Gestão de Clientes
+### 3. Gestão de Clientes
 - Clique em "Novo Cliente" para adicionar
 - Use a barra de busca para encontrar clientes
 - Edite ou exclua clientes conforme necessário
 
-### 3. Projetos
+### 4. Projetos
 - Crie novos projetos vinculados aos clientes
 - O sistema automaticamente:
   - Gera transação de sinal (50% do valor)
   - Atualiza estatísticas do cliente
   - Cria timeline do projeto
 
-### 4. Finanças
+### 5. Finanças
 - Visualize o fluxo de caixa em tempo real
 - Adicione transações manuais quando necessário
 - Use filtros para análises específicas
+
+### 6. Usuários (apenas Admin)
+- Gerencie usuários do sistema
+- Altere permissões (Admin, Manager, User)
+- Visualize atividades de usuários
 
 ## 🔄 Automações do Sistema
 
