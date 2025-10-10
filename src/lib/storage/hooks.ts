@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { IStorageAdapter, DataRecord, QueryOptions } from './types';
 import { getStorageManager } from './storage-manager';
+import { useAuth } from './src/contexts/AuthContext';
 
 export const useStorageOperations = () => {
   const getAdapter = useCallback((): IStorageAdapter => {
