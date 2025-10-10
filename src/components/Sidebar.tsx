@@ -57,8 +57,10 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage }) => {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
     { id: 'clients', label: 'Clientes', icon: Users },
-    { id: 'projects', label: 'Projetos', icon: Briefcase },
-    { id: 'products', label: 'Produtos', icon: Package },
+    { id: 'sales', label: 'Vendas', icon: ShoppingCart }, // NOVO
+    { id: 'purchases', label: 'Compras', icon: ShoppingBag }, // NOVO
+    //{ id: 'projects', label: 'Projetos', icon: Briefcase },
+    //{ id: 'products', label: 'Produtos', icon: Package },
     { id: 'stock', label: 'Estoque', icon: BarChart3 },
     { id: 'finance', label: 'Finanças', icon: DollarSign },
     ...(userProfile?.role === 'admin' ? [
