@@ -20,8 +20,18 @@ export interface User {
   created_at: string;
 }
 
+// Interface para UserProfile do banco
+interface UserProfile {
+  id: string;
+  email: string;
+  name: string;
+  role: 'admin' | 'manager' | 'user';
+  created_at?: string;
+}
+
 interface AuthContextType {
   user: User | null;
+  userProfile: UserProfile | null;
   supabaseUser: SupabaseUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -58,6 +68,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -78,15 +89,67 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         .maybeSingle();
 
       if (error) {
+        // Se for erro de recursão infinita, usar perfil básico
+        if (error.code === '42P17') {
+          console.error('[AuthContext] Erro de recursão infinita, usando perfil básico');
+          const fallbackProfile: UserProfile = {
+            id: sbUser.id,
+            email: sbUser.email ?? "",
+            name: sbUser.email?.split('@')[0] ?? "Usuário",
+            role: 'user',
+          };
+          setUserProfile(fallbackProfile);
+          return {
+            ...fallbackProfile,
+            created_at: sbUser.created_at ?? new Date().toISOString(),
+          };
+        }
         console.error('[AuthContext] Erro ao buscar perfil:', error);
       }
 
-      console.log('[AuthContext] Perfil encontrado:', profile);
+      // Se não encontrou perfil, tentar criar
+      if (!profile) {
+        console.log('[AuthContext] Perfil não encontrado, criando...');
+        
+        const newProfile: UserProfile = {
+          id: sbUser.id,
+          email: sbUser.email || '',
+          name: sbUser.email?.split('@')[0] || 'Usuário',
+          role: 'user',
+        };
 
-      const user = {
+        const { data: createdProfile, error: createError } = await supabase
+          .from('user_profiles')
+          .insert([newProfile])
+          .select()
+          .maybeSingle();
+
+        if (createError) {
+          console.error('[AuthContext] Erro ao criar perfil:', createError);
+          // Retornar perfil básico mesmo se falhar
+          setUserProfile(newProfile);
+          return {
+            ...newProfile,
+            created_at: sbUser.created_at ?? new Date().toISOString(),
+          };
+        }
+
+        if (createdProfile) {
+          setUserProfile(createdProfile as UserProfile);
+          return {
+            ...createdProfile,
+            created_at: createdProfile.created_at || new Date().toISOString(),
+          };
+        }
+      }
+
+      console.log('[AuthContext] Perfil encontrado:', profile);
+      setUserProfile(profile as UserProfile);
+
+      const user: User = {
         id: sbUser.id,
         email: sbUser.email ?? "",
-        name: profile?.name ?? "",
+        name: profile?.name ?? sbUser.email?.split('@')[0] ?? "",
         role: profile?.role ?? 'user',
         created_at: sbUser.created_at ?? new Date().toISOString(),
       };
@@ -96,11 +159,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       return user;
     } catch (err) {
       console.error('[AuthContext] Exceção ao buscar perfil:', err);
-      return {
+      const fallbackProfile: UserProfile = {
         id: sbUser.id,
         email: sbUser.email ?? "",
-        name: "",
+        name: sbUser.email?.split('@')[0] ?? "Usuário",
         role: 'user',
+      };
+      setUserProfile(fallbackProfile);
+      return {
+        ...fallbackProfile,
         created_at: sbUser.created_at ?? new Date().toISOString(),
       };
     }
@@ -122,7 +189,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 
         if (error) throw error;
 
-        handleSessionChange(session);
+        await handleSessionChange(session);
       } catch (err) {
         console.error("[AuthContext] ❌ Erro ao recuperar sessão:", err);
       } finally {
@@ -130,8 +197,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       }
 
       // Escuta mudanças (login, logout, refresh, etc.)
-      const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-        handleSessionChange(session);
+      const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
+        await handleSessionChange(session);
       });
 
       subscription = data.subscription;
@@ -158,6 +225,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     } else {
       setSupabaseUser(null);
       setUser(null);
+      setUserProfile(null);
       setIsAuthenticated(false);
       console.log("[AuthContext] 🚪 Sessão finalizada");
     }
@@ -212,6 +280,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 
       setSupabaseUser(null);
       setUser(null);
+      setUserProfile(null);
       setIsAuthenticated(false);
       console.log("[AuthContext] ✅ Logout realizado com sucesso.");
     } catch (err: any) {
@@ -238,13 +307,31 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         return { success: false, error: error.message };
       }
 
-      if (data.user && data.session) {
-        const localUser = await mapUser(data.user);
-        setSupabaseUser(data.user);
-        setUser(localUser);
-        setIsAuthenticated(true);
-        console.log("[AuthContext] 🎉 Usuário cadastrado e logado automaticamente:", email, `(${localUser?.role})`);
-        return { success: true };
+      if (data.user) {
+        // Criar perfil imediatamente após o cadastro
+        const newProfile: UserProfile = {
+          id: data.user.id,
+          email: data.user.email || email,
+          name: email.split('@')[0],
+          role: 'user',
+        };
+
+        const { error: profileError } = await supabase
+          .from('user_profiles')
+          .insert([newProfile]);
+
+        if (profileError) {
+          console.error("[AuthContext] Erro ao criar perfil no signup:", profileError);
+        }
+
+        if (data.session) {
+          const localUser = await mapUser(data.user);
+          setSupabaseUser(data.user);
+          setUser(localUser);
+          setIsAuthenticated(true);
+          console.log("[AuthContext] 🎉 Usuário cadastrado e logado automaticamente:", email, `(${localUser?.role})`);
+          return { success: true };
+        }
       }
 
       return { success: false, error: "Falha ao criar usuário" };
@@ -264,6 +351,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     <AuthContext.Provider
       value={{
         user,
+        userProfile,
         supabaseUser,
         isAuthenticated,
         isLoading,
@@ -273,8 +361,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       }}
     >
       {isLoading ? (
-        <div style={{ padding: 24, fontFamily: "sans-serif" }}>
-          🔄 Verificando autenticação...
+        <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-amber-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-600">🔄 Verificando autenticação...</p>
+          </div>
         </div>
       ) : (
         children
