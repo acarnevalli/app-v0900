@@ -441,18 +441,33 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const loadSales = async () => {
-    if (!user) return;
+  if (!user) return;
+  try {
     const { data: salesData, error: salesErr } = await supabase
       .from("sales")
       .select("*, client:clients(name)")
       .eq("user_id", user.id)
       .order('date', { ascending: false });
-    if (salesErr) throw salesErr;
+    
+    if (salesErr) {
+      console.error('[AppContext] Erro ao buscar sales:', salesErr);
+      throw salesErr;
+    }
 
     const { data: saleItems, error: itemsErr } = await supabase
       .from("sale_items")
       .select("*, product:products(name)");
-    if (itemsErr) throw itemsErr;
+    
+    if (itemsErr) {
+      console.error('[AppContext] Erro ao buscar sale_items:', itemsErr);
+      // Se a tabela não existir, continua sem items
+      setSales(salesData?.map((sale: any) => ({ 
+        ...sale,
+        client_name: sale.client?.name,
+        items: [] 
+      })) || []);
+      return;
+    }
 
     const merged = (salesData || []).map((sale: any) => ({
       ...sale,
@@ -470,21 +485,40 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         })),
     }));
     setSales(merged);
-  };
+  } catch (error) {
+    console.error('[AppContext] Erro em loadSales:', error);
+    setSales([]); // Define array vazio em caso de erro
+  }
+};
 
   const loadPurchases = async () => {
-    if (!user) return;
+  if (!user) return;
+  try {
     const { data: purchasesData, error: purchasesErr } = await supabase
       .from("purchases")
       .select("*, supplier:suppliers(name)")
       .eq("user_id", user.id)
       .order('date', { ascending: false });
-    if (purchasesErr) throw purchasesErr;
+    
+    if (purchasesErr) {
+      console.error('[AppContext] Erro ao buscar purchases:', purchasesErr);
+      throw purchasesErr;
+    }
 
     const { data: purchaseItems, error: itemsErr } = await supabase
       .from("purchase_items")
       .select("*, product:products(name)");
-    if (itemsErr) throw itemsErr;
+    
+    if (itemsErr) {
+      console.error('[AppContext] Erro ao buscar purchase_items:', itemsErr);
+      // Se a tabela não existir, continua sem items
+      setPurchases(purchasesData?.map((purchase: any) => ({ 
+        ...purchase,
+        supplier_name: purchase.supplier?.name,
+        items: [] 
+      })) || []);
+      return;
+    }
 
     const merged = (purchasesData || []).map((purchase: any) => ({
       ...purchase,
@@ -502,8 +536,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         })),
     }));
     setPurchases(merged);
-  };
-
+  } catch (error) {
+    console.error('[AppContext] Erro em loadPurchases:', error);
+    setPurchases([]); // Define array vazio em caso de erro
+  }
+};
+  
   // ---------------------------------------------------------------
   // Refresh principal (sincroniza tudo)
   // ---------------------------------------------------------------
