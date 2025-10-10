@@ -14,9 +14,8 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { DebugAuth } from './components/DebugAuth';
 
-return (
-  <>
-    {const AppContent: React.FC = () => {
+// Componente AppContent separado - FORA do return
+const AppContent: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
   const [currentPage, setCurrentPage] = useState('dashboard');
 
@@ -76,15 +75,19 @@ return (
   };
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50">
-      <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} />
-      <main className="flex-1 ml-64 p-6">
-        {renderPage()}
-      </main>
-    </div>
+    <>
+      <div className="flex min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50">
+        <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} />
+        <main className="flex-1 ml-64 p-6">
+          {renderPage()}
+        </main>
+      </div>
+      <DebugAuth />
+    </>
   );
 };
 
+// Componente App principal
 function App() {
   return (
     <AuthProvider>
@@ -97,7 +100,4 @@ function App() {
   );
 }
 
-export default App;}
-    <DebugAuth />
-  </>
-);
+export default App;
