@@ -12,8 +12,11 @@ import Users from './pages/Users';
 import { AppProvider } from './contexts/AppContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SettingsProvider } from './contexts/SettingsContext';
+import { DebugAuth } from './components/DebugAuth';
 
-const AppContent: React.FC = () => {
+return (
+  <>
+    {const AppContent: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
   const [currentPage, setCurrentPage] = useState('dashboard');
 
@@ -94,4 +97,7 @@ function App() {
   );
 }
 
-export default App;
+export default App;}
+    <DebugAuth />
+  </>
+);
