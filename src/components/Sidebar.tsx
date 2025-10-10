@@ -16,13 +16,16 @@ const getInitial = (name: string): string => {
 };
 
 const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage }) => {
-  const { user, logout } = useAuth();
+  // ALTERAÇÃO 1: Adicionar userProfile ao destructuring
+  const { user, userProfile, logout } = useAuth();
   const [isOnline, setIsOnline] = React.useState(navigator.onLine);
   const [syncStatus, setSyncStatus] = React.useState<any>(null);
 
   React.useEffect(() => {
+    // ALTERAÇÃO 2: Log tanto do user quanto do userProfile
     console.log('[Sidebar] User state:', user);
-  }, [user]);
+    console.log('[Sidebar] User profile:', userProfile);
+  }, [user, userProfile]);
 
   React.useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -50,6 +53,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage }) => {
     };
   }, []);
 
+  // ALTERAÇÃO 3: Usar userProfile?.role em vez de user?.role
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
     { id: 'clients', label: 'Clientes', icon: Users },
@@ -57,7 +61,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage }) => {
     { id: 'products', label: 'Produtos', icon: Package },
     { id: 'stock', label: 'Estoque', icon: BarChart3 },
     { id: 'finance', label: 'Finanças', icon: DollarSign },
-    ...(user?.role === 'admin' ? [
+    ...(userProfile?.role === 'admin' ? [
       { id: 'users', label: 'Usuários', icon: UserCog },
       { id: 'settings', label: 'Configurações', icon: Settings }
     ] : []),
@@ -81,16 +85,20 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage }) => {
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full flex items-center justify-center">
               <span className="text-white font-medium text-sm">
-                {user?.name && typeof user.name === 'string' && user.name.length > 0
-                  ? getInitial(user.name)
+                {/* ALTERAÇÃO 4: Usar userProfile?.name */}
+                {userProfile?.name && typeof userProfile.name === 'string' && userProfile.name.length > 0
+                  ? getInitial(userProfile.name)
                   : '?'
                 }
               </span>
             </div>
             <div>
-              <p className="text-sm font-medium text-white">{user?.name}</p>
+              {/* ALTERAÇÃO 5: Usar userProfile?.name e userProfile?.role */}
+              <p className="text-sm font-medium text-white">
+                {userProfile?.name || user?.email || 'Carregando...'}
+              </p>
               <p className="text-xs text-amber-200/80">
-                {user?.role === 'admin' ? 'Administrador' : 'Usuário'}
+                {userProfile?.role === 'admin' ? 'Administrador' : 'Usuário'}
               </p>
             </div>
           </div>
