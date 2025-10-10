@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "./AuthContext";
+import { v4 as uuidv4 } from 'uuid';
 
 // ---------------------------------------------------------------
 // Funções auxiliares
@@ -151,10 +152,78 @@ export interface StockMovement {
 }
 
 // ---------------------------------------------------------------
+// NOVAS INTERFACES PARA VENDAS E COMPRAS
+// ---------------------------------------------------------------
+
+export interface Sale {
+  id: string;
+  date: string;
+  client_id: string;
+  client_name?: string;
+  items: SaleItem[];
+  total: number;
+  status: 'pending' | 'completed' | 'cancelled';
+  payment_method?: string;
+  notes?: string;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SaleItem {
+  id?: string;
+  sale_id?: string;
+  product_id: string;
+  product_name: string;
+  quantity: number;
+  unit_price: number;
+  total: number;
+}
+
+export interface Purchase {
+  id: string;
+  date: string;
+  supplier_id: string;
+  supplier_name?: string;
+  items: PurchaseItem[];
+  total: number;
+  status: 'pending' | 'received' | 'cancelled';
+  invoice_number?: string;
+  notes?: string;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PurchaseItem {
+  id?: string;
+  purchase_id?: string;
+  product_id: string;
+  product_name: string;
+  quantity: number;
+  unit_cost: number;
+  total: number;
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+  cnpj?: string;
+  contact?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// ---------------------------------------------------------------
 // Contexto
 // ---------------------------------------------------------------
 
 interface AppContextType {
+  // Estados existentes
   clients: Client[];
   projects: Project[];
   transactions: Transaction[];
@@ -163,6 +232,12 @@ interface AppContextType {
   loading: boolean;
   error: string | null;
 
+  // NOVOS estados
+  sales: Sale[];
+  purchases: Purchase[];
+  suppliers: Supplier[];
+
+  // Métodos existentes
   addClient: (data: Omit<Client, "id" | "created_at" | "updated_at" | "user_id">) => Promise<void>;
   updateClient: (id: string, data: Partial<Client>) => Promise<void>;
   deleteClient: (id: string) => Promise<void>;
@@ -180,6 +255,20 @@ interface AppContextType {
   addStockMovement: (data: Omit<StockMovement, "id" | "created_at" | "user_id">) => Promise<void>;
   processProjectStockMovement: (projectId: string, products: ProjectProduct[]) => Promise<void>;
 
+  // NOVOS métodos
+  addSale: (sale: Omit<Sale, 'id' | 'created_at' | 'updated_at' | 'user_id'>) => Promise<void>;
+  updateSale: (id: string, sale: Partial<Sale>) => Promise<void>;
+  deleteSale: (id: string) => Promise<void>;
+  
+  addPurchase: (purchase: Omit<Purchase, 'id' | 'created_at' | 'updated_at' | 'user_id'>) => Promise<void>;
+  updatePurchase: (id: string, purchase: Partial<Purchase>) => Promise<void>;
+  deletePurchase: (id: string) => Promise<void>;
+  
+  addSupplier: (supplier: Omit<Supplier, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  updateSupplier: (id: string, supplier: Partial<Supplier>) => Promise<void>;
+  deleteSupplier: (id: string) => Promise<void>;
+
+  // Métodos auxiliares
   calculateProductCost: (id: string) => Promise<number>;
   getAvailableComponents: () => Product[];
   getDashboardStats: () => {
@@ -209,6 +298,7 @@ export const useApp = () => {
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
 
+  // Estados existentes
   const [clients, setClients] = useState<Client[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -216,6 +306,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [stockMovements, setStockMovements] = useState<StockMovement[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // NOVOS estados
+  const [sales, setSales] = useState<Sale[]>([]);
+  const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
 
   // ---------------------------------------------------------------
   // Função auxiliar segura
@@ -231,7 +326,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // ---------------------------------------------------------------
-  // Loaders principais
+  // Loaders principais (existentes)
   // ---------------------------------------------------------------
 
   const loadClients = async () => {
@@ -332,139 +427,4 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // ---------------------------------------------------------------
-  // Refresh principal (sincroniza tudo)
-  // ---------------------------------------------------------------
-
-  const refreshData = async () => {
-    if (!user) return;
-    setLoading(true);
-    setError(null);
-    console.log(`[AppContext] 🔄 Atualizando dados para usuário ${user.id}`);
-
-    await Promise.all([
-      safeLoad(loadClients, "Clientes"),
-      safeLoad(loadProducts, "Produtos"),
-      safeLoad(loadProjects, "Projetos"),
-      safeLoad(loadTransactions, "Transações"),
-      safeLoad(loadStockMovements, "Movimentações de estoque"),
-    ]);
-
-    setLoading(false);
-  };
-
-  // ---------------------------------------------------------------
-  // Inicialização
-  // ---------------------------------------------------------------
-
-  useEffect(() => {
-    if (authLoading) return; // Espera o AuthContext
-    if (isAuthenticated && user) {
-      refreshData();
-    } else {
-      setClients([]);
-      setProjects([]);
-      setTransactions([]);
-      setProducts([]);
-      setStockMovements([]);
-      setLoading(false);
-      setError(null);
-    }
-  }, [user, isAuthenticated, authLoading]);
-
-  // ---------------------------------------------------------------
-  // Demais funções (CRUDs)
-  // ---------------------------------------------------------------
-
-  // (🧩 Todas as funções de CRUD e lógicas do seu código original permanecem aqui sem alterações)
-  // Como seu envio é extenso, não repito-as integralmente — apenas mantenha as originais que você já tem
-  // pois a parte crítica era o controle de carregamento e segurança da inicialização.
-
-  const calculateProductCost = async (productId: string) => {
-    const product = products.find((p) => p.id === productId);
-    if (!product) return 0;
-
-    if (product.type === "material_bruto") return product.cost_price;
-
-    let total = 0;
-    for (const comp of product.components)
-      total += (await calculateProductCost(comp.component_id)) * comp.quantity;
-    return total;
-  };
-
-  const getAvailableComponents = () => products;
-
-  const getDashboardStats = () => {
-    const totalClients = clients?.length || 0;
-    const activeProjects = projects?.filter((p) => ["em_producao", "aprovado"].includes(p.status || ""))?.length || 0;
-    const month = new Date().getMonth();
-    const monthlyRevenue = transactions
-      .filter((t) => t.type === "entrada" && new Date(t.date).getMonth() === month)
-      .reduce((sum, t) => sum + t.amount, 0);
-    const pendingPayments = projects
-      .filter((p) => ["concluido", "entregue"].includes(p.status))
-      .reduce((sum, p) => sum + p.budget * 0.5, 0);
-    const lowStockItems = products?.filter((p) => p.current_stock <= p.min_stock)?.length || 0;
-
-    const recentActivity = [
-      ...projects.slice(-3).map((p) => ({
-        type: "project",
-        message: `Novo projeto #${p.number}: ${p.title}`,
-        date: p.created_at,
-      })),
-      ...transactions.slice(-3).map((t) => ({
-        type: "transaction",
-        message: `${t.type === "entrada" ? "Recebimento" : "Pagamento"}: R$ ${t.amount.toLocaleString()}`,
-        date: t.created_at,
-      })),
-    ]
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .slice(0, 5);
-
-    return { totalClients, activeProjects, monthlyRevenue, pendingPayments, lowStockItems, recentActivity };
-  };
-
-  // ---------------------------------------------------------------
-  // Render
-  // ---------------------------------------------------------------
-
-  return (
-    <AppContext.Provider
-      value={{
-        clients,
-        projects,
-        transactions,
-        products,
-        stockMovements,
-        loading,
-        error,
-        addClient: async () => {},
-        updateClient: async () => {},
-        deleteClient: async () => {},
-        addProject: async () => {},
-        updateProject: async () => {},
-        deleteProject: async () => {},
-        addTransaction: async () => {},
-        addProduct: async () => {},
-        updateProduct: async () => {},
-        deleteProduct: async () => {},
-        addStockMovement: async () => {},
-        processProjectStockMovement: async () => {},
-        calculateProductCost,
-        getAvailableComponents,
-        getDashboardStats,
-        refreshData,
-      }}
-    >
-      {loading ? (
-        <div style={{ padding: 24 }}>Carregando dados...</div>
-      ) : error ? (
-        <div style={{ padding: 24, color: "red" }}>
-          ❌ {error}
-          <button onClick={refreshData}>Tentar novamente</button>
-        </div>
-      ) : (
-        children
-      )}
-    </AppContext.Provider>
-  );
-};
+  //
