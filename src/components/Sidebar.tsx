@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Users, Briefcase, DollarSign, Hammer, Package, Wrench, BarChart3, Settings, LogOut, Wifi, WifiOff, Cloud, UserCog } from 'lucide-react';
+import { Home, Users, Briefcase, DollarSign, Hammer, Package, Wrench, BarChart3, Settings, LogOut, Wifi, WifiOff, Cloud, UserCog, ShoppingCart, ShoppingBag } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { getStorageManager } from '../lib/storage';
 
