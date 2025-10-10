@@ -427,4 +427,763 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // ---------------------------------------------------------------
-  //
+  // NOVOS Loaders para Vendas e Compras
+  // ---------------------------------------------------------------
+
+  const loadSuppliers = async () => {
+    if (!user) return;
+    const { data, error } = await supabase
+      .from("suppliers")
+      .select("*")
+      .order('name');
+    if (error) throw error;
+    setSuppliers(data || []);
+  };
+
+  const loadSales = async () => {
+    if (!user) return;
+    const { data: salesData, error: salesErr } = await supabase
+      .from("sales")
+      .select("*, client:clients(name)")
+      .eq("user_id", user.id)
+      .order('date', { ascending: false });
+    if (salesErr) throw salesErr;
+
+    const { data: saleItems, error: itemsErr } = await supabase
+      .from("sale_items")
+      .select("*, product:products(name)");
+    if (itemsErr) throw itemsErr;
+
+    const merged = (salesData || []).map((sale: any) => ({
+      ...sale,
+      client_name: sale.client?.name,
+      items: (saleItems || [])
+        .filter((item: any) => item.sale_id === sale.id)
+        .map((item: any) => ({
+          id: item.id,
+          sale_id: item.sale_id,
+          product_id: item.product_id,
+          product_name: item.product?.name || "",
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          total: item.total,
+        })),
+    }));
+    setSales(merged);
+  };
+
+  const loadPurchases = async () => {
+    if (!user) return;
+    const { data: purchasesData, error: purchasesErr } = await supabase
+      .from("purchases")
+      .select("*, supplier:suppliers(name)")
+      .eq("user_id", user.id)
+      .order('date', { ascending: false });
+    if (purchasesErr) throw purchasesErr;
+
+    const { data: purchaseItems, error: itemsErr } = await supabase
+      .from("purchase_items")
+      .select("*, product:products(name)");
+    if (itemsErr) throw itemsErr;
+
+    const merged = (purchasesData || []).map((purchase: any) => ({
+      ...purchase,
+      supplier_name: purchase.supplier?.name,
+      items: (purchaseItems || [])
+        .filter((item: any) => item.purchase_id === purchase.id)
+        .map((item: any) => ({
+          id: item.id,
+          purchase_id: item.purchase_id,
+          product_id: item.product_id,
+          product_name: item.product?.name || "",
+          quantity: item.quantity,
+          unit_cost: item.unit_cost,
+          total: item.total,
+        })),
+    }));
+    setPurchases(merged);
+  };
+
+  // ---------------------------------------------------------------
+  // Refresh principal (sincroniza tudo)
+  // ---------------------------------------------------------------
+
+  const refreshData = async () => {
+    if (!user) return;
+    setLoading(true);
+    setError(null);
+    console.log(`[AppContext] 🔄 Atualizando dados para usuário ${user.id}`);
+
+    await Promise.all([
+      safeLoad(loadClients, "Clientes"),
+      safeLoad(loadProducts, "Produtos"),
+      safeLoad(loadProjects, "Projetos"),
+      safeLoad(loadTransactions, "Transações"),
+      safeLoad(loadStockMovements, "Movimentações de estoque"),
+      safeLoad(loadSuppliers, "Fornecedores"),
+      safeLoad(loadSales, "Vendas"),
+      safeLoad(loadPurchases, "Compras"),
+    ]);
+
+    setLoading(false);
+  };
+
+  // ---------------------------------------------------------------
+  // Inicialização
+  // ---------------------------------------------------------------
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (isAuthenticated && user) {
+      refreshData();
+    } else {
+      setClients([]);
+      setProjects([]);
+      setTransactions([]);
+      setProducts([]);
+      setStockMovements([]);
+      setSales([]);
+      setPurchases([]);
+      setSuppliers([]);
+      setLoading(false);
+      setError(null);
+    }
+  }, [user, isAuthenticated, authLoading]);
+
+  // ---------------------------------------------------------------
+  // CRUD de Clientes
+  // ---------------------------------------------------------------
+
+  const addClient = async (data: Omit<Client, "id" | "created_at" | "updated_at" | "user_id">) => {
+    if (!user) return;
+    const newClient = {
+      ...data,
+      user_id: user.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    
+    const { error } = await supabase.from("clients").insert([newClient]);
+    if (error) throw error;
+    await loadClients();
+  };
+
+  const updateClient = async (id: string, data: Partial<Client>) => {
+    if (!user) return;
+    const { error } = await supabase
+      .from("clients")
+      .update({ ...data, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .eq("user_id", user.id);
+    if (error) throw error;
+    await loadClients();
+  };
+
+  const deleteClient = async (id: string) => {
+    if (!user) return;
+    const { error } = await supabase
+      .from("clients")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", user.id);
+    if (error) throw error;
+    await loadClients();
+  };
+
+  // ---------------------------------------------------------------
+  // CRUD de Projetos
+  // ---------------------------------------------------------------
+
+  const addProject = async (data: Omit<Project, "id" | "created_at" | "updated_at" | "number" | "user_id">) => {
+    if (!user) return;
+    
+    // Gerar próximo número
+    const maxNumber = projects.reduce((max, p) => Math.max(max, p.number), 0);
+    
+    const newProject = {
+      ...data,
+      number: maxNumber + 1,
+      user_id: user.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    
+    const { data: insertedProject, error } = await supabase
+      .from("projects")
+      .insert([newProject])
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    // Inserir produtos do projeto
+    if (data.products && data.products.length > 0) {
+      const projectProducts = data.products.map(p => ({
+        project_id: insertedProject.id,
+        product_id: p.product_id,
+        quantity: p.quantity,
+        unit_price: p.unit_price,
+        total_price: p.total_price,
+        user_id: user.id,
+      }));
+      
+      const { error: prodError } = await supabase
+        .from("project_products")
+        .insert(projectProducts);
+      
+      if (prodError) throw prodError;
+    }
+    
+    await loadProjects();
+  };
+
+  const updateProject = async (id: string, data: Partial<Project>) => {
+    if (!user) return;
+    const { error } = await supabase
+      .from("projects")
+      .update({ ...data, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .eq("user_id", user.id);
+    if (error) throw error;
+    await loadProjects();
+  };
+
+  const deleteProject = async (id: string) => {
+    if (!user) return;
+    const { error } = await supabase
+      .from("projects")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", user.id);
+    if (error) throw error;
+    await loadProjects();
+  };
+
+  // ---------------------------------------------------------------
+  // CRUD de Produtos
+  // ---------------------------------------------------------------
+
+  const addProduct = async (data: Omit<Product, "id" | "created_at" | "updated_at" | "user_id">) => {
+    if (!user) return;
+    const newProduct = {
+      ...data,
+      user_id: user.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    
+    const { data: insertedProduct, error } = await supabase
+      .from("products")
+      .insert([newProduct])
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    // Inserir componentes se houver
+    if (data.components && data.components.length > 0) {
+      const components = data.components.map(c => ({
+        product_id: insertedProduct.id,
+        component_id: c.component_id,
+        quantity: c.quantity,
+        user_id: user.id,
+      }));
+      
+      const { error: compError } = await supabase
+        .from("product_components")
+        .insert(components);
+      
+      if (compError) throw compError;
+    }
+    
+    await loadProducts();
+  };
+
+  const updateProduct = async (data: Product) => {
+    if (!user) return;
+    const { error } = await supabase
+      .from("products")
+      .update({ 
+        ...data, 
+        updated_at: new Date().toISOString() 
+      })
+      .eq("id", data.id)
+      .eq("user_id", user.id);
+    if (error) throw error;
+    await loadProducts();
+  };
+
+  const deleteProduct = async (id: string) => {
+    if (!user) return;
+    const { error } = await supabase
+      .from("products")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", user.id);
+    if (error) throw error;
+    await loadProducts();
+  };
+
+  // ---------------------------------------------------------------
+  // Transações e Estoque
+  // ---------------------------------------------------------------
+
+  const addTransaction = async (data: Omit<Transaction, "id" | "created_at" | "user_id">) => {
+    if (!user) return;
+    const newTransaction = {
+      ...data,
+      user_id: user.id,
+      created_at: new Date().toISOString(),
+    };
+    
+    const { error } = await supabase.from("transactions").insert([newTransaction]);
+    if (error) throw error;
+    await loadTransactions();
+  };
+
+  const addStockMovement = async (data: Omit<StockMovement, "id" | "created_at" | "user_id">) => {
+    if (!user) return;
+    const newMovement = {
+      ...data,
+      user_id: user.id,
+      created_at: new Date().toISOString(),
+    };
+    
+    const { error } = await supabase.from("stock_movements").insert([newMovement]);
+    if (error) throw error;
+    
+    // Atualizar estoque do produto
+    const product = products.find(p => p.id === data.product_id);
+    if (product) {
+      const newStock = data.movement_type === 'entrada' 
+        ? product.current_stock + data.quantity
+        : product.current_stock - data.quantity;
+      
+      await updateProduct({
+        ...product,
+        current_stock: Math.max(0, newStock),
+      });
+    }
+    
+    await loadStockMovements();
+  };
+
+  const processProjectStockMovement = async (projectId: string, products: ProjectProduct[]) => {
+    for (const item of products) {
+      await addStockMovement({
+        product_id: item.product_id,
+        product_name: item.product_name,
+        movement_type: 'saida',
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        total_value: item.total_price,
+        project_id: projectId,
+        reference_type: 'project',
+        date: new Date().toISOString(),
+        notes: `Saída para projeto #${projectId}`,
+      });
+    }
+  };
+
+  // ---------------------------------------------------------------
+  // NOVOS MÉTODOS - Vendas
+  // ---------------------------------------------------------------
+
+  const addSale = async (sale: Omit<Sale, 'id' | 'created_at' | 'updated_at' | 'user_id'>) => {
+    if (!user) return;
+    
+    const newSale = {
+      date: sale.date,
+      client_id: sale.client_id,
+      total: sale.total,
+      status: sale.status,
+      payment_method: sale.payment_method,
+      notes: sale.notes,
+      user_id: user.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    const { data: insertedSale, error } = await supabase
+      .from('sales')
+      .insert([newSale])
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // Inserir itens da venda
+    if (sale.items && sale.items.length > 0) {
+      const saleItems = sale.items.map(item => ({
+        sale_id: insertedSale.id,
+        product_id: item.product_id,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        total: item.total,
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('sale_items')
+        .insert(saleItems);
+
+      if (itemsError) throw itemsError;
+    }
+
+    // Atualizar estoque (diminuir quantidade)
+    for (const item of sale.items) {
+      await addStockMovement({
+        product_id: item.product_id,
+        product_name: item.product_name,
+        movement_type: 'saida',
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        total_value: item.total,
+        reference_type: 'manual',
+        date: sale.date,
+        notes: `Venda #${insertedSale.id}`,
+      });
+    }
+
+    // Criar transação financeira
+    if (sale.status === 'completed') {
+      await addTransaction({
+        type: 'entrada',
+        category: 'venda',
+        description: `Venda para cliente`,
+        amount: sale.total,
+        date: sale.date,
+      });
+    }
+
+    await refreshData();
+  };
+
+  const updateSale = async (id: string, sale: Partial<Sale>) => {
+    if (!user) return;
+    const { error } = await supabase
+      .from('sales')
+      .update({ ...sale, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .eq('user_id', user.id);
+    if (error) throw error;
+    await loadSales();
+  };
+
+  const deleteSale = async (id: string) => {
+    if (!user) return;
+    const { error } = await supabase
+      .from('sales')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id);
+    if (error) throw error;
+    await loadSales();
+  };
+
+  // ---------------------------------------------------------------
+  // NOVOS MÉTODOS - Compras
+  // ---------------------------------------------------------------
+
+  const addPurchase = async (purchase: Omit<Purchase, 'id' | 'created_at' | 'updated_at' | 'user_id'>) => {
+    if (!user) return;
+    
+    const newPurchase = {
+      date: purchase.date,
+      supplier_id: purchase.supplier_id,
+      total: purchase.total,
+      status: purchase.status,
+      invoice_number: purchase.invoice_number,
+      notes: purchase.notes,
+      user_id: user.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    const { data: insertedPurchase, error } = await supabase
+      .from('purchases')
+      .insert([newPurchase])
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // Inserir itens da compra
+    if (purchase.items && purchase.items.length > 0) {
+      const purchaseItems = purchase.items.map(item => ({
+        purchase_id: insertedPurchase.id,
+        product_id: item.product_id,
+        quantity: item.quantity,
+        unit_cost: item.unit_cost,
+        total: item.total,
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('purchase_items')
+        .insert(purchaseItems);
+
+      if (itemsError) throw itemsError;
+    }
+
+    // Atualizar estoque (aumentar quantidade) se compra foi recebida
+    if (purchase.status === 'received') {
+      for (const item of purchase.items) {
+        await addStockMovement({
+          product_id: item.product_id,
+          product_name: item.product_name,
+          movement_type: 'entrada',
+          quantity: item.quantity,
+          unit_price: item.unit_cost,
+          total_value: item.total,
+          reference_type: 'manual',
+          date: purchase.date,
+          notes: `Compra #${insertedPurchase.id}`,
+        });
+      }
+    }
+
+    // Criar transação financeira
+    await addTransaction({
+      type: 'saida',
+      category: 'compra',
+      description: `Compra de fornecedor`,
+      amount: purchase.total,
+      date: purchase.date,
+    });
+
+    await refreshData();
+  };
+
+  const updatePurchase = async (id: string, purchase: Partial<Purchase>) => {
+    if (!user) return;
+    const { error } = await supabase
+      .from('purchases')
+      .update({ ...purchase, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .eq('user_id', user.id);
+    if (error) throw error;
+    await loadPurchases();
+  };
+
+  const deletePurchase = async (id: string) => {
+    if (!user) return;
+    const { error } = await supabase
+      .from('purchases')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id);
+    if (error) throw error;
+    await loadPurchases();
+  };
+
+  // ---------------------------------------------------------------
+  // NOVOS MÉTODOS - Fornecedores
+  // ---------------------------------------------------------------
+
+  const addSupplier = async (supplier: Omit<Supplier, 'id' | 'created_at' | 'updated_at'>) => {
+    const newSupplier = {
+      ...supplier,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await supabase.from('suppliers').insert([newSupplier]);
+    if (error) throw error;
+    await loadSuppliers();
+  };
+
+  const updateSupplier = async (id: string, supplier: Partial<Supplier>) => {
+    const { error } = await supabase
+      .from('suppliers')
+      .update({ ...supplier, updated_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) throw error;
+    await loadSuppliers();
+  };
+
+  const deleteSupplier = async (id: string) => {
+    const { error } = await supabase
+      .from('suppliers')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+    await loadSuppliers();
+  };
+
+  // ---------------------------------------------------------------
+  // Métodos auxiliares
+  // ---------------------------------------------------------------
+
+  const calculateProductCost = async (productId: string) => {
+    const product = products.find((p) => p.id === productId);
+    if (!product) return 0;
+
+    if (product.type === "material_bruto") return product.cost_price;
+
+    let total = 0;
+    for (const comp of product.components)
+      total += (await calculateProductCost(comp.component_id)) * comp.quantity;
+    return total;
+  };
+
+  const getAvailableComponents = () => products;
+
+  const getDashboardStats = () => {
+    const totalClients = clients?.length || 0;
+    const activeProjects = projects?.filter((p) => ["em_producao", "aprovado"].includes(p.status || ""))?.length || 0;
+    
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+    // Receitas do mês (vendas + transações de entrada)
+    const monthlySalesRevenue = sales
+      .filter(s => {
+        const saleDate = new Date(s.date);
+        return s.status === 'completed' && 
+               saleDate >= firstDayOfMonth && 
+               saleDate <= lastDayOfMonth;
+      })
+      .reduce((sum, s) => sum + s.total, 0);
+
+    const monthlyTransactionRevenue = transactions
+      .filter(t => {
+        const transDate = new Date(t.date);
+        return t.type === "entrada" && 
+               transDate >= firstDayOfMonth && 
+               transDate <= lastDayOfMonth;
+      })
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const monthlyRevenue = monthlySalesRevenue + monthlyTransactionRevenue;
+
+    // Pagamentos pendentes (vendas pendentes)
+    const pendingSales = sales
+      .filter(s => s.status === 'pending')
+      .reduce((sum, s) => sum + s.total, 0);
+
+    const pendingProjects = projects
+      .filter(p => ["concluido", "entregue"].includes(p.status))
+      .reduce((sum, p) => sum + p.budget * 0.5, 0);
+
+    const pendingPayments = pendingSales + pendingProjects;
+
+    // Itens com estoque baixo
+    const lowStockItems = products?.filter((p) => p.current_stock <= p.min_stock)?.length || 0;
+
+    // Atividades recentes
+    const recentActivity = [
+      ...projects.slice(-3).map((p) => ({
+        type: "project",
+        message: `Novo projeto #${p.number}: ${p.title}`,
+        date: p.created_at,
+      })),
+      ...sales.slice(-3).map((s) => ({
+        type: "sale",
+        message: `Venda para ${s.client_name || 'Cliente'}: R$ ${s.total.toLocaleString('pt-BR')}`,
+        date: s.created_at,
+      })),
+      ...purchases.slice(-3).map((p) => ({
+        type: "purchase",
+        message: `Compra de ${p.supplier_name || 'Fornecedor'}: R$ ${p.total.toLocaleString('pt-BR')}`,
+        date: p.created_at,
+      })),
+    ]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 5);
+
+    return { 
+      totalClients, 
+      activeProjects, 
+      monthlyRevenue, 
+      pendingPayments, 
+      lowStockItems, 
+      recentActivity 
+    };
+  };
+
+  // ---------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------
+
+  return (
+    <AppContext.Provider
+      value={{
+        // Estados
+        clients,
+        projects,
+        transactions,
+        products,
+        stockMovements,
+        sales,
+        purchases,
+        suppliers,
+        loading,
+        error,
+        
+        // Métodos de clientes
+        addClient,
+        updateClient,
+        deleteClient,
+        
+        // Métodos de projetos
+        addProject,
+        updateProject,
+        deleteProject,
+        
+        // Métodos de produtos
+        addProduct,
+        updateProduct,
+        deleteProduct,
+        
+        // Métodos de transações e estoque
+        addTransaction,
+        addStockMovement,
+        processProjectStockMovement,
+        
+        // Métodos de vendas
+        addSale,
+        updateSale,
+        deleteSale,
+        
+        // Métodos de compras
+        addPurchase,
+        updatePurchase,
+        deletePurchase,
+        
+        // Métodos de fornecedores
+        addSupplier,
+        updateSupplier,
+        deleteSupplier,
+        
+        // Métodos auxiliares
+        calculateProductCost,
+        getAvailableComponents,
+        getDashboardStats,
+        refreshData,
+      }}
+    >
+      {loading ? (
+        <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-amber-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-600">Carregando dados...</p>
+          </div>
+        </div>
+      ) : error ? (
+        <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50">
+          <div className="text-center">
+            <p className="text-red-600 mb-4">❌ {error}</p>
+            <button 
+              onClick={refreshData}
+              className="px-4 py-2 bg-amber-600 text-white rounded hover:bg-amber-700"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        </div>
+      ) : (
+        children
+      )}
+    </AppContext.Provider>
+  );
+};
