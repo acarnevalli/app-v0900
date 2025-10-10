@@ -3,6 +3,8 @@ import Sidebar from './components/Sidebar';
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './pages/Dashboard';
 import Clients from './pages/Clients';
+import Sales from './pages/Sales';
+import Purchases from './pages/Purchases';
 import Projects from './pages/Projects';
 import Finance from './pages/Finance';
 import Products from './pages/Products';
@@ -13,6 +15,7 @@ import { AppProvider } from './contexts/AppContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { DebugAuth } from './components/DebugAuth';
+
 
 // Componente AppContent separado - FORA do return
 const AppContent: React.FC = () => {
@@ -57,6 +60,10 @@ const AppContent: React.FC = () => {
         return <Dashboard />;
       case 'clients':
         return <Clients />;
+      case 'sales':
+        return <Sales />;
+      case 'purchases':
+        return <Purchases />;
       case 'projects':
         return <Projects />;
       case 'finance':
