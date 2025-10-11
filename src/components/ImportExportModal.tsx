@@ -1,5 +1,13 @@
 import React, { useState } from 'react';
-import { X, Upload, FileDown, Users, Package, Send } from 'lucide-react';
+import {
+  X,
+  Upload,
+  FileDown,
+  Users,
+  Package,
+  Send,
+  RefreshCw,
+} from 'lucide-react';
 import { importClientsCSV, importProductsCSV } from '../utils/importExport';
 
 interface ImportExportModalProps {
@@ -9,7 +17,7 @@ interface ImportExportModalProps {
 
 /**
  * Modal que permite importar e exportar clientes ou produtos do sistema.
- * Agora com integração automática via API.
+ * Inclui envio via API, download de modelo e exportação real do banco.
  */
 const ImportExportModal: React.FC<ImportExportModalProps> = ({ isOpen, onClose }) => {
   const [importType, setImportType] = useState<'clientes' | 'produtos'>('clientes');
@@ -17,6 +25,7 @@ const ImportExportModal: React.FC<ImportExportModalProps> = ({ isOpen, onClose }
   const [status, setStatus] = useState<string | null>(null);
   const [result, setResult] = useState<any[] | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   /** Processa o arquivo CSV selecionado */
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -27,15 +36,20 @@ const ImportExportModal: React.FC<ImportExportModalProps> = ({ isOpen, onClose }
     setStatus('📄 Lendo arquivo...');
     setResult(null);
 
-    const text = await file.text();
-    const imported =
-      importType === 'clientes' ? importClientsCSV(text) : importProductsCSV(text);
+    try {
+      const text = await file.text();
+      const imported =
+        importType === 'clientes' ? importClientsCSV(text) : importProductsCSV(text);
 
-    if (imported.success) {
-      setResult(imported.data || []);
-      setStatus(`✅ Importação concluída (${imported.data?.length} registros detectados).`);
-    } else {
-      setStatus(`❌ Erro: ${imported.error}`);
+      if (imported.success) {
+        setResult(imported.data || []);
+        setStatus(`✅ Importação concluída (${imported.data?.length} registros detectados).`);
+      } else {
+        setStatus(`❌ Erro: ${imported.error}`);
+      }
+    } catch (err) {
+      console.error(err);
+      setStatus('❌ Erro ao processar o arquivo CSV.');
     }
   };
 
@@ -63,21 +77,55 @@ const ImportExportModal: React.FC<ImportExportModalProps> = ({ isOpen, onClose }
 
       if (resp.ok) {
         const json = await resp.json().catch(() => ({}));
-        setStatus(`✅ Dados enviados com sucesso! (${result.length} registros processados)`);
+        setStatus(`✅ Dados enviados com sucesso ✔️ (${result.length} registros).`);
         console.log('Import API response:', json);
+        setResult(null);
+        setFileName('');
       } else {
         const txt = await resp.text();
         setStatus(`❌ Falha ao enviar: ${txt}`);
       }
     } catch (err) {
       console.error(err);
-      setStatus('❌ Erro de conexão ao servidor.');
+      setStatus('❌ Erro de conexão com o servidor.');
     } finally {
       setIsUploading(false);
     }
   };
 
-  /** Gera um CSV modelo para download */
+  /** Exporta dados reais do backend em CSV */
+  const handleExportData = async () => {
+    setIsExporting(true);
+    setStatus('⬇️ Gerando arquivo de exportação...');
+
+    try {
+      const resp = await fetch(
+        importType === 'clientes'
+          ? '/api/export/clients'
+          : '/api/export/products'
+      );
+      if (!resp.ok) throw new Error('Erro ao gerar exportação');
+      const csv = await resp.text();
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download =
+        importType === 'clientes'
+          ? 'export_clientes.csv'
+          : 'export_produtos.csv';
+      link.click();
+
+      setStatus('✅ Exportação concluída.');
+    } catch (err) {
+      console.error(err);
+      setStatus('❌ Falha ao exportar dados do servidor.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  /** Gera um arquivo modelo */
   const handleExportTemplate = () => {
     const template =
       importType === 'clientes'
@@ -104,12 +152,12 @@ const ImportExportModal: React.FC<ImportExportModalProps> = ({ isOpen, onClose }
           <X className="h-5 w-5" />
         </button>
 
-        <h2 className="text-2xl font-semibold text-gray-800 mb-6">
+        <h2 className="text-2xl font-semibold text-gray-800 mb-6 text-center">
           Importar / Exportar Dados
         </h2>
 
-        {/* Seletor de tipo */}
-        <div className="flex space-x-2 mb-4">
+        {/* Seleção entre Clientes ou Produtos */}
+        <div className="flex space-x-2 mb-6">
           <button
             onClick={() => setImportType('clientes')}
             className={`flex-1 p-2 rounded-lg flex items-center justify-center space-x-2 border transition ${
@@ -135,7 +183,7 @@ const ImportExportModal: React.FC<ImportExportModalProps> = ({ isOpen, onClose }
           </button>
         </div>
 
-        {/* Upload de arquivo */}
+        {/* Upload */}
         <div className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg mb-4">
           <input
             type="file"
@@ -147,41 +195,57 @@ const ImportExportModal: React.FC<ImportExportModalProps> = ({ isOpen, onClose }
           <label htmlFor="fileInput" className="cursor-pointer flex flex-col items-center">
             <Upload className="h-8 w-8 text-purple-500 mb-2" />
             <span className="text-sm text-gray-600">
-              {fileName || 'Clique para selecionar um arquivo CSV'}
+              {fileName || 'Clique ou arraste um arquivo CSV para importar'}
             </span>
           </label>
         </div>
 
-        <div className="flex space-x-2">
-          <button
-            onClick={handleExportTemplate}
-            className="w-1/2 flex items-center justify-center space-x-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 py-2"
-          >
-            <FileDown className="h-5 w-5" />
-            <span>Baixar Modelo</span>
-          </button>
+        {/* Botões principais */}
+        <div className="flex flex-col space-y-2 mb-3">
+          <div className="flex space-x-2">
+            <button
+              onClick={handleExportTemplate}
+              className="w-1/2 flex items-center justify-center space-x-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 py-2"
+            >
+              <FileDown className="h-5 w-5" />
+              <span>Modelo CSV</span>
+            </button>
+
+            <button
+              disabled={!result || isUploading}
+              onClick={handleSendToAPI}
+              className={`w-1/2 flex items-center justify-center space-x-2 rounded-lg py-2 text-white transition ${
+                !result
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-purple-600 hover:bg-purple-700'
+              }`}
+            >
+              <Send className="h-5 w-5" />
+              <span>{isUploading ? 'Enviando...' : 'Enviar Dados'}</span>
+            </button>
+          </div>
 
           <button
-            disabled={!result || isUploading}
-            onClick={handleSendToAPI}
-            className={`w-1/2 flex items-center justify-center space-x-2 rounded-lg py-2 text-white transition ${
-              !result ? 'bg-gray-400 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700'
-            }`}
+            onClick={handleExportData}
+            disabled={isExporting}
+            className="w-full flex items-center justify-center space-x-2 rounded-lg bg-blue-600 text-white py-2 hover:bg-blue-700 transition"
           >
-            <Send className="h-5 w-5" />
-            <span>{isUploading ? 'Enviando...' : 'Enviar ao Servidor'}</span>
+            <RefreshCw className="h-5 w-5" />
+            <span>{isExporting ? 'Gerando exportação...' : 'Exportar dados do sistema'}</span>
           </button>
         </div>
 
+        {/* Status / Logs */}
         {status && (
-          <div className="mt-4 text-sm text-center text-gray-700 whitespace-pre-line">
+          <div className="mt-2 text-sm text-center text-gray-700 whitespace-pre-line">
             {status}
           </div>
         )}
 
+        {/* Pré-visualização */}
         {result && result.length > 0 && (
           <div className="mt-4 max-h-40 overflow-y-auto border-t pt-2 text-xs text-gray-700">
-            <p className="font-semibold mb-1">Pré-visualização:</p>
+            <p className="font-semibold mb-1">Pré-visualização (até 3 linhas):</p>
             <pre>{JSON.stringify(result.slice(0, 3), null, 2)}</pre>
           </div>
         )}
