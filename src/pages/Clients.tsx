@@ -1,153 +1,190 @@
+
 import React, { useState } from 'react';
-import { Plus, Search, Edit2, Trash2, Phone, Mail, MapPin, Briefcase, DollarSign, Users } from 'lucide-react';
-import { useApp, Client } from '../contexts/AppContext';
+import { Plus, Search, Edit, Trash2, Phone, Mail, MapPin } from 'lucide-react';
+import { useApp } from '../contexts/AppContext';
 import ClientModal from '../components/ClientModal';
 
 const Clients: React.FC = () => {
-  const { clients, deleteClient } = useApp();
-  const [searchTerm, setSearchTerm] = useState('');
+  const { clients = [], deleteClient } = useApp();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [selectedClient, setSelectedClient] = useState<any>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const filteredClients = clients.filter(client =>
-    client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.phone.includes(searchTerm)
-  );
-
-  const handleEdit = (client: Client) => {
-    setEditingClient(client);
+  const handleEdit = (client: any) => {
+    setSelectedClient(client);
     setIsModalOpen(true);
   };
 
-  const handleDelete = (clientId: string) => {
-    if (window.confirm('Tem certeza que deseja excluir este cliente? Todos os projetos relacionados também serão removidos.')) {
-      deleteClient(clientId);
+  const handleDelete = async (id: string) => {
+    if (window.confirm('Tem certeza que deseja excluir este cliente?')) {
+      await deleteClient(id);
     }
   };
 
-  const handleModalClose = () => {
+  const handleCloseModal = () => {
     setIsModalOpen(false);
-    setEditingClient(null);
+    setSelectedClient(null);
+  };
+
+  const filteredClients = clients.filter(client =>
+    client?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    client?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    client?.phone?.includes(searchTerm) ||
+    client?.cpf?.includes(searchTerm) ||
+    client?.cnpj?.includes(searchTerm)
+  );
+
+  // Função segura para formatar endereço
+  const formatAddress = (client: any) => {
+    if (!client) return 'Endereço não informado';
+    
+    const parts = [];
+    
+    if (client.street) {
+      parts.push(client.street);
+      if (client.numero) {
+        parts.push(`, ${client.numero}`);
+      }
+    }
+    
+    if (client.neighborhood) {
+      parts.push(` - ${client.neighborhood}`);
+    }
+    
+    if (client.city && client.state) {
+      parts.push(` - ${client.city}/${client.state}`);
+    } else if (client.city) {
+      parts.push(` - ${client.city}`);
+    } else if (client.state) {
+      parts.push(` - ${client.state}`);
+    }
+    
+    if (client.zip_code) {
+      parts.push(` - CEP: ${client.zip_code}`);
+    }
+    
+    return parts.length > 0 ? parts.join('') : 'Endereço não informado';
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="p-6">
+      <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Gestão de Clientes</h1>
-          <p className="text-gray-600 mt-1">Gerencie sua base de clientes</p>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">Clientes</h1>
+          <p className="text-gray-600">Gerencie sua base de clientes</p>
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="bg-gradient-to-r from-amber-600 to-amber-700 text-white px-6 py-3 rounded-lg font-medium flex items-center space-x-2 hover:from-amber-700 hover:to-amber-800 transition-all duration-200 shadow-lg hover:shadow-xl"
+          className="flex items-center space-x-2 bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors"
         >
           <Plus className="h-5 w-5" />
           <span>Novo Cliente</span>
         </button>
       </div>
 
-      {/* Barra de Busca */}
-      <div className="bg-white rounded-xl shadow-lg p-6">
+      <div className="mb-6">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
           <input
             type="text"
-            placeholder="Buscar por nome, email ou telefone..."
+            placeholder="Buscar por nome, email, telefone ou documento..."
+            className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-500"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
           />
         </div>
       </div>
 
-      {/* Grid de Clientes */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredClients.map((client) => (
-          <div key={client.id} className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 overflow-hidden">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-bold text-gray-800">{client.name}</h3>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => handleEdit(client)}
-                    className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                  >
-                    <Edit2 className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(client.id)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center space-x-3 text-gray-600">
-                  <Mail className="h-4 w-4 text-amber-600" />
-                  <span className="text-sm">{client.email}</span>
-                </div>
-                {client.phone && (
-                  <div className="flex items-center space-x-3 text-gray-600">
-                    <Phone className="h-4 w-4 text-amber-600" />
-                    <span className="text-sm">{client.phone}</span>
-                  </div>
-                )}
-                <div className="flex items-center space-x-3 text-gray-600">
-                  <Phone className="h-4 w-4 text-green-600" />
-                  <span className="text-sm">{client.mobile}</span>
-                </div>
-                <div className="flex items-center space-x-3 text-gray-600">
-                  <MapPin className="h-4 w-4 text-amber-600" />
-                  <span className="text-sm">{client.address.city}, {client.address.state}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gray-50 px-6 py-4 border-t">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="flex items-center space-x-1 text-sm text-gray-600">
-                    <Briefcase className="h-4 w-4 text-amber-600" />
-                    <span>{client.total_projects || 0} projetos</span>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-1 text-sm font-medium text-green-600">
-                  <DollarSign className="h-4 w-4" />
-                  <span>R$ {(client.total_value || 0).toLocaleString()}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-gray-200">
+                <th className="text-left py-4 px-6 text-sm font-medium text-gray-700">Nome</th>
+                <th className="text-left py-4 px-6 text-sm font-medium text-gray-700">Documento</th>
+                <th className="text-left py-4 px-6 text-sm font-medium text-gray-700">Contato</th>
+                <th className="text-left py-4 px-6 text-sm font-medium text-gray-700">Endereço</th>
+                <th className="text-left py-4 px-6 text-sm font-medium text-gray-700">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredClients.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="text-center py-12 text-gray-500">
+                    {searchTerm ? 'Nenhum cliente encontrado.' : 'Nenhum cliente cadastrado.'}
+                  </td>
+                </tr>
+              ) : (
+                filteredClients.map((client) => (
+                  <tr key={client.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-4 px-6">
+                      <div className="font-medium text-gray-800">{client.name || 'Nome não informado'}</div>
+                      <div className="text-sm text-gray-500">{client.email || 'Email não informado'}</div>
+                    </td>
+                    <td className="py-4 px-6">
+                      <div className="text-sm">
+                        {client.type === 'pf' ? (
+                          <>
+                            <span className="font-medium">CPF:</span> {client.cpf || 'Não informado'}
+                          </>
+                        ) : (
+                          <>
+                            <span className="font-medium">CNPJ:</span> {client.cnpj || 'Não informado'}
+                          </>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-4 px-6">
+                      <div className="space-y-1">
+                        {client.phone && (
+                          <div className="flex items-center text-sm text-gray-600">
+                            <Phone className="h-3 w-3 mr-1" />
+                            {client.phone}
+                          </div>
+                        )}
+                        {client.mobile && (
+                          <div className="flex items-center text-sm text-gray-600">
+                            <Phone className="h-3 w-3 mr-1" />
+                            {client.mobile}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-4 px-6">
+                      <div className="flex items-start text-sm text-gray-600">
+                        <MapPin className="h-3 w-3 mr-1 mt-0.5 flex-shrink-0" />
+                        <span>{formatAddress(client)}</span>
+                      </div>
+                    </td>
+                    <td className="py-4 px-6">
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => handleEdit(client)}
+                          className="text-gray-600 hover:text-amber-600 transition-colors"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(client.id)}
+                          className="text-gray-600 hover:text-red-600 transition-colors"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {filteredClients.length === 0 && (
-        <div className="text-center py-12">
-          <div className="bg-white rounded-xl shadow-lg p-8">
-            <div className="text-gray-400 mb-4">
-              <Users className="h-16 w-16 mx-auto" />
-            </div>
-            <h3 className="text-xl font-medium text-gray-500 mb-2">
-              {searchTerm ? 'Nenhum cliente encontrado' : 'Nenhum cliente cadastrado'}
-            </h3>
-            <p className="text-gray-400">
-              {searchTerm
-                ? 'Tente ajustar os termos de busca'
-                : 'Comece adicionando seu primeiro cliente'
-              }
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Modal */}
       {isModalOpen && (
         <ClientModal
-          client={editingClient}
-          onClose={handleModalClose}
+          isOpen={isModalOpen}
+          onClose={handleCloseModal}
+          client={selectedClient}
         />
       )}
     </div>
