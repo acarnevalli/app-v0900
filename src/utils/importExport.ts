@@ -1,3 +1,58 @@
+
+interface CSVImportResult {
+  success: boolean;
+  data?: any[];
+  error?: string;
+}
+
+// Função para detectar o separador do CSV
+function detectCSVSeparator(csvText: string): string {
+  const firstLine = csvText.split('\n')[0];
+  const separators = [',', ';', '\t', '|'];
+  
+  let maxCount = 0;
+  let bestSeparator = ',';
+  
+  for (const sep of separators) {
+    const count = (firstLine.match(new RegExp(`\\${sep}`, 'g')) || []).length;
+    if (count > maxCount) {
+      maxCount = count;
+      bestSeparator = sep;
+    }
+  }
+  
+  return bestSeparator;
+}
+
+// Função auxiliar para parsear linha CSV considerando vírgulas dentro de aspas
+function parseCSVLine(line: string, separator: string = ','): string[] {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    const nextChar = line[i + 1];
+
+    if (char === '"') {
+      if (inQuotes && nextChar === '"') {
+        current += '"';
+        i++; // Skip next quote
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === separator && !inQuotes) {
+      result.push(current);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+
+  result.push(current);
+  return result;
+}
+
 export const importClientsCSV = (csvText: string): CSVImportResult => {
   try {
     const lines = csvText.trim().split('\n');
