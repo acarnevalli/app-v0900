@@ -1,0 +1,68 @@
+- =====================================================
+-- 🔄  TRIGGERS PARA ATUALIZAR ESTOQUE AUTOMATICAMENTE
+-- =====================================================
+
+-- 1️⃣ Função: atualiza estoque ao inserir uma compra
+create or replace function public.fn_add_stock_on_purchase()
+returns trigger as $$
+begin
+  -- Se o produto existir, soma a quantidade comprada
+  update public.products
+  set stock = coalesce(stock,0) + coalesce(new.quantity,0)
+  where id = new.product_id;
+  return new;
+end;
+$$ language plpgsql;
+
+-- 2️⃣ Função: atualiza estoque ao inserir uma venda
+create or replace function public.fn_subtract_stock_on_sale()
+returns trigger as $$
+begin
+  update public.products
+  set stock = coalesce(stock,0) - coalesce(new.quantity,0)
+  where id = new.product_id;
+  return new;
+end;
+$$ language plpgsql;
+
+-- 3️⃣ Função: movimentação de estoque (entrada/saída)
+create or replace function public.fn_update_stock_on_movement()
+returns trigger as $$
+begin
+  if new.movement_type = 'entrada' then
+    update public.products
+    set stock = coalesce(stock,0) + coalesce(new.quantity,0)
+    where id = new.product_id;
+  elsif new.movement_type = 'saida' then
+    update public.products
+    set stock = coalesce(stock,0) - coalesce(new.quantity,0)
+    where id = new.product_id;
+  end if;
+  return new;
+end;
+$$ language plpgsql;
+
+-- =====================================================
+-- 🧩 TRIGGERS (vinculam as funções às tabelas)
+-- =====================================================
+
+-- Tabela de itens de compra
+drop trigger if exists trg_add_stock_on_purchase on public.purchase_items;
+create trigger trg_add_stock_on_purchase
+after insert on public.purchase_items
+for each row
+execute function public.fn_add_stock_on_purchase();
+
+-- Tabela de itens de venda
+drop trigger if exists trg_subtract_stock_on_sale on public.sale_items;
+create trigger trg_subtract_stock_on_sale
+after insert on public.sale_items
+for each row
+execute function public.fn_subtract_stock_on_sale();
+
+-- Tabela de movimentações
+drop trigger if exists trg_update_stock_on_movement on public.stock_movements;
+create trigger trg_update_stock_on_movement
+after insert on public.stock_movements
+for each row
+execute function public.fn_update_stock_on_movement();
