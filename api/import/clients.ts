@@ -1,3 +1,5 @@
+import { supabase } from '../../supabase/client';
+
 export default async function handler(req: Request): Promise<Response> {
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Método não permitido' }), {
@@ -6,20 +8,29 @@ export default async function handler(req: Request): Promise<Response> {
   }
 
   try {
-    const body = await req.json();
-    console.log('Recebidos clientes:', body);
+    const clients = await req.json();
+    console.log('📥 Recebendo clientes:', clients.length);
 
-    // Aqui você poderia chamar seu Supabase ou outro banco, ex:
-    // await supabase.from('clients').insert(body);
+    // Insere os dados no banco Supabase (tabela: clients)
+    const { error } = await supabase.from('clients').insert(clients);
 
-    return new Response(JSON.stringify({ ok: true, count: body.length }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    if (error) {
+      console.error('❌ Erro ao inserir:', error);
+      return new Response(
+        JSON.stringify({ error: 'Erro ao salvar clientes', details: error }),
+        { status: 500 }
+      );
+    }
+
+    return new Response(
+      JSON.stringify({ ok: true, count: clients.length }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    );
   } catch (err: any) {
-    console.error('Erro import clients', err);
-    return new Response(JSON.stringify({ error: 'Erro ao processar dados' }), {
-      status: 500,
-    });
+    console.error('Erro geral import/clients:', err);
+    return new Response(
+      JSON.stringify({ error: 'Erro interno ao processar clientes' }),
+      { status: 500 }
+    );
   }
 }
