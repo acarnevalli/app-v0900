@@ -1,4 +1,3 @@
-
 interface CSVImportResult {
   success: boolean;
   data?: any[];
@@ -9,18 +8,18 @@ interface CSVImportResult {
 function detectCSVSeparator(csvText: string): string {
   const firstLine = csvText.split('\n')[0];
   const separators = [',', ';', '\t', '|'];
-  
+
   let maxCount = 0;
   let bestSeparator = ',';
-  
+
   for (const sep of separators) {
-    const count = (firstLine.match(new RegExp(`\\${sep}`, 'g')) || []).length;
+    const count = firstLine.split(sep).length - 1;
     if (count > maxCount) {
       maxCount = count;
       bestSeparator = sep;
     }
   }
-  
+
   return bestSeparator;
 }
 
@@ -72,7 +71,7 @@ export const importClientsCSV = (csvText: string): CSVImportResult => {
 
     const headers = firstLine.split(separator).map(h => h.trim().toLowerCase().replace(/['"]/g, ''));
     console.log('Headers encontrados:', headers);
-    
+
     const clients = [];
     const warnings = [];
 
@@ -251,7 +250,7 @@ export const importClientsCSV = (csvText: string): CSVImportResult => {
     }
 
     console.log(`Importação concluída: ${clients.length} clientes importados, ${warnings.length} avisos`);
-    
+
     if (warnings.length > 0) {
       console.warn('Avisos durante importação:', warnings);
     }
