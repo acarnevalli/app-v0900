@@ -9,6 +9,8 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { importClientsCSV, importProductsCSV } from '../utils/importExport';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 interface ImportExportModalProps {
   isOpen: boolean;
@@ -17,9 +19,10 @@ interface ImportExportModalProps {
 
 /**
  * Modal que permite importar e exportar clientes ou produtos do sistema.
- * Inclui envio via API, download de modelo e exportação real do banco.
+ * Usa diretamente o Supabase sem API intermediária.
  */
 const ImportExportModal: React.FC<ImportExportModalProps> = ({ isOpen, onClose }) => {
+  const { user } = useAuth();
   const [importType, setImportType] = useState<'clientes' | 'produtos'>('clientes');
   const [fileName, setFileName] = useState('');
   const [status, setStatus] = useState<string | null>(null);
@@ -53,73 +56,197 @@ const ImportExportModal: React.FC<ImportExportModalProps> = ({ isOpen, onClose }
     }
   };
 
-  /** Envia os dados importados ao backend */
+  /** Envia os dados importados diretamente ao Supabase */
   const handleSendToAPI = async () => {
     if (!result || result.length === 0) {
       setStatus('⚠️ Nenhum dado válido para enviar.');
       return;
     }
 
+    if (!user) {
+      setStatus('❌ Você precisa estar autenticado para importar dados.');
+      return;
+    }
+
     setIsUploading(true);
-    setStatus('🚀 Enviando dados para o servidor...');
+    setStatus('🚀 Enviando dados para o banco...');
 
     try {
-      const resp = await fetch(
-        importType === 'clientes'
-          ? '/api/import/clients'
-          : '/api/import/products',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(result),
-        }
-      );
+      if (importType === 'clientes') {
+        // Adicionar user_id a cada cliente
+        const clientsWithUserId = result.map(client => ({
+          ...client,
+          user_id: user.id,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          // Campos obrigatórios com defaults
+          mobile: client.mobile || client.phone || '(00) 00000-0000',
+          country: client.country || 'Brasil',
+          state: client.state || 'N/A',
+          city: client.city || 'N/A',
+          zip_code: client.zip_code || '00000-000',
+          neighborhood: client.neighborhood || 'N/A',
+          street_type: client.street_type || 'Rua',
+          street: client.street || 'N/A',
+        }));
 
-      if (resp.ok) {
-        const json = await resp.json().catch(() => ({}));
-        setStatus(`✅ Dados enviados com sucesso ✔️ (${result.length} registros).`);
-        console.log('Import API response:', json);
-        setResult(null);
-        setFileName('');
+        const { error } = await supabase
+          .from('clients')
+          .insert(clientsWithUserId);
+
+        if (error) throw error;
+
+        setStatus(`✅ ${result.length} clientes importados com sucesso! ✔️`);
       } else {
-        const txt = await resp.text();
-        setStatus(`❌ Falha ao enviar: ${txt}`);
+        // Produtos (sem user_id)
+        const productsFormatted = result.map(product => ({
+          name: product.name,
+          description: product.description || '',
+          category: product.category || 'Geral',
+          type: 'produto_pronto' as const,
+          unit: product.unit || 'UN',
+          cost_price: product.cost || product.cost_price || 0,
+          sale_price: product.price || product.sale_price || 0,
+          current_stock: product.stock || product.current_stock || 0,
+          min_stock: product.min_stock || 0,
+          supplier: product.supplier || '',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }));
+
+        const { error } = await supabase
+          .from('products')
+          .insert(productsFormatted);
+
+        if (error) throw error;
+
+        setStatus(`✅ ${result.length} produtos importados com sucesso! ✔️`);
       }
-    } catch (err) {
-      console.error(err);
-      setStatus('❌ Erro de conexão com o servidor.');
+
+      // Limpar após sucesso
+      setResult(null);
+      setFileName('');
+      
+      // Recarregar página após 2 segundos para atualizar lista
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+
+    } catch (err: any) {
+      console.error('Erro ao importar:', err);
+      setStatus(`❌ Falha ao enviar: ${err.message || 'Erro desconhecido'}`);
     } finally {
       setIsUploading(false);
     }
   };
 
-  /** Exporta dados reais do backend em CSV */
+  /** Exporta dados reais do Supabase em CSV */
   const handleExportData = async () => {
+    if (!user) {
+      setStatus('❌ Você precisa estar autenticado para exportar dados.');
+      return;
+    }
+
     setIsExporting(true);
     setStatus('⬇️ Gerando arquivo de exportação...');
 
     try {
-      const resp = await fetch(
-        importType === 'clientes'
-          ? '/api/export/clients'
-          : '/api/export/products'
-      );
-      if (!resp.ok) throw new Error('Erro ao gerar exportação');
-      const csv = await resp.text();
+      if (importType === 'clientes') {
+        // Buscar clientes do usuário
+        const { data, error } = await supabase
+          .from('clients')
+          .select('*')
+          .eq('user_id', user.id);
 
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download =
-        importType === 'clientes'
-          ? 'export_clientes.csv'
-          : 'export_produtos.csv';
-      link.click();
+        if (error) throw error;
 
-      setStatus('✅ Exportação concluída.');
-    } catch (err) {
-      console.error(err);
-      setStatus('❌ Falha ao exportar dados do servidor.');
+        if (!data || data.length === 0) {
+          setStatus('⚠️ Nenhum cliente encontrado para exportar.');
+          setIsExporting(false);
+          return;
+        }
+
+        // Converter para CSV
+        const headers = [
+          'nome', 'email', 'telefone', 'cpf', 'cnpj', 
+          'cidade', 'estado', 'cep', 'bairro', 'rua'
+        ];
+        const rows = data.map(c => [
+          c.name,
+          c.email,
+          c.phone,
+          c.cpf || '',
+          c.cnpj || '',
+          c.city,
+          c.state,
+          c.zip_code,
+          c.neighborhood,
+          c.street
+        ]);
+
+        const csv = [
+          headers.join(','),
+          ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+        ].join('\n');
+
+        // Download
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `clientes_${new Date().toISOString().split('T')[0]}.csv`;
+        link.click();
+
+        setStatus(`✅ ${data.length} clientes exportados com sucesso!`);
+
+      } else {
+        // Buscar produtos
+        const { data, error } = await supabase
+          .from('products')
+          .select('*');
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+          setStatus('⚠️ Nenhum produto encontrado para exportar.');
+          setIsExporting(false);
+          return;
+        }
+
+        // Converter para CSV
+        const headers = [
+          'nome', 'codigo', 'categoria', 'tipo', 'unidade',
+          'custo', 'preco_venda', 'estoque_atual', 'estoque_minimo'
+        ];
+        const rows = data.map(p => [
+          p.name,
+          p.id,
+          p.category,
+          p.type,
+          p.unit,
+          p.cost_price,
+          p.sale_price || '',
+          p.current_stock,
+          p.min_stock
+        ]);
+
+        const csv = [
+          headers.join(','),
+          ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+        ].join('\n');
+
+        // Download
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `produtos_${new Date().toISOString().split('T')[0]}.csv`;
+        link.click();
+
+        setStatus(`✅ ${data.length} produtos exportados com sucesso!`);
+      }
+
+    } catch (err: any) {
+      console.error('Erro ao exportar:', err);
+      setStatus(`❌ Falha ao exportar: ${err.message || 'Erro desconhecido'}`);
     } finally {
       setIsExporting(false);
     }
@@ -129,8 +256,12 @@ const ImportExportModal: React.FC<ImportExportModalProps> = ({ isOpen, onClose }
   const handleExportTemplate = () => {
     const template =
       importType === 'clientes'
-        ? 'nome,email,telefone,cpf,cnpj,cidade,estado\n'
-        : 'nome,codigo,preco,custo,categoria,quantidade\n';
+        ? 'nome,email,telefone,cpf,cnpj,cidade,estado,cep,bairro,rua\n' +
+          'João Silva,joao@email.com,(11) 98888-8888,123.456.789-00,,São Paulo,SP,01234-567,Centro,Rua A\n' +
+          'Empresa LTDA,empresa@email.com,(11) 3333-3333,,12.345.678/0001-90,São Paulo,SP,04567-890,Jardins,Av B\n'
+        : 'nome,categoria,tipo,unidade,custo,preco_venda,estoque_atual,estoque_minimo\n' +
+          'Produto Exemplo,Geral,produto_pronto,UN,10.00,25.00,100,10\n' +
+          'Material Bruto,Materiais,material_bruto,KG,5.50,0,500,50\n';
 
     const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -138,6 +269,8 @@ const ImportExportModal: React.FC<ImportExportModalProps> = ({ isOpen, onClose }
     link.download =
       importType === 'clientes' ? 'modelo_clientes.csv' : 'modelo_produtos.csv';
     link.click();
+
+    setStatus('✅ Modelo baixado com sucesso!');
   };
 
   if (!isOpen) return null;
@@ -159,7 +292,12 @@ const ImportExportModal: React.FC<ImportExportModalProps> = ({ isOpen, onClose }
         {/* Seleção entre Clientes ou Produtos */}
         <div className="flex space-x-2 mb-6">
           <button
-            onClick={() => setImportType('clientes')}
+            onClick={() => {
+              setImportType('clientes');
+              setStatus(null);
+              setResult(null);
+              setFileName('');
+            }}
             className={`flex-1 p-2 rounded-lg flex items-center justify-center space-x-2 border transition ${
               importType === 'clientes'
                 ? 'bg-amber-100 border-amber-400'
@@ -171,7 +309,12 @@ const ImportExportModal: React.FC<ImportExportModalProps> = ({ isOpen, onClose }
           </button>
 
           <button
-            onClick={() => setImportType('produtos')}
+            onClick={() => {
+              setImportType('produtos');
+              setStatus(null);
+              setResult(null);
+              setFileName('');
+            }}
             className={`flex-1 p-2 rounded-lg flex items-center justify-center space-x-2 border transition ${
               importType === 'produtos'
                 ? 'bg-green-100 border-green-400'
@@ -184,7 +327,7 @@ const ImportExportModal: React.FC<ImportExportModalProps> = ({ isOpen, onClose }
         </div>
 
         {/* Upload */}
-        <div className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg mb-4">
+        <div className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg mb-4 hover:border-amber-400 transition">
           <input
             type="file"
             accept=".csv,text/csv"
@@ -194,8 +337,8 @@ const ImportExportModal: React.FC<ImportExportModalProps> = ({ isOpen, onClose }
           />
           <label htmlFor="fileInput" className="cursor-pointer flex flex-col items-center">
             <Upload className="h-8 w-8 text-purple-500 mb-2" />
-            <span className="text-sm text-gray-600">
-              {fileName || 'Clique ou arraste um arquivo CSV para importar'}
+            <span className="text-sm text-gray-600 text-center">
+              {fileName || 'Clique para selecionar um arquivo CSV'}
             </span>
           </label>
         </div>
@@ -205,48 +348,59 @@ const ImportExportModal: React.FC<ImportExportModalProps> = ({ isOpen, onClose }
           <div className="flex space-x-2">
             <button
               onClick={handleExportTemplate}
-              className="w-1/2 flex items-center justify-center space-x-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 py-2"
+              className="w-1/2 flex items-center justify-center space-x-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 transition"
             >
               <FileDown className="h-5 w-5" />
-              <span>Modelo CSV</span>
+              <span>Baixar Modelo</span>
             </button>
 
             <button
               disabled={!result || isUploading}
               onClick={handleSendToAPI}
               className={`w-1/2 flex items-center justify-center space-x-2 rounded-lg py-2 text-white transition ${
-                !result
+                !result || isUploading
                   ? 'bg-gray-400 cursor-not-allowed'
                   : 'bg-purple-600 hover:bg-purple-700'
               }`}
             >
               <Send className="h-5 w-5" />
-              <span>{isUploading ? 'Enviando...' : 'Enviar Dados'}</span>
+              <span>{isUploading ? 'Enviando...' : 'Importar'}</span>
             </button>
           </div>
 
           <button
             onClick={handleExportData}
             disabled={isExporting}
-            className="w-full flex items-center justify-center space-x-2 rounded-lg bg-blue-600 text-white py-2 hover:bg-blue-700 transition"
+            className={`w-full flex items-center justify-center space-x-2 rounded-lg py-2 text-white transition ${
+              isExporting
+                ? 'bg-blue-400 cursor-wait'
+                : 'bg-blue-600 hover:bg-blue-700'
+            }`}
           >
-            <RefreshCw className="h-5 w-5" />
-            <span>{isExporting ? 'Gerando exportação...' : 'Exportar dados do sistema'}</span>
+            <RefreshCw className={`h-5 w-5 ${isExporting ? 'animate-spin' : ''}`} />
+            <span>{isExporting ? 'Exportando...' : 'Exportar Dados'}</span>
           </button>
         </div>
 
         {/* Status / Logs */}
         {status && (
-          <div className="mt-2 text-sm text-center text-gray-700 whitespace-pre-line">
+          <div className={`mt-3 p-3 rounded-lg text-sm text-center ${
+            status.includes('✅') ? 'bg-green-50 text-green-700' :
+            status.includes('❌') ? 'bg-red-50 text-red-700' :
+            status.includes('⚠️') ? 'bg-yellow-50 text-yellow-700' :
+            'bg-blue-50 text-blue-700'
+          }`}>
             {status}
           </div>
         )}
 
         {/* Pré-visualização */}
         {result && result.length > 0 && (
-          <div className="mt-4 max-h-40 overflow-y-auto border-t pt-2 text-xs text-gray-700">
-            <p className="font-semibold mb-1">Pré-visualização (até 3 linhas):</p>
-            <pre>{JSON.stringify(result.slice(0, 3), null, 2)}</pre>
+          <div className="mt-4 max-h-40 overflow-y-auto border rounded-lg p-3 bg-gray-50 text-xs text-gray-700">
+            <p className="font-semibold mb-2 text-gray-800">
+              📋 Pré-visualização (até 3 registros):
+            </p>
+            <pre className="whitespace-pre-wrap">{JSON.stringify(result.slice(0, 3), null, 2)}</pre>
           </div>
         )}
       </div>
