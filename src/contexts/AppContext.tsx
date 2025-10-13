@@ -2,6 +2,114 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { supabase } from "../lib/supabase";
 import { useAuth } from "./AuthContext";
 import { v4 as uuidv4 } from 'uuid';
+import { createContext, useContext, useEffect, useState } from 'react'
+import { supabase, handleAuthError } from '../lib/supabase-client'
+
+// ---------------------------------------------------------------
+// Funções de auth
+// ---------------------------------------------------------------
+
+const AppContext = createContext({})
+
+export function AppProvider({ children }: { children: React.ReactNode }) {
+  const [products, setProducts] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [user, setUser] = useState(null)
+
+  useEffect(() => {
+    checkUser()
+    fetchProducts()
+    
+    // Listener para mudanças de autenticação
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'TOKEN_REFRESHED') {
+          console.log('Token renovado com sucesso')
+        }
+        if (event === 'SIGNED_OUT') {
+          setUser(null)
+          setProducts([])
+        }
+        if (session) {
+          setUser(session.user)
+        }
+      }
+    )
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  const checkUser = async () => {
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession()
+      
+      if (error) {
+        await handleAuthError(error)
+        return
+      }
+      
+      if (session?.user) {
+        setUser(session.user)
+      }
+    } catch (error) {
+      console.error('Erro ao verificar usuário:', error)
+    }
+  }
+
+  const fetchProducts = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .order('created_at', { ascending: false })
+      
+      if (error) {
+        console.error('Erro ao buscar produtos:', error)
+        
+        // Se for erro de autenticação, trata especificamente
+        if (error.message?.includes('JWT')) {
+          await handleAuthError(error)
+          return
+        }
+        
+        setError('Erro ao carregar produtos. Tente novamente mais tarde.')
+        return
+      }
+      
+      setProducts(data || [])
+    } catch (error) {
+      console.error('Erro inesperado:', error)
+      setError('Erro ao conectar com o servidor.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <AppContext.Provider value={{ 
+      products, 
+      loading, 
+      error, 
+      user, 
+      fetchProducts,
+      checkUser 
+    }}>
+      {children}
+    </AppContext.Provider>
+  )
+}
+
+export const useApp = () => {
+  const context = useContext(AppContext)
+  if (!context) {
+    throw new Error('useApp deve ser usado dentro de AppProvider')
+  }
+  return context
+}
 
 // ---------------------------------------------------------------
 // Funções auxiliares
