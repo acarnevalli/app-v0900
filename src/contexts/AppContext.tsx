@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { ReactNode } from 'react'
 import { supabase } from "../lib/supabase";
 import { useAuth } from "./AuthContext";
 import { v4 as uuidv4 } from 'uuid';
