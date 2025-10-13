@@ -57,65 +57,98 @@ export const importClientsCSV = (csvText: string): CSVImportResult => {
     if (lines.length < 2) return { success: false, error: 'Arquivo CSV vazio ou inválido' };
 
     const separator = detectCSVSeparator(csvText);
-    let firstLine = lines[0].replace(/^\uFEFF/, '');
-    const headers = firstLine.split(separator).map(h => h.trim().toLowerCase());
-
     const clients = [];
 
+    // Pular a primeira linha (cabeçalho)
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i].trim();
       if (!line) continue;
 
       const values = parseCSVLine(line, separator);
-      const client: any = { type: 'pf', fl_ativo: true };
+      
+      // Mapeamento direto por índice conforme a ordem fornecida:
+      // 0: Nome
+      // 1: Razão Social
+      // 2: CNPJ
+      // 3: CPF
+      // 4: ID Estrangeiro (ignorar)
+      // 5: DataCriacao (ignorar)
+      // 6: Observações (ignorar)
+      // 7: Status
+      // 8: Código (ignorar)
+      // 9: Inscrição Estadual
+      // 10: Email principal
+      // 11: Telefone principal
+      // 12: Data fundação/Aniversário (ignorar)
+      // 13: CEP
+      // 14: Estado
+      // 15: Cidade
+      // 16: Endereço
+      // 17: Número
+      // 18: Bairro
+      // 19: Complemento
+      // 20: Nome Contato (ignorar)
+      // 21: E-mail Contato (ignorar)
 
-      headers.forEach((header, idx) => {
-        const val = values[idx]?.trim().replace(/^['"]|['"]$/g, '') || '';
-        switch (header) {
-          case 'nome':
-          case 'cliente':
-          case 'name':
-            client.name = val;
-            break;
-          case 'email':
-          case 'e-mail':
-            client.email = val;
-            break;
-          case 'telefone':
-          case 'phone':
-            client.phone = val;
-            break;
-          case 'cpf':
-            client.cpf = val;
-            break;
-          case 'cnpj':
-            client.cnpj = val;
-            client.type = 'pj';
-            break;
-          case 'cidade':
-            client.city = val;
-            break;
-          case 'estado':
-          case 'uf':
-            client.state = val;
-            break;
-        }
-      });
+      const nome = values[0]?.trim().replace(/^['"]|['"]$/g, '') || '';
+      const razaoSocial = values[1]?.trim().replace(/^['"]|['"]$/g, '') || '';
+      const cnpj = values[2]?.trim().replace(/^['"]|['"]$/g, '') || '';
+      const cpf = values[3]?.trim().replace(/^['"]|['"]$/g, '') || '';
+      const status = values[7]?.trim().replace(/^['"]|['"]$/g, '').toLowerCase() || '';
+      const inscricaoEstadual = values[9]?.trim().replace(/^['"]|['"]$/g, '') || '';
+      const email = values[10]?.trim().replace(/^['"]|['"]$/g, '') || '';
+      const telefone = values[11]?.trim().replace(/^['"]|['"]$/g, '') || '';
+      const cep = values[13]?.trim().replace(/^['"]|['"]$/g, '') || '';
+      const estado = values[14]?.trim().replace(/^['"]|['"]$/g, '') || '';
+      const cidade = values[15]?.trim().replace(/^['"]|['"]$/g, '') || '';
+      const endereco = values[16]?.trim().replace(/^['"]|['"]$/g, '') || '';
+      const numero = values[17]?.trim().replace(/^['"]|['"]$/g, '') || '';
+      const bairro = values[18]?.trim().replace(/^['"]|['"]$/g, '') || '';
+      const complemento = values[19]?.trim().replace(/^['"]|['"]$/g, '') || '';
 
-      if (!client.name) continue;
+      // Validação: precisa ter pelo menos nome
+      if (!nome) continue;
 
-      // Defaults
-      if (!client.email) client.email = `cliente${Date.now()}@exemplo.com`;
-      if (!client.phone) client.phone = '(00) 0000-0000';
-      if (!client.city) client.city = 'Não informado';
+      // Determinar tipo: PJ se tiver CNPJ, senão PF
+      const type = cnpj ? 'pj' : 'pf';
+
+      // Determinar se está ativo baseado no status
+      const fl_ativo = status === 'ativo' || status === 'active' || status === '1' || status === 'sim' || !status;
+
+      const client: any = {
+        name: nome,
+        type: type,
+        cpf: cpf || null,
+        cnpj: cnpj || null,
+        razao_social: razaoSocial || null,
+        inscricao_estadual: inscricaoEstadual || null,
+        isento_icms: false,
+        email: email || `cliente${Date.now()}@exemplo.com`,
+        phone: telefone || '(00) 0000-0000',
+        mobile: telefone || '(00) 00000-0000',
+        country: 'Brasil',
+        state: estado || 'N/A',
+        city: cidade || 'N/A',
+        zip_code: cep || '00000-000',
+        neighborhood: bairro || 'N/A',
+        street_type: 'Rua',
+        street: endereco || 'N/A',
+        numero: numero || 'S/N',
+        complemento: complemento || '',
+        id_empresa: null,
+        fl_ativo: fl_ativo,
+      };
 
       clients.push(client);
     }
 
-    if (clients.length === 0) return { success: false, error: 'Nenhum cliente válido encontrado' };
+    if (clients.length === 0) {
+      return { success: false, error: 'Nenhum cliente válido encontrado no arquivo' };
+    }
 
     return { success: true, data: clients };
-  } catch {
+  } catch (err) {
+    console.error('Erro ao processar CSV:', err);
     return { success: false, error: 'Erro ao processar arquivo CSV de clientes' };
   }
 };
