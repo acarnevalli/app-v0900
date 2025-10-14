@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Save, User, Mail, Phone, Building } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
+import { formatCNPJ, validateCNPJ } from '../lib/utils';
 
 interface SupplierModalProps {
   isOpen: boolean;
@@ -20,7 +21,7 @@ const SupplierModal: React.FC<SupplierModalProps> = ({ isOpen, onClose, supplier
   const { addSupplier, updateSupplier } = useApp();
   const [formData, setFormData] = useState({
     name: supplier?.name || '',
-    cnpj: supplier?.cnpj || '',
+    cnpj: supplier?.cnpj ? formatCNPJ(supplier.cnpj) : '',
     contact: supplier?.contact || '',
     email: supplier?.email || '',
     phone: supplier?.phone || '',
@@ -33,20 +34,38 @@ const SupplierModal: React.FC<SupplierModalProps> = ({ isOpen, onClose, supplier
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
-    if (!formData.name.trim()) newErrors.name = 'Nome é obrigatório';
+
+    if (!formData.name.trim()) {
+      newErrors.name = 'Nome é obrigatório';
+    }
+
     if (formData.email && !/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'Email inválido';
     }
-    if (formData.cnpj && !/^\d{14}$|^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/.test(formData.cnpj)) {
-      newErrors.cnpj = 'CNPJ deve ter 14 dígitos ou estar no formato xx.xxx.xxx/xxxx-xx';
+
+    if (formData.cnpj) {
+      const clean = formData.cnpj.replace(/\D/g, '');
+      if (clean.length > 0 && clean.length < 14) {
+        newErrors.cnpj = 'CNPJ incompleto';
+      } else if (clean.length === 14 && !validateCNPJ(formData.cnpj)) {
+        newErrors.cnpj = 'CNPJ inválido';
+      }
     }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+
+    if (name === 'cnpj') {
+      const formatted = formatCNPJ(value);
+      setFormData((prev) => ({ ...prev, cnpj: formatted }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
+
     if (errors[name]) {
       setErrors((prev) => {
         const { [name]: _, ...rest } = prev;
@@ -61,10 +80,15 @@ const SupplierModal: React.FC<SupplierModalProps> = ({ isOpen, onClose, supplier
 
     setIsSubmitting(true);
     try {
+      const cleanData = {
+        ...formData,
+        cnpj: formData.cnpj.replace(/\D/g, '') || undefined,
+      };
+
       if (supplier?.id) {
-        await updateSupplier(supplier.id, formData);
+        await updateSupplier(supplier.id, cleanData);
       } else {
-        await addSupplier(formData);
+        await addSupplier(cleanData);
       }
       onClose();
     } catch (err: any) {
@@ -84,7 +108,6 @@ const SupplierModal: React.FC<SupplierModalProps> = ({ isOpen, onClose, supplier
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden border border-amber-100">
-        {/* Cabeçalho */}
         <div className="flex justify-between items-center p-6 border-b border-amber-100">
           <div className="flex items-center space-x-3">
             <div className="bg-amber-100 p-2 rounded-lg">
@@ -108,7 +131,6 @@ const SupplierModal: React.FC<SupplierModalProps> = ({ isOpen, onClose, supplier
           </button>
         </div>
 
-        {/* Formulário */}
         <form onSubmit={handleSubmit} className="p-6 space-y-5 overflow-y-auto max-h-[calc(90vh-200px)]">
           {errors.submit && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
@@ -116,7 +138,6 @@ const SupplierModal: React.FC<SupplierModalProps> = ({ isOpen, onClose, supplier
             </div>
           )}
 
-          {/* Nome */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Nome Fantasia *</label>
             <div className="relative">
@@ -135,7 +156,6 @@ const SupplierModal: React.FC<SupplierModalProps> = ({ isOpen, onClose, supplier
             {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
           </div>
 
-          {/* CNPJ */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">CNPJ</label>
             <input
@@ -147,11 +167,11 @@ const SupplierModal: React.FC<SupplierModalProps> = ({ isOpen, onClose, supplier
                 errors.cnpj ? 'border-red-300' : 'border-gray-300'
               }`}
               placeholder="00.000.000/0000-00"
+              maxLength={18}
             />
             {errors.cnpj && <p className="mt-1 text-sm text-red-600">{errors.cnpj}</p>}
           </div>
 
-          {/* Contato - Responsável */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Contato (Responsável)</label>
             <input
@@ -164,7 +184,6 @@ const SupplierModal: React.FC<SupplierModalProps> = ({ isOpen, onClose, supplier
             />
           </div>
 
-          {/* Email */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
             <div className="relative">
@@ -183,7 +202,6 @@ const SupplierModal: React.FC<SupplierModalProps> = ({ isOpen, onClose, supplier
             {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
           </div>
 
-          {/* Telefone */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
             <div className="relative">
@@ -199,7 +217,6 @@ const SupplierModal: React.FC<SupplierModalProps> = ({ isOpen, onClose, supplier
             </div>
           </div>
 
-          {/* Endereço */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Endereço</label>
             <textarea
@@ -212,7 +229,6 @@ const SupplierModal: React.FC<SupplierModalProps> = ({ isOpen, onClose, supplier
             />
           </div>
 
-          {/* Ações */}
           <div className="flex space-x-3 pt-4 border-t border-gray-100">
             <button
               type="submit"
