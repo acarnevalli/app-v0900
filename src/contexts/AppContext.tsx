@@ -307,24 +307,60 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // ✅ FUNÇÃO ATUALIZADA COM PAGINAÇÃO
   const loadClients = async () => {
     if (!user) return;
-    const { data, error } = await supabase.from("clients").select("*").eq("user_id", user.id);
-    if (error) throw error;
-    setClients(data || []);
+    
+    // ✅ Buscar TODOS os clientes com paginação
+    let allClients: Client[] = [];
+    let from = 0;
+    const pageSize = 1000;
+    let hasMore = true;
+
+    console.log(`[AppContext] 🔄 Iniciando carregamento de clientes para usuário ${user.id}`);
+
+    while (hasMore) {
+      const { data, error } = await supabase
+        .from("clients")
+        .select("*")
+        .eq("user_id", user.id)
+        .range(from, from + pageSize - 1)
+        .order('name'); // Ordenar alfabeticamente
+
+      if (error) {
+        console.error(`[AppContext] ❌ Erro ao buscar clientes (range ${from}-${from + pageSize - 1}):`, error);
+        throw error;
+      }
+
+      if (data && data.length > 0) {
+        allClients = [...allClients, ...data];
+        console.log(`[AppContext] 📄 Carregados ${data.length} clientes (total acumulado: ${allClients.length})`);
+        from += pageSize;
+        
+        // Se retornou menos que pageSize, não há mais registros
+        if (data.length < pageSize) {
+          hasMore = false;
+        }
+      } else {
+        hasMore = false;
+      }
+    }
+
+    console.log(`[AppContext] ✅ ${allClients.length} clientes carregados no total`);
+    setClients(allClients);
   };
 
   const loadProducts = async () => {
-  if (!user) return;
-  const { data: productsData, error: prodErr } = await supabase
-    .from("products")
-    .select("*");  // ✅ SEM filtro de user_id
-  if (prodErr) throw prodErr;
+    if (!user) return;
+    const { data: productsData, error: prodErr } = await supabase
+      .from("products")
+      .select("*");  // ✅ SEM filtro de user_id
+    if (prodErr) throw prodErr;
 
-  const { data: componentsData, error: compErr } = await supabase
-    .from("product_components")
-    .select(`*, component:products!product_components_component_id_fkey(id, name, unit, cost_price)`);  // ✅ SEM filtro de user_id
-  if (compErr) throw compErr;
+    const { data: componentsData, error: compErr } = await supabase
+      .from("product_components")
+      .select(`*, component:products!product_components_component_id_fkey(id, name, unit, cost_price)`);  // ✅ SEM filtro de user_id
+    if (compErr) throw compErr;
 
     const merged = (productsData || []).map((p) => ({
       ...p,
@@ -353,10 +389,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       .eq("user_id", user.id);
     if (projErr) throw projErr;
 
-   const { data: projProds, error: projProdErr } = await supabase
-  .from("project_products")
-  .select("*")  // ✅ SEM relacionamento
-  .eq("user_id", user.id);  // ✅ Este pode manter (project_products TEM user_id)
+    const { data: projProds, error: projProdErr } = await supabase
+      .from("project_products")
+      .select("*")  // ✅ SEM relacionamento
+      .eq("user_id", user.id);  // ✅ Este pode manter (project_products TEM user_id)
     if (projProdErr) throw projProdErr;
 
     const merged = (projectsData || []).map((p: any) => ({
@@ -391,13 +427,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (!user) return;
     const { data, error } = await supabase
       .from("stock_movements")
-       .select("*")
+      .select("*")
       .eq("user_id", user.id);
     if (error) throw error;
     const mapped = (data || []).map((m: any) => ({
       ...m,
-      product_name: m.product.name,
-      project_title: m.project.title,
+      product_name: m.product?.name || "",
+      project_title: m.project?.title || "",
     }));
     setStockMovements(mapped);
   };
@@ -449,7 +485,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             id: item.id,
             sale_id: item.sale_id,
             product_id: item.product_id,
-            product_name: item.product.name || "",
+            product_name: item.product?.name || "",
             quantity: item.quantity,
             unit_price: item.unit_price,
             total: item.total,
@@ -499,7 +535,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             id: item.id,
             purchase_id: item.purchase_id,
             product_id: item.product_id,
-            product_name: item.product.name || "",
+            product_name: item.product?.name || "",
             quantity: item.quantity,
             unit_cost: item.unit_cost,
             total: item.total,
@@ -659,6 +695,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     
     const { data: insertedProduct, error } = await supabase
       .from("products")
+    const addProduct = async (data: Omit<Product, "id" | "created_at" | "updated_at" | "user_id">) => {
+    if (!user) return;
+    const newProduct = {
+      ...data,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    
+    const { data: insertedProduct, error } = await supabase
+      .from("products")
       .insert([newProduct])
       .select()
       .single();
@@ -690,7 +736,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         ...data, 
         updated_at: new Date().toISOString() 
       })
-      .eq("id", data.id)
+      .eq("id", data.id);
     if (error) throw error;
     await loadProducts();
   };
@@ -700,7 +746,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const { error } = await supabase
       .from("products")
       .delete()
-      .eq("id", id)
+      .eq("id", id);
     if (error) throw error;
     await loadProducts();
   };
