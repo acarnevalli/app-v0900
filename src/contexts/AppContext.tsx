@@ -307,11 +307,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // ✅ FUNÇÃO ATUALIZADA COM PAGINAÇÃO
   const loadClients = async () => {
     if (!user) return;
     
-    // ✅ Buscar TODOS os clientes com paginação
     let allClients: Client[] = [];
     let from = 0;
     const pageSize = 1000;
@@ -325,7 +323,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         .select("*")
         .eq("user_id", user.id)
         .range(from, from + pageSize - 1)
-        .order('name'); // Ordenar alfabeticamente
+        .order('name');
 
       if (error) {
         console.error(`[AppContext] ❌ Erro ao buscar clientes (range ${from}-${from + pageSize - 1}):`, error);
@@ -337,7 +335,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         console.log(`[AppContext] 📄 Carregados ${data.length} clientes (total acumulado: ${allClients.length})`);
         from += pageSize;
         
-        // Se retornou menos que pageSize, não há mais registros
         if (data.length < pageSize) {
           hasMore = false;
         }
@@ -354,12 +351,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (!user) return;
     const { data: productsData, error: prodErr } = await supabase
       .from("products")
-      .select("*");  // ✅ SEM filtro de user_id
+      .select("*");
     if (prodErr) throw prodErr;
 
     const { data: componentsData, error: compErr } = await supabase
       .from("product_components")
-      .select(`*, component:products!product_components_component_id_fkey(id, name, unit, cost_price)`);  // ✅ SEM filtro de user_id
+      .select(`*, component:products!product_components_component_id_fkey(id, name, unit, cost_price)`);
     if (compErr) throw compErr;
 
     const merged = (productsData || []).map((p) => ({
@@ -391,8 +388,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     const { data: projProds, error: projProdErr } = await supabase
       .from("project_products")
-      .select("*")  // ✅ SEM relacionamento
-      .eq("user_id", user.id);  // ✅ Este pode manter (project_products TEM user_id)
+      .select("*")
+      .eq("user_id", user.id);
     if (projProdErr) throw projProdErr;
 
     const merged = (projectsData || []).map((p: any) => ({
@@ -403,7 +400,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         .map((pp: any) => ({
           id: pp.id,
           product_id: pp.product_id,
-          product_name: pp.product.name || "",
+          product_name: pp.product?.name || "",
           quantity: pp.quantity,
           unit_price: pp.unit_price,
           total_price: pp.total_price,
@@ -685,16 +682,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     await loadProjects();
   };
 
-  const addProduct = async (data: Omit<Product, "id" | "created_at" | "updated_at" | "user_id">) => {
-    if (!user) return;
-    const newProduct = {
-      ...data,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    
-    const { data: insertedProduct, error } = await supabase
-      .from("products")
     const addProduct = async (data: Omit<Product, "id" | "created_at" | "updated_at" | "user_id">) => {
     if (!user) return;
     const newProduct = {
