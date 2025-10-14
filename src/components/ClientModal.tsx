@@ -1,537 +1,469 @@
-import React, { useState, useEffect } from 'react';
-import { X, User, Mail, Phone, MapPin, FileText, Smartphone } from 'lucide-react';
-import { useApp, Client } from '../contexts/AppContext';
+import React, { useState } from 'react';
+import { X, Save, User, Mail, Phone, Smartphone, CreditCard, Home, Building, Building2 } from 'lucide-react';
+import { useApp } from '../contexts/AppContext';
+import { formatCPF, validateCPF } from '../lib/utils';
 
 interface ClientModalProps {
-  client?: Client | null;
+  isOpen: boolean;
   onClose: () => void;
+  client?: {
+    id?: string;
+    name: string;
+    type: 'pf' | 'pj';
+    cpf?: string;
+    cnpj?: string;
+    email?: string;
+    phone?: string;
+    mobile?: string;
+    razao_social?: string;
+    inscricao_estadual?: string;
+    isento_icms?: boolean;
+    country?: string;
+    state?: string;
+    city?: string;
+    zip_code?: string;
+    neighborhood?: string;
+    street_type?: string;
+    street?: string;
+    numero?: string;
+    complemento?: string;
+  } | null;
 }
 
-const ClientModal: React.FC<ClientModalProps> = ({ client, onClose }) => {
+const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) => {
   const { addClient, updateClient } = useApp();
+
   const [formData, setFormData] = useState({
-    name: '',
-    type: 'pf' as 'pf' | 'pj',
-    cpf: '',
-    cnpj: '',
-    email: '',
-    phone: '',
-    mobile: '',
-    razao_social: '',
-    inscricao_estadual: '',
-    isento_icms: false,
-    numero: '',
-    complemento: '',
-    id_empresa: '',
-    fl_ativo: true,
-    address: {
-      country: 'Brasil',
-      state: '',
-      city: '',
-      zipCode: '',
-      neighborhood: '',
-      streetType: 'Rua',
-      street: ''
-    }
+    name: client?.name || '',
+    email: client?.email || '',
+    phone: client?.phone || '',
+    mobile: client?.mobile || '',
+    cpf: client?.cpf ? formatCPF(client.cpf) : '',
+    cnpj: client?.cnpj || '',
+    type: client?.type || 'pf',
+    razao_social: client?.razao_social || '',
+    inscricao_estadual: client?.inscricao_estadual || '',
+    isento_icms: client?.isento_icms || false,
+    country: client?.country || 'Brasil',
+    state: client?.state || '',
+    city: client?.city || '',
+    zip_code: client?.zip_code || '',
+    neighborhood: client?.neighborhood || '',
+    street_type: client?.street_type || 'rua',
+    street: client?.street || '',
+    numero: client?.numero || '',
+    complemento: client?.complemento || '',
   });
 
-  useEffect(() => {
-    if (client) {
-      setFormData({
-        name: client.name,
-        type: client.type,
-        cpf: client.cpf || '',
-        cnpj: client.cnpj || '',
-        email: client.email,
-        phone: client.phone,
-        mobile: client.mobile,
-        razao_social: client.razao_social || '',
-        inscricao_estadual: client.inscricao_estadual || '',
-        isento_icms: client.isento_icms || false,
-        numero: client.numero || '',
-        complemento: client.complemento || '',
-        id_empresa: client.id_empresa || '',
-        fl_ativo: client.fl_ativo,
-        address: client.address
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  if (!isOpen) return null;
+
+  const validate = () => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.name.trim()) newErrors.name = 'Nome é obrigatório';
+
+    if (formData.email && !/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = 'Email inválido';
+    }
+
+    if (formData.type === 'pf' && formData.cpf) {
+      const clean = formData.cpf.replace(/\D/g, '');
+      if (clean.length > 0 && clean.length < 11) {
+        newErrors.cpf = 'CPF incompleto';
+      } else if (clean.length === 11 && !validateCPF(formData.cpf)) {
+        newErrors.cpf = 'CPF inválido';
+      }
+    }
+
+    if (formData.type === 'pj' && !formData.razao_social.trim()) {
+      newErrors.razao_social = 'Razão Social é obrigatória para Pessoa Jurídica';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target;
+
+    if (name === 'cpf') {
+      const formatted = formatCPF(value);
+      setFormData((prev) => ({ ...prev, cpf: formatted }));
+    } else if (name === 'type') {
+      setFormData((prev) => ({
+        ...prev,
+        type: value as 'pf' | 'pj',
+        cpf: value === 'pf' ? prev.cpf : '',
+        cnpj: value === 'pj' ? prev.cnpj : '',
+      }));
+    } else if (type === 'checkbox') {
+      const checked = (e.target as HTMLInputElement).checked;
+      setFormData((prev) => ({ ...prev, [name]: checked }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
+
+    if (errors[name]) {
+      setErrors((prev) => {
+        const { [name]: _, ...rest } = prev;
+        return rest;
       });
     }
-  }, [client]);
+  };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (client) {
-      updateClient(client.id, formData);
-    } else {
-      addClient(formData);
-    }
-    
-    onClose();
-  };
+    if (!validate()) return;
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    
-    if (name.startsWith('address.')) {
-      const addressField = name.split('.')[1];
-      setFormData(prev => ({
-        ...prev,
-        address: {
-          ...prev.address,
-          [addressField]: value
-        }
-      }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        [name]: value
-      }));
-    }
-  };
+    setIsSubmitting(true);
+    try {
+      const cleanData = {
+        ...formData,
+        cpf: formData.cpf.replace(/\D/g, '') || undefined,
+        cnpj: formData.cnpj.replace(/\D/g, '') || undefined,
+      };
 
-  const handleZipCodeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const zipCode = e.target.value.replace(/\D/g, '');
-    
-    setFormData(prev => ({
-      ...prev,
-      address: {
-        ...prev.address,
-        zipCode: zipCode
+      if (client?.id) {
+        await updateClient(client.id, cleanData);
+      } else {
+        await addClient(cleanData);
       }
-    }));
-
-    if (zipCode && zipCode.length === 8) {
-      try {
-        const response = await fetch(`https://viacep.com.br/ws/${zipCode}/json/`);
-        const data = await response.json();
-        
-        if (!data.erro) {
-          setFormData(prev => ({
-            ...prev,
-            address: {
-              ...prev.address,
-              state: data.uf,
-              city: data.localidade,
-              neighborhood: data.bairro,
-              street: data.logradouro
-            }
-          }));
-        }
-      } catch (error) {
-        console.error('Erro ao buscar CEP:', error);
-      }
+      onClose();
+    } catch (err: any) {
+      console.error('Erro ao salvar cliente:', err);
+      setErrors({ submit: err.message || 'Erro ao salvar. Tente novamente.' });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const formatCPF = (value: string) => {
-    if (!value) return '';
-    return value
-      .replace(/\D/g, '')
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d{1,2})/, '$1-$2')
-      .replace(/(-\d{2})\d+?$/, '$1');
-  };
-
-  const formatCNPJ = (value: string) => {
-    if (!value) return '';
-    return value
-      .replace(/\D/g, '')
-      .replace(/(\d{2})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d)/, '$1/$2')
-      .replace(/(\d{4})(\d{1,2})/, '$1-$2')
-      .replace(/(-\d{2})\d+?$/, '$1');
-  };
-
-  const formatPhone = (value: string) => {
-    if (!value) return '';
-    return value
-      .replace(/\D/g, '')
-      .replace(/(\d{2})(\d)/, '($1) $2')
-      .replace(/(\d{4})(\d)/, '$1-$2')
-      .replace(/(-\d{4})\d+?$/, '$1');
-  };
-
-  const formatMobile = (value: string) => {
-    if (!value) return '';
-    return value
-      .replace(/\D/g, '')
-      .replace(/(\d{2})(\d)/, '($1) $2')
-      .replace(/(\d{5})(\d)/, '$1-$2')
-      .replace(/(-\d{4})\d+?$/, '$1');
-  };
-
-  const formatZipCode = (value: string) => {
-    if (!value) return '';
-    return value
-      .replace(/\D/g, '')
-      .replace(/(\d{5})(\d)/, '$1-$2')
-      .replace(/(-\d{3})\d+?$/, '$1');
+  const handleClose = () => {
+    if (!isSubmitting) {
+      onClose();
+    }
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-amber-600 to-orange-600 text-white rounded-t-xl">
-          <h2 className="text-2xl font-bold">
-            {client ? 'Editar Cliente' : 'Novo Cliente'}
-          </h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden border border-amber-100">
+        <div className="flex justify-between items-center p-6 border-b border-amber-100">
+          <div className="flex items-center space-x-3">
+            <div className="bg-amber-100 p-2 rounded-lg">
+              {formData.type === 'pf' ? (
+                <User className="h-6 w-6 text-amber-700" />
+              ) : (
+                <Building2 className="h-6 w-6 text-amber-700" />
+              )}
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-800">
+                {client ? 'Editar Cliente' : 'Novo Cliente'}
+              </h2>
+              <p className="text-sm text-gray-500">
+                {formData.type === 'pf' ? 'Pessoa Física' : 'Pessoa Jurídica'}
+              </p>
+            </div>
+          </div>
           <button
-            onClick={onClose}
-            className="p-2 text-white hover:bg-white hover:bg-opacity-20 rounded-lg transition-colors"
+            onClick={handleClose}
+            disabled={isSubmitting}
+            className="text-gray-400 hover:text-gray-600 disabled:opacity-50 transition-colors"
           >
             <X className="h-6 w-6" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Tipo de Pessoa */}
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              <FileText className="h-4 w-4 inline mr-2 text-amber-600" />
-              Tipo de Pessoa
-            </label>
-            <div className="flex space-x-6">
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  name="type"
-                  value="pf"
-                  checked={formData.type === 'pf'}
-                  onChange={handleChange}
-                  className="mr-2 text-amber-600 focus:ring-amber-500"
-                />
-                <span className="text-sm font-medium">Pessoa Física</span>
-              </label>
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  name="type"
-                  value="pj"
-                  checked={formData.type === 'pj'}
-                  onChange={handleChange}
-                  className="mr-2 text-amber-600 focus:ring-amber-500"
-                />
-                <span className="text-sm font-medium">Pessoa Jurídica</span>
-              </label>
+        <form onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto max-h-[calc(90vh-200px)]">
+          {errors.submit && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+              {errors.submit}
+            </div>
+          )}
+
+          {/* Tipo de Cliente */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Cliente</label>
+              <div className="flex space-x-4">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="type"
+                    value="pf"
+                    checked={formData.type === 'pf'}
+                    onChange={handleChange}
+                    className="text-amber-600 focus:ring-amber-500"
+                  />
+                  <User className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm font-medium">Pessoa Física</span>
+                </label>
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="type"
+                    value="pj"
+                    checked={formData.type === 'pj'}
+                    onChange={handleChange}
+                    className="text-amber-600 focus:ring-amber-500"
+                  />
+                  <Building className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm font-medium">Pessoa Jurídica</span>
+                </label>
+              </div>
             </div>
           </div>
 
-          {/* Dados Básicos */}
+          {/* Nome / Razão Social */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              {formData.type === 'pf' ? 'Nome Completo' : 'Razão Social'} *
+            </label>
+            <input
+              type="text"
+              name="name"
+              value={formData.name}
+              onChange={handleChange}
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
+                errors.name ? 'border-red-300' : 'border-gray-300'
+              }`}
+              placeholder={formData.type === 'pf' ? 'João Silva' : 'Marcenaria Pro LTDA'}
+            />
+            {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
+          </div>
+
+          {/* CPF / CNPJ */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {formData.type === 'pf' ? (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">CPF</label>
+                <div className="relative">
+                  <CreditCard className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <input
+                    type="text"
+                    name="cpf"
+                    value={formData.cpf}
+                    onChange={handleChange}
+                    className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
+                      errors.cpf ? 'border-red-300' : 'border-gray-300'
+                    }`}
+                    placeholder="000.000.000-00"
+                    maxLength={14}
+                  />
+                </div>
+                {errors.cpf && <p className="mt-1 text-sm text-red-600">{errors.cpf}</p>}
+              </div>
+            ) : (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">CNPJ</label>
+                <input
+                  type="text"
+                  name="cnpj"
+                  value={formData.cnpj}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  placeholder="00.000.000/0000-00"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Dados de Contato */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <User className="h-4 w-4 inline mr-2 text-amber-600" />
-                {formData.type === 'pf' ? 'Nome Completo' : 'Razão Social'}
-              </label>
-              <input
-                type="text"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                placeholder={formData.type === 'pf' ? 'Digite o nome completo' : 'Digite a razão social'}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <FileText className="h-4 w-4 inline mr-2 text-amber-600" />
-                {formData.type === 'pf' ? 'CPF' : 'CNPJ'}
-              </label>
-              <input
-                type="text"
-                name={formData.type === 'pf' ? 'cpf' : 'cnpj'}
-                value={formData.type === 'pf' ? formData.cpf : formData.cnpj}
-                onChange={(e) => {
-                  const formatted = formData.type === 'pf' 
-                    ? formatCPF(e.target.value)
-                    : formatCNPJ(e.target.value);
-                  handleChange({ ...e, target: { ...e.target, value: formatted } });
-                }}
-                required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                placeholder={formData.type === 'pf' ? '000.000.000-00' : '00.000.000/0000-00'}
-              />
-            </div>
-          </div>
-
-          {/* Contatos */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <Mail className="h-4 w-4 inline mr-2 text-amber-600" />
-                Email
-              </label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                placeholder="cliente@email.com"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <Phone className="h-4 w-4 inline mr-2 text-amber-600" />
-                Telefone
-              </label>
-              <input
-                type="tel"
-                name="phone"
-                value={formData.phone}
-                onChange={(e) => {
-                  const formatted = formatPhone(e.target.value);
-                  handleChange({ ...e, target: { ...e.target, value: formatted } });
-                }}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                placeholder="(11) 3333-3333"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <Smartphone className="h-4 w-4 inline mr-2 text-amber-600" />
-                Celular
-              </label>
-              <input
-                type="tel"
-                name="mobile"
-                value={formData.mobile}
-                onChange={(e) => {
-                  const formatted = formatMobile(e.target.value);
-                  handleChange({ ...e, target: { ...e.target, value: formatted } });
-                }}
-                required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                placeholder="(11) 99999-9999"
-              />
-            </div>
-          </div>
-
-          {/* Endereço */}
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-              <MapPin className="h-5 w-5 mr-2 text-amber-600" />
-              Endereço
-            </h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">País</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <input
-                  type="text"
-                  name="address.country"
-                  value={formData.address.country}
+                  type="email"
+                  name="email"
+                  value={formData.email}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
+                    errors.email ? 'border-red-300' : 'border-gray-300'
+                  }`}
+                  placeholder="cliente@exemplo.com"
                 />
               </div>
+              {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">CEP</label>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Telefone Fixo</label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <input
                   type="text"
-                  name="address.zipCode"
-                  value={formatZipCode(formData.address.zipCode)}
-                  onChange={handleZipCodeChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                  placeholder="00000-000"
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  placeholder="(00) 0000-0000"
                 />
               </div>
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Estado</label>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Celular</label>
+              <div className="relative">
+                <Smartphone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <input
                   type="text"
-                  name="address.state"
-                  value={formData.address.state}
+                  name="mobile"
+                  value={formData.mobile}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Cidade</label>
-                <input
-                  type="text"
-                  name="address.city"
-                  value={formData.address.city}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  placeholder="(00) 00000-0000"
                 />
               </div>
             </div>
 
             {formData.type === 'pj' && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Razão Social
-                </label>
-                <input
-                  type="text"
-                  name="razao_social"
-                  value={formData.razao_social}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                  placeholder="Razão social da empresa"
-                />
-              </div>
-            )}
+               <label className="block text-sm font-medium text-gray-700 mb-1">Inscrição Estadual</label>
+              <input
+                type="text"
+                name="inscricao_estadual"
+                value={formData.inscricao_estadual}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                placeholder="ISENTO ou número"
+              />
+            </div>
 
-            {formData.type === 'pj' && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Inscrição Estadual
-                </label>
-                <input
-                  type="text"
-                  name="inscricao_estadual"
-                  value={formData.inscricao_estadual}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                  placeholder="Inscrição estadual"
-                />
-              </div>
-            )}
+                {formData.type === 'pj' && (
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                name="isento_icms"
+                checked={formData.isento_icms}
+                onChange={handleChange}
+                className="w-4 h-4 text-amber-600 rounded focus:ring-amber-500"
+              />
+              <label className="text-sm text-gray-700">Isento de ICMS</label>
+            </div>
+          )}
+        </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Bairro</label>
-                <input
-                  type="text"
-                  name="address.neighborhood"
-                  value={formData.address.neighborhood}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                />
-              </div>
+        {/* Endereço */}
+        <div className="border-t border-gray-100 pt-6">
+          <h3 className="text-lg font-medium text-gray-800 mb-4 flex items-center">
+            <Home className="h-5 w-5 text-amber-600 mr-2" />
+            Endereço
+          </h3>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Logradouro</label>
-                <select
-                  name="address.streetType"
-                  value={formData.address.streetType}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                >
-                  <option value="Rua">Rua</option>
-                  <option value="Avenida">Avenida</option>
-                  <option value="Alameda">Alameda</option>
-                  <option value="Travessa">Travessa</option>
-                  <option value="Praça">Praça</option>
-                  <option value="Estrada">Estrada</option>
-                </select>
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Logradouro</label>
+              <input
+                type="text"
+                name="street"
+                value={formData.street}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                placeholder="Nome da rua/avenida"
+              />
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Logradouro</label>
-                <input
-                  type="text"
-                  name="address.street"
-                  value={formData.address.street}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                  placeholder="Nome da rua, número"
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Número</label>
+              <input
+                type="text"
+                name="numero"
+                value={formData.numero}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                placeholder="000"
+              />
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Número</label>
-                <input
-                  type="text"
-                  name="numero"
-                  value={formData.numero}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                  placeholder="Número"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Complemento</label>
-                <input
-                  type="text"
-                  name="complemento"
-                  value={formData.complemento}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                  placeholder="Complemento"
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">CEP</label>
+              <input
+                type="text"
+                name="zip_code"
+                value={formData.zip_code}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                placeholder="00000-000"
+              />
             </div>
           </div>
 
-          {/* Configurações Adicionais */}
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-              <FileText className="h-5 w-5 mr-2 text-amber-600" />
-              Configurações Adicionais
-            </h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">ID da Empresa</label>
-                <input
-                  type="text"
-                  name="id_empresa"
-                  value={formData.id_empresa}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                  placeholder="ID da empresa"
-                />
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Bairro</label>
+              <input
+                type="text"
+                name="neighborhood"
+                value={formData.neighborhood}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                placeholder="Bairro"
+              />
+            </div>
 
-              <div className="space-y-3">
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    name="isento_icms"
-                    checked={formData.isento_icms}
-                    onChange={(e) => setFormData(prev => ({ ...prev, isento_icms: e.target.checked }))}
-                    className="mr-2 text-amber-600 focus:ring-amber-500"
-                  />
-                  <span className="text-sm font-medium text-gray-700">Isento de ICMS</span>
-                </label>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Cidade</label>
+              <input
+                type="text"
+                name="city"
+                value={formData.city}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                placeholder="Cidade"
+              />
+            </div>
 
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    name="fl_ativo"
-                    checked={formData.fl_ativo}
-                    onChange={(e) => setFormData(prev => ({ ...prev, fl_ativo: e.target.checked }))}
-                    className="mr-2 text-amber-600 focus:ring-amber-500"
-                  />
-                  <span className="text-sm font-medium text-gray-700">Cliente Ativo</span>
-                </label>
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+              <input
+                type="text"
+                name="state"
+                value={formData.state}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                placeholder="SP"
+                maxLength={2}
+              />
             </div>
           </div>
 
-          <div className="flex space-x-4 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className="flex-1 px-6 py-3 bg-gradient-to-r from-amber-600 to-orange-600 text-white rounded-lg hover:from-amber-700 hover:to-orange-700 font-medium transition-all duration-200 shadow-lg hover:shadow-xl"
-            >
-              {client ? 'Atualizar' : 'Salvar'}
-            </button>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Complemento</label>
+            <input
+              type="text"
+              name="complemento"
+              value={formData.complemento}
+              onChange={handleChange}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+              placeholder="Apto, bloco, etc."
+            />
           </div>
-        </form>
-      </div>
+        </div>
+
+        {/* Ações */}
+        <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3 pt-6 border-t border-gray-100 px-6 pb-6">
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="flex-1 flex items-center justify-center space-x-2 bg-amber-600 text-white py-2 px-4 rounded-lg hover:bg-amber-700 disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
+          >
+            <Save className="h-4 w-4" />
+            <span>{isSubmitting ? 'Salvando...' : 'Salvar Cliente'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleClose}
+            disabled={isSubmitting}
+            className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-70 transition-colors"
+          >
+            Cancelar
+          </button>
+        </div>
+      </form>
     </div>
-  );
-};
-
+  </div>
+</div>
 export default ClientModal;
