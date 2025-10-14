@@ -75,6 +75,13 @@ export interface ProductComponent {
   total_cost: number;
 }
 
+export interface Category {
+  id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ProjectProduct {
   id: string;
   product_id: string;
@@ -222,6 +229,7 @@ interface AppContextType {
   projects: Project[];
   transactions: Transaction[];
   products: Product[];
+  categories: Category[];
   stockMovements: StockMovement[];
   loading: boolean;
   error: string | null;
@@ -242,6 +250,9 @@ interface AppContextType {
   addProduct: (data: Omit<Product, "id" | "created_at" | "updated_at" | "user_id">) => Promise<void>;
   updateProduct: (data: Product) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
+
+  addCategory: (name: string) => Promise<void>;
+  loadCategories: () => Promise<void>;
 
   addStockMovement: (data: Omit<StockMovement, "id" | "created_at" | "user_id">) => Promise<void>;
   processProjectStockMovement: (projectId: string, products: ProjectProduct[]) => Promise<void>;
@@ -291,6 +302,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [stockMovements, setStockMovements] = useState<StockMovement[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -377,6 +389,39 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     setProducts(merged);
   };
+
+  const loadCategories = async () => {
+  const { data, error } = await supabase
+    .from('categories')
+    .select('*')
+    .order('name');
+
+  if (error) {
+    console.error('Erro ao carregar categorias:', error);
+  } else {
+    setCategories(data || []);
+  }
+};
+
+  const addCategory = async (name: string) => {
+  const cleanedName = name.trim();
+  if (!cleanedName) throw new Error('Nome da categoria é obrigatório');
+
+  const { data, error } = await supabase
+    .from('categories')
+    .insert([{ name: cleanedName }])
+    .select()
+    .single();
+
+  if (error) {
+    if (error.code === '23505') {
+      throw new Error('Categoria já existe');
+    }
+    throw error;
+  }
+
+  setCategories((prev) => [...prev, data]);
+};
 
   const loadProjects = async () => {
     if (!user) return;
@@ -560,6 +605,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       safeLoad(loadSuppliers, "Fornecedores"),
       safeLoad(loadSales, "Vendas"),
       safeLoad(loadPurchases, "Compras"),
+      safeLoad(loadCategories, "Categorias"),
     ]);
 
     setLoading(false);
@@ -1091,6 +1137,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         projects,
         transactions,
         products,
+        categories,
         stockMovements,
         sales,
         purchases,
@@ -1109,6 +1156,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         addProduct,
         updateProduct,
         deleteProduct,
+
+        addCategory,
+        loadCategories,
+        deleteCategory,
         
         addTransaction,
         addStockMovement,
