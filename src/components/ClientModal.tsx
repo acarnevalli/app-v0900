@@ -320,19 +320,24 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) =>
               </div>
             </div>
 
+            {/* Inscrição Estadual para PJ */}
             {formData.type === 'pj' && (
-               <label className="block text-sm font-medium text-gray-700 mb-1">Inscrição Estadual</label>
-              <input
-                type="text"
-                name="inscricao_estadual"
-                value={formData.inscricao_estadual}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                placeholder="ISENTO ou número"
-              />
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Inscrição Estadual</label>
+                <input
+                  type="text"
+                  name="inscricao_estadual"
+                  value={formData.inscricao_estadual}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  placeholder="ISENTO ou número"
+                />
+              </div>
+            )}
+          </div>
 
-                {formData.type === 'pj' && (
+          {/* Checkbox Isento ICMS para PJ */}
+          {formData.type === 'pj' && (
             <div className="flex items-center space-x-2">
               <input
                 type="checkbox"
@@ -344,126 +349,127 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) =>
               <label className="text-sm text-gray-700">Isento de ICMS</label>
             </div>
           )}
-        </div>
 
-        {/* Endereço */}
-        <div className="border-t border-gray-100 pt-6">
-          <h3 className="text-lg font-medium text-gray-800 mb-4 flex items-center">
-            <Home className="h-5 w-5 text-amber-600 mr-2" />
-            Endereço
-          </h3>
+          {/* Endereço */}
+          <div className="border-t border-gray-100 pt-6">
+            <h3 className="text-lg font-medium text-gray-800 mb-4 flex items-center">
+              <Home className="h-5 w-5 text-amber-600 mr-2" />
+              Endereço
+            </h3>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Logradouro</label>
-              <input
-                type="text"
-                name="street"
-                value={formData.street}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                placeholder="Nome da rua/avenida"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Logradouro</label>
+                <input
+                  type="text"
+                  name="street"
+                  value={formData.street}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  placeholder="Nome da rua/avenida"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Número</label>
+                <input
+                  type="text"
+                  name="numero"
+                  value={formData.numero}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  placeholder="000"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">CEP</label>
+                <input
+                  type="text"
+                  name="zip_code"
+                  value={formData.zip_code}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  placeholder="00000-000"
+                />
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Número</label>
-              <input
-                type="text"
-                name="numero"
-                value={formData.numero}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                placeholder="000"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Bairro</label>
+                <input
+                  type="text"
+                  name="neighborhood"
+                  value={formData.neighborhood}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  placeholder="Bairro"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Cidade</label>
+                <input
+                  type="text"
+                  name="city"
+                  value={formData.city}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  placeholder="Cidade"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+                <input
+                  type="text"
+                  name="state"
+                  value={formData.state}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  placeholder="SP"
+                  maxLength={2}
+                />
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">CEP</label>
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Complemento</label>
               <input
                 type="text"
-                name="zip_code"
-                value={formData.zip_code}
+                name="complemento"
+                value={formData.complemento}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                placeholder="00000-000"
+                placeholder="Apto, bloco, etc."
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Bairro</label>
-              <input
-                type="text"
-                name="neighborhood"
-                value={formData.neighborhood}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                placeholder="Bairro"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Cidade</label>
-              <input
-                type="text"
-                name="city"
-                value={formData.city}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                placeholder="Cidade"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
-              <input
-                type="text"
-                name="state"
-                value={formData.state}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                placeholder="SP"
-                maxLength={2}
-              />
-            </div>
+          {/* Ações */}
+          <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3 pt-6 border-t border-gray-100">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="flex-1 flex items-center justify-center space-x-2 bg-amber-600 text-white py-2 px-4 rounded-lg hover:bg-amber-700 disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
+            >
+              <Save className="h-4 w-4" />
+              <span>{isSubmitting ? 'Salvando...' : 'Salvar Cliente'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleClose}
+              disabled={isSubmitting}
+              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-70 transition-colors"
+            >
+              Cancelar
+            </button>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Complemento</label>
-            <input
-              type="text"
-              name="complemento"
-              value={formData.complemento}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-              placeholder="Apto, bloco, etc."
-            />
-          </div>
-        </div>
-
-        {/* Ações */}
-        <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3 pt-6 border-t border-gray-100 px-6 pb-6">
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="flex-1 flex items-center justify-center space-x-2 bg-amber-600 text-white py-2 px-4 rounded-lg hover:bg-amber-700 disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
-          >
-            <Save className="h-4 w-4" />
-            <span>{isSubmitting ? 'Salvando...' : 'Salvar Cliente'}</span>
-          </button>
-          <button
-            type="button"
-            onClick={handleClose}
-            disabled={isSubmitting}
-            className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-70 transition-colors"
-          >
-            Cancelar
-          </button>
-        </div>
-      </form>
+        </form>
+      </div>
     </div>
-  </div>
-</div>
+  );
+};
+
 export default ClientModal;
