@@ -1,5 +1,5 @@
-import React from 'react';
-import { Home, Users, Briefcase, DollarSign, Package, BarChart3, Settings, LogOut, Wifi, WifiOff, Cloud, UserCog, ShoppingCart, ShoppingBag } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Home, Users, Briefcase, DollarSign, Package, BarChart3, Settings, LogOut, Wifi, WifiOff, Cloud, UserCog, ShoppingCart, ShoppingBag, ChevronDown, ChevronRight, Folder } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { getStorageManager } from '../lib/storage';
 
@@ -17,15 +17,21 @@ const getInitial = (name: string): string => {
 
 const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage }) => {
   const { user, userProfile, logout } = useAuth();
-  const [isOnline, setIsOnline] = React.useState(navigator.onLine);
-  const [syncStatus, setSyncStatus] = React.useState<any>(null);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [syncStatus, setSyncStatus] = useState<any>(null);
 
-  React.useEffect(() => {
+  // Estados para controle de expansão dos grupos
+  const [expandedGroups, setExpandedGroups] = useState({
+    sales: true,
+    purchases: true,
+  });
+
+  useEffect(() => {
     console.log('[Sidebar] User state:', user);
     console.log('[Sidebar] User profile:', userProfile);
   }, [user, userProfile]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
 
@@ -44,6 +50,17 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage }) => {
     updateSyncStatus();
     const interval = setInterval(updateSyncStatus, 5000);
 
+    // Recupera o estado de expansão do localStorage
+    const saved = localStorage.getItem('sidebar-expanded-groups');
+    if (saved) {
+      try {
+        setExpandedGroups(JSON.parse(saved));
+      } catch (e) {
+        // Se JSON falhar, mantém o padrão
+        console.warn('Invalid sidebar-expanded-groups in localStorage');
+      }
+    }
+
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
@@ -51,20 +68,27 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage }) => {
     };
   }, []);
 
-  const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: Home },
-    { id: 'clients', label: 'Clientes', icon: Users },
-    { id: 'products', label: 'Produtos', icon: Package }, // ✅ DESCOMENTADO
-    { id: 'projects', label: 'Projetos', icon: Briefcase }, // ✅ DESCOMENTADO
-    { id: 'sales', label: 'Vendas', icon: ShoppingCart },
-    { id: 'purchases', label: 'Compras', icon: ShoppingBag },
-    { id: 'stock', label: 'Estoque', icon: BarChart3 },
-    { id: 'finance', label: 'Finanças', icon: DollarSign },
-    ...(userProfile?.role === 'admin' ? [
-      { id: 'users', label: 'Usuários', icon: UserCog },
-      { id: 'settings', label: 'Configurações', icon: Settings }
-    ] : []),
-  ];
+  // Salva estado de expansão
+  useEffect(() => {
+    localStorage.setItem('sidebar-expanded-groups', JSON.stringify(expandedGroups));
+  }, [expandedGroups]);
+
+  // Função para alternar grupo expandido
+  const toggleGroup = (group: 'sales' | 'purchases') => {
+    setExpandedGroups(prev => ({
+      ...prev,
+      [group]: !prev[group],
+    }));
+  };
+
+  // Define se o item está ativo (ou subitem ativo)
+  const isActive = (pageId: string) => {
+    return currentPage === pageId;
+  };
+
+  const salesIcon = isActive('clients') || isActive('products') || isActive('projects') || isActive('sales')
+    ? ShoppingBag
+    : ShoppingCart;
 
   return (
     <div className="fixed left-0 top-0 h-full w-64 bg-gradient-to-b from-amber-900 via-amber-800 to-orange-900 text-white shadow-2xl backdrop-blur-sm">
@@ -84,10 +108,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage }) => {
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full flex items-center justify-center">
               <span className="text-white font-medium text-sm">
-                {userProfile?.name && typeof userProfile.name === 'string' && userProfile.name.length > 0
-                  ? getInitial(userProfile.name)
-                  : '?'
-                }
+                {userProfile?.name ? getInitial(userProfile.name) : '?'}
               </span>
             </div>
             <div>
@@ -103,23 +124,148 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage }) => {
       </div>
       
       <nav className="mt-8 px-3 overflow-y-auto max-h-[calc(100vh-400px)]">
-        {menuItems.map((item) => {
-          const Icon = item.icon;
-          return (
+        {/* Dashboard (único item de nível raiz) */}
+        <button
+          key="dashboard"
+          onClick={() => setCurrentPage('dashboard')}
+          className={`w-full flex items-center space-x-3 px-4 py-3 mb-2 text-left transition-all duration-300 rounded-xl hover:bg-amber-700/70 hover:shadow-lg ${
+            currentPage === 'dashboard'
+              ? 'bg-gradient-to-r from-amber-700 to-orange-600 text-white shadow-lg transform translate-x-1'
+              : 'text-amber-100 hover:text-white hover:translate-x-1'
+          }`}
+        >
+          <Home className="h-5 w-5 flex-shrink-0" />
+          <span className="font-medium text-sm">Dashboard</span>
+        </button>
+
+        {/* GRUPO VENDAS */}
+        <div className="mb-1">
+          <button
+            onClick={() => toggleGroup('sales')}
+            className="w-full flex items-center justify-between px-4 py-2.5 text-amber-200 hover:text-white hover:bg-amber-800/30 rounded-xl transition-all duration-200 text-sm font-medium"
+            aria-expanded={expandedGroups.sales}
+          >
+            <div className="flex items-center space-x-3">
+              <salesIcon className="h-5 w-5" />
+              <span>Vendas</span>
+            </div>
+            {expandedGroups.sales ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
+          </button>
+
+          <div className={`pl-8 overflow-hidden transition-all duration-300 ${expandedGroups.sales ? 'max-h-60 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
+            {[
+              { id: 'clients', label: 'Clientes', icon: Users },
+              { id: 'products', label: 'Produtos', icon: Package },
+              { id: 'projects', label: 'Projetos', icon: Briefcase },
+              { id: 'sales', label: 'Vendas', icon: ShoppingCart },
+            ].map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setCurrentPage(item.id)}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 my-1 text-left transition-all duration-300 rounded-lg ${
+                    currentPage === item.id
+                      ? 'bg-gradient-to-r from-orange-700 to-red-600 text-white font-medium shadow-md'
+                      : 'text-amber-100 hover:text-white hover:bg-amber-800/40'
+                  }`}
+                >
+                  <Icon className="h-4 w-4 flex-shrink-0" />
+                  <span className="text-xs">{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* GRUPO COMPRAS */}
+        <div className="mb-1">
+          <button
+            onClick={() => toggleGroup('purchases')}
+            className="w-full flex items-center justify-between px-4 py-2.5 text-amber-200 hover:text-white hover:bg-amber-800/30 rounded-xl transition-all duration-200 text-sm font-medium"
+            aria-expanded={expandedGroups.purchases}
+          >
+            <div className="flex items-center space-x-3">
+              <Package className="h-5 w-5" />
+              <span>Compras</span>
+            </div>
+            {expandedGroups.purchases ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
+          </button>
+
+          <div className={`pl-8 overflow-hidden transition-all duration-300 ${expandedGroups.purchases ? 'max-h-60 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
+            {[
+              { id: 'purchases', label: 'Pedidos', icon: ShoppingBag },
+              { id: 'stock', label: 'Estoque', icon: BarChart3 },
+              { id: 'suppliers', label: 'Fornecedores', icon: Users },
+            ].map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setCurrentPage(item.id)}
+                  className={`w-full flex items-center space-x-3 px-3 py-2 my-1 text-left transition-all duration-300 rounded-lg ${
+                    currentPage === item.id
+                      ? 'bg-gradient-to-r from-orange-700 to-red-600 text-white font-medium shadow-md'
+                      : 'text-amber-100 hover:text-white hover:bg-amber-800/40'
+                  }`}
+                >
+                  <Icon className="h-4 w-4 flex-shrink-0" />
+                  <span className="text-xs">{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ITENS SOBRESSALENTES */}
+        <button
+          onClick={() => setCurrentPage('finance')}
+          className={`w-full flex items-center space-x-3 px-4 py-3 mb-2 mt-1 text-left transition-all duration-300 rounded-xl hover:bg-amber-700/70 hover:shadow-lg ${
+            currentPage === 'finance'
+              ? 'bg-gradient-to-r from-amber-700 to-orange-600 text-white shadow-lg transform translate-x-1'
+              : 'text-amber-100 hover:text-white hover:translate-x-1'
+          }`}
+        >
+          <DollarSign className="h-5 w-5 flex-shrink-0" />
+          <span className="font-medium text-sm">Finanças</span>
+        </button>
+
+        {/* Itens condicionais (admin) */}
+        {userProfile?.role === 'admin' && (
+          <>
             <button
-              key={item.id}
-              onClick={() => setCurrentPage(item.id)}
-              className={`w-full flex items-center space-x-3 px-4 py-3 mb-2 text-left transition-all duration-300 rounded-xl hover:bg-amber-700/70 hover:shadow-lg hover:translate-x-1 ${
-                currentPage === item.id
+              onClick={() => setCurrentPage('users')}
+              className={`w-full flex items-center space-x-3 px-4 py-3 mb-2 text-left transition-all duration-300 rounded-xl hover:bg-amber-700/70 hover:shadow-lg ${
+                currentPage === 'users'
                   ? 'bg-gradient-to-r from-amber-700 to-orange-600 text-white shadow-lg transform translate-x-1'
-                  : 'text-amber-100 hover:text-white'
+                  : 'text-amber-100 hover:text-white hover:translate-x-1'
               }`}
             >
-              <Icon className="h-5 w-5 flex-shrink-0" />
-              <span className="font-medium text-sm">{item.label}</span>
+              <UserCog className="h-5 w-5 flex-shrink-0" />
+              <span className="font-medium text-sm">Usuários</span>
             </button>
-          );
-        })}
+            
+            <button
+              onClick={() => setCurrentPage('settings')}
+              className={`w-full flex items-center space-x-3 px-4 py-3 mb-2 text-left transition-all duration-300 rounded-xl hover:bg-amber-700/70 hover:shadow-lg ${
+                currentPage === 'settings'
+                  ? 'bg-gradient-to-r from-amber-700 to-orange-600 text-white shadow-lg transform translate-x-1'
+                  : 'text-amber-100 hover:text-white hover:translate-x-1'
+              }`}
+            >
+              <Settings className="h-5 w-5 flex-shrink-0" />
+              <span className="font-medium text-sm">Configurações</span>
+            </button>
+          </>
+        )}
       </nav>
       
       <div className="absolute bottom-0 left-0 right-0 p-6 border-t border-amber-700/50 bg-gradient-to-t from-amber-900/50 space-y-3">
@@ -164,12 +310,4 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage }) => {
         </button>
 
         <div className="text-center text-amber-200/80">
-          <p className="text-xs">Sistema de Gestão</p>
-          <p className="text-xs">v1.0.0</p>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default Sidebar;
+          <p className
