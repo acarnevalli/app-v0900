@@ -310,4 +310,11 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage }) => {
         </button>
 
         <div className="text-center text-amber-200/80">
-          <p className
+           <p className="text-xs">Sistema de Gestão</p>
+          <p className="text-xs">v1.0.0</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+export default Sidebar;
