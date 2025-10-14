@@ -9,12 +9,14 @@ import Projects from './pages/Projects';
 import Finance from './pages/Finance';
 import Products from './pages/Products';
 import Stock from './pages/Stock';
+import Suppliers from './pages/Suppliers';
 import Settings from './pages/Settings';
 import Users from './pages/Users';
 import { AppProvider } from './contexts/AppContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { DebugAuth } from './components/DebugAuth';
+
 
 
 // Componente AppContent separado - FORA do return
@@ -60,6 +62,8 @@ const AppContent: React.FC = () => {
         return <Dashboard />;
       case 'clients':
         return <Clients />;
+      case 'suppliers': // ✅ Novo caso
+        return <Suppliers />;
       case 'sales':
         return <Sales />;
       case 'purchases':
