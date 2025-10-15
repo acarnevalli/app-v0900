@@ -304,12 +304,11 @@ const Products: React.FC = () => {
       )}
 
       {/* Modal */}
-      {isModalOpen && (
-        <ProductModal
-          product={editingProduct}
-          onClose={handleModalClose}
-        />
-      )}
+      <ProductModal
+        isOpen={isModalOpen}
+        product={editingProduct}
+        onClose={handleModalClose}
+      />
     </div>
   );
 };
