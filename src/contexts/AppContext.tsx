@@ -1118,28 +1118,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     await loadProjects();
   }, [user, projects, ensureUser]);
 
-  const updateProject = useCallback(async (id: string, data: Partial<Project>) => {
-    ensureUser();
-    const { error } = await supabase
-      .from("projects")
-      .update({ ...data, updated_at: new Date().toISOString() })
-      .eq("id", id)
-      .eq("user_id", user.id);
-    if (error) throw error;
-    await loadProjects();
-  }, [user, ensureUser]);
-
-  const deleteProject = useCallback(async (id: string) => {
-    ensureUser();
-    const { error } = await supabase
-      .from("projects")
-      .delete()
-      .eq("id", id)
-      .eq("user_id", user.id);
-    if (error) throw error;
-    await loadProjects();
-  }, [user, ensureUser]);
-
   const updateProduct = useCallback(async (data: Product) => {
     ensureUser();
     const { error } = await supabase
