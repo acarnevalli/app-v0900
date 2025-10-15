@@ -673,15 +673,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         total_price: p.total_price,
         user_id: user.id,
       }));
-      const projectProducts = data.products.map(p => ({
-        project_id: insertedProject.id,
-        product_id: p.product_id,
-        product_name: p.product_name,
-        quantity: p.quantity,
-        unit_price: p.unit_price,
-        total_price: p.total_price,
-        user_id: user.id,
-      }));
       const { error: prodError } = await supabase.from("project_products").insert(projectProducts);
       if (prodError) throw prodError;
     }
