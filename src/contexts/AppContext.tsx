@@ -324,20 +324,24 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // ✅ CORREÇÃO 3: Melhor tratamento de erros
+  // ✅ Melhor tratamento de erros
   const safeLoad = async (fn: () => Promise<void>, name: string) => {
     try {
       await fn();
       return true;
     } catch (err: any) {
       console.error(`[AppContext] ❌ Falha ao carregar ${name}:`, err);
-      // Não limpa os dados, apenas registra o erro
       setError(`Erro ao carregar ${name}: ${err.message || 'Erro desconhecido'}`);
       return false;
     }
   };
 
-  // ✅ CORREÇÃO 6: Categorias com suporte a dados globais
+  // ✅ Utilitários de validação
+  const ensureUser = () => {
+    if (!user) throw new Error('Usuário não autenticado');
+  };
+
+  // ✅ Load functions
   const loadCategories = useCallback(async () => {
     if (!user) return;
     
@@ -353,35 +357,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
     setCategories(validateArray(data));
   }, [user]);
-
-  const addCategory = useCallback(async (name: string) => {
-    if (!user) throw new Error('Usuário não autenticado');
-    
-    const cleanedName = name.trim();
-    if (!cleanedName) throw new Error('Nome da categoria é obrigatório');
-
-    const exists = categories.some(
-      c => c.name.toLowerCase() === cleanedName.toLowerCase()
-    );
-    if (exists) throw new Error('Categoria já existe');
-
-    const { data, error } = await supabase
-      .from('categories')
-      .insert([cleanUndefined({ 
-        name: cleanedName,
-        user_id: user.id,
-        is_global: false
-      })])
-      .select()
-      .single();
-
-    if (error) {
-      if (error.code === '23505') throw new Error('Categoria já existe');
-      throw error;
-    }
-
-    setCategories(prev => [...prev, data]);
-  }, [user, categories]);
 
   const loadClients = useCallback(async () => {
     if (!user) return;
@@ -488,7 +463,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setStockMovements(validateArray(data));
   }, [user]);
 
-  // ✅ CORREÇÃO 6: Suppliers com opção de dados globais
   const loadSuppliers = useCallback(async () => {
     if (!user) return;
     
@@ -564,7 +538,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setPurchases(merged);
   }, [user]);
 
-  // ✅ CORREÇÃO 2: Refresh controlado
+  // ✅ Refresh controlado
   const refreshData = useCallback(async () => {
     if (!user) return;
     
@@ -612,7 +586,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       if (isAuthenticated && user) {
         await refreshData();
       } else {
-        // Mantém os dados mas não limpa completamente
         setLoading(false);
         setError(null);
       }
@@ -625,12 +598,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [user, isAuthenticated, authLoading, refreshData]);
 
-  // ✅ Utilitários de validação
-  const ensureUser = () => {
-    if (!user) throw new Error('Usuário não autenticado');
-  };
-
-  // ✅ Proteção contra recursão infinita - Correção do item 4
+  // ✅ Proteção contra recursão infinita
   const calculateProductCost = useCallback(async (productId: string): Promise<number> => {
     const visited = new Set<string>();
 
@@ -657,7 +625,73 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     return await calculate(productId);
   }, [products]);
 
-  // ✅ addProduct com validação e limpeza de undefined
+  // ✅ Category functions
+  const addCategory = useCallback(async (name: string) => {
+    if (!user) throw new Error('Usuário não autenticado');
+    
+    const cleanedName = name.trim();
+    if (!cleanedName) throw new Error('Nome da categoria é obrigatório');
+
+    const exists = categories.some(
+      c => c.name.toLowerCase() === cleanedName.toLowerCase()
+    );
+    if (exists) throw new Error('Categoria já existe');
+
+    const { data, error } = await supabase
+      .from('categories')
+      .insert([cleanUndefined({ 
+        name: cleanedName,
+        user_id: user.id,
+        is_global: false
+      })])
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === '23505') throw new Error('Categoria já existe');
+      throw error;
+    }
+
+    setCategories(prev => [...prev, data]);
+  }, [user, categories]);
+
+  // ✅ Client functions
+  const addClient = useCallback(async (data: Omit<Client, "id" | "created_at" | "updated_at" | "user_id">) => {
+    ensureUser();
+    const newClient = {
+      ...data,
+      user_id: user!.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = await supabase.from("clients").insert([newClient]);
+    if (error) throw error;
+    await loadClients();
+  }, [user, loadClients]);
+
+  const updateClient = useCallback(async (id: string, data: Partial<Client>) => {
+    ensureUser();
+    const { error } = await supabase
+      .from("clients")
+      .update({ ...data, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .eq("user_id", user!.id);
+    if (error) throw error;
+    await loadClients();
+  }, [user, loadClients]);
+
+  const deleteClient = useCallback(async (id: string) => {
+    ensureUser();
+    const { error } = await supabase
+      .from("clients")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", user!.id);
+    if (error) throw error;
+    await loadClients();
+  }, [user, loadClients]);
+
+  // ✅ Product functions
   const addProduct = useCallback(async (data: Omit<Product, "id" | "created_at" | "updated_at" | "user_id">) => {
     ensureUser();
     
@@ -672,12 +706,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       current_stock: Math.max(0, parseInt(data.current_stock.toString()) || 0),
       min_stock: Math.max(0, parseInt(data.min_stock.toString()) || 0),
       supplier: data.supplier?.trim(),
-      user_id: user.id,
+      user_id: user!.id,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
 
-    // Validação mínima
     if (!productData.name) {
       throw new Error('Nome do produto é obrigatório');
     }
@@ -690,7 +723,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     if (error) throw error;
 
-    // Adiciona componentes se houver
     if (data.components && data.components.length > 0) {
       const components = data.components.map(c => ({
         product_id: insertedProduct.id,
@@ -706,13 +738,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
 
     await loadProducts();
-  }, [user, ensureUser]);
+  }, [user, loadProducts]);
 
-  // ✅ updateProduct com atualização dos componentes
+  // ✅ ÚNICA declaração de updateProduct
   const updateProduct = useCallback(async (data: Product) => {
     ensureUser();
 
-    // Atualiza dados do produto
     const { error: productError } = await supabase
       .from("products")
       .update(cleanUndefined({
@@ -729,19 +760,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         updated_at: new Date().toISOString()
       }))
       .eq("id", data.id)
-      .eq("user_id", user.id);
+      .eq("user_id", user!.id);
 
     if (productError) throw productError;
 
-    // ✅ Atualiza componentes - Correção do item 8
     if (data.components) {
-      // Primeiro remove os atuais
       await supabase
         .from("product_components")
         .delete()
         .eq("product_id", data.id);
 
-      // Depois insere os novos
       if (data.components.length > 0) {
         const components = data.components.map(c => ({
           product_id: data.id,
@@ -758,9 +786,93 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
 
     await loadProducts();
-  }, [user, ensureUser]);
+  }, [user, loadProducts]);
 
-  // ✅ addStockMovement com validação de estoque negativo
+  const deleteProduct = useCallback(async (id: string) => {
+    ensureUser();
+    const { error } = await supabase
+      .from("products")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", user!.id);
+    if (error) throw error;
+    await loadProducts();
+  }, [user, loadProducts]);
+
+  // ✅ Project functions
+  const addProject = useCallback(async (data: Omit<Project, "id" | "created_at" | "updated_at" | "number" | "user_id">) => {
+    ensureUser();
+    
+    const maxNumber = (projects || []).reduce((max, p) => Math.max(max, p.number), 0);
+    const newProject = {
+      ...data,
+      number: maxNumber + 1,
+      user_id: user!.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    
+    const { data: insertedProject, error } = await supabase
+      .from("projects")
+      .insert([newProject])
+      .select()
+      .single();
+    if (error) throw error;
+
+    if (data.products && data.products.length > 0) {
+      const projectProducts = data.products.map(p => ({
+        project_id: insertedProject.id,
+        product_id: p.product_id,
+        product_name: p.product_name,
+        quantity: p.quantity,
+        unit_price: p.unit_price,
+        total_price: p.total_price,
+        user_id: user!.id,
+      })).filter(p => p.quantity > 0);
+
+      const { error: prodError } = await supabase.from("project_products").insert(projectProducts);
+      if (prodError) throw prodError;
+    }
+
+    await loadProjects();
+  }, [user, projects, loadProjects]);
+
+  const updateProject = useCallback(async (id: string, data: Partial<Project>) => {
+    ensureUser();
+    const { error } = await supabase
+      .from("projects")
+      .update({ ...data, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .eq("user_id", user!.id);
+    if (error) throw error;
+    await loadProjects();
+  }, [user, loadProjects]);
+
+  const deleteProject = useCallback(async (id: string) => {
+    ensureUser();
+    const { error } = await supabase
+      .from("projects")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", user!.id);
+    if (error) throw error;
+    await loadProjects();
+  }, [user, loadProjects]);
+
+  // ✅ Transaction functions
+  const addTransaction = useCallback(async (data: Omit<Transaction, "id" | "created_at" | "user_id">) => {
+    ensureUser();
+    const newTransaction = {
+      ...data,
+      user_id: user!.id,
+      created_at: new Date().toISOString(),
+    };
+    const { error } = await supabase.from("transactions").insert([newTransaction]);
+    if (error) throw error;
+    await loadTransactions();
+  }, [user, loadTransactions]);
+
+  // ✅ Stock Movement functions
   const addStockMovement = useCallback(async (data: Omit<StockMovement, "id" | "created_at" | "user_id">) => {
     ensureUser();
 
@@ -777,23 +889,21 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     const movementData = {
       ...data,
-      user_id: user.id,
+      user_id: user!.id,
       created_at: new Date().toISOString(),
     };
 
     const { error } = await supabase.from("stock_movements").insert([movementData]);
     if (error) throw error;
 
-    // Atualiza estoque local
     await updateProduct({
       ...product,
       current_stock: newStock,
     });
 
     await loadStockMovements();
-  }, [user, products, ensureUser, updateProduct]);
+  }, [user, products, updateProduct, loadStockMovements]);
 
-  // ✅ processProjectStockMovement com execução paralela
   const processProjectStockMovement = useCallback(async (projectId: string, products: ProjectProduct[]) => {
     ensureUser();
 
@@ -814,18 +924,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       })
     );
 
-    // ✅ Executa em paralelo - Correção do item 5
     await Promise.all(movementPromises);
-  }, [ensureUser, addStockMovement]);
+  }, [addStockMovement]);
 
-  // ✅ addSale com validação e execução paralela
+  // ✅ Sale functions
   const addSale = useCallback(async (sale: Omit<Sale, 'id' | 'created_at' | 'updated_at' | 'user_id'>) => {
     ensureUser();
-
-    // Valida itens
-    if (sale.items && sale.items.length === 0) {
-      sale.items = [];
-    }
 
     const newSale = {
       date: sale.date,
@@ -834,7 +938,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       status: sale.status,
       payment_method: sale.payment_method,
       notes: sale.notes,
-      user_id: user.id,
+      user_id: user!.id,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -847,7 +951,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     if (saleError) throw saleError;
 
-    // Insere itens
     if (sale.items && sale.items.length > 0) {
       const saleItems = sale.items.map(item => ({
         sale_id: insertedSale.id,
@@ -862,12 +965,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       if (itemsError) throw itemsError;
     }
 
-    // Movimenta estoque em paralelo
     if (sale.items && sale.status === 'completed') {
       await processProjectStockMovement(insertedSale.id, sale.items);
     }
 
-    // Cria transação
     if (sale.status === 'completed') {
       await addTransaction({
         type: 'entrada',
@@ -879,15 +980,33 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
 
     await refreshData();
-  }, [user, ensureUser, processProjectStockMovement, addTransaction, refreshData]);
+  }, [user, processProjectStockMovement, addTransaction, refreshData]);
 
-  // ✅ addPurchase com validação e execução paralela
+  const updateSale = useCallback(async (id: string, sale: Partial<Sale>) => {
+    ensureUser();
+    const { error } = await supabase
+      .from('sales')
+      .update({ ...sale, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .eq('user_id', user!.id);
+    if (error) throw error;
+    await loadSales();
+  }, [user, loadSales]);
+
+  const deleteSale = useCallback(async (id: string) => {
+    ensureUser();
+    const { error } = await supabase
+      .from('sales')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user!.id);
+    if (error) throw error;
+    await loadSales();
+  }, [user, loadSales]);
+
+  // ✅ Purchase functions
   const addPurchase = useCallback(async (purchase: Omit<Purchase, 'id' | 'created_at' | 'updated_at' | 'user_id'>) => {
     ensureUser();
-
-    if (purchase.items && purchase.items.length === 0) {
-      purchase.items = [];
-    }
 
     const newPurchase = {
       date: purchase.date,
@@ -896,7 +1015,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       status: purchase.status,
       invoice_number: purchase.invoice_number,
       notes: purchase.notes,
-      user_id: user.id,
+      user_id: user!.id,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -923,7 +1042,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       if (itemsError) throw itemsError;
     }
 
-    // Movimenta estoque e cria transação se recebido
     if (purchase.status === 'received') {
       const movements = purchase.items?.map(item => 
         addStockMovement({
@@ -951,37 +1069,67 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
 
     await refreshData();
-  }, [user, ensureUser, addStockMovement, addTransaction, refreshData]);
+  }, [user, addStockMovement, addTransaction, refreshData]);
 
-  // ✅ Funções básicas com proteção
-  const addClient = useCallback(async (data: Omit<Client, "id" | "created_at" | "updated_at" | "user_id">) => {
+  const updatePurchase = useCallback(async (id: string, purchase: Partial<Purchase>) => {
     ensureUser();
-    const newClient = {
-      ...data,
-      user_id: user.id,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    const { error } = await supabase.from("clients").insert([newClient]);
+    const { error } = await supabase
+      .from('purchases')
+      .update({ ...purchase, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .eq('user_id', user!.id);
     if (error) throw error;
-    await loadClients();
-  }, [user, ensureUser]);
+    await loadPurchases();
+  }, [user, loadPurchases]);
 
+  const deletePurchase = useCallback(async (id: string) => {
+    ensureUser();
+    const { error } = await supabase
+      .from('purchases')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user!.id);
+    if (error) throw error;
+    await loadPurchases();
+  }, [user, loadPurchases]);
+    // ✅ Supplier functions
   const addSupplier = useCallback(async (supplier: Omit<Supplier, 'id' | 'created_at' | 'updated_at'>) => {
     ensureUser();
     const newSupplier = {
       ...supplier,
-      user_id: user.id,
+      user_id: user!.id,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
     const { error } = await supabase.from('suppliers').insert([newSupplier]);
     if (error) throw error;
     await loadSuppliers();
-  }, [user, ensureUser]);
+  }, [user, loadSuppliers]);
 
-  // Demais funções (update, delete) seguem o mesmo padrão com useCallback
-  // [código omitido por brevidade, mas mantém a mesma estrutura]
+  const updateSupplier = useCallback(async (id: string, supplier: Partial<Supplier>) => {
+    ensureUser();
+    const { error } = await supabase
+      .from('suppliers')
+      .update({ ...supplier, updated_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) throw error;
+    await loadSuppliers();
+  }, [user, loadSuppliers]);
+
+  const deleteSupplier = useCallback(async (id: string) => {
+    ensureUser();
+    const { error } = await supabase
+      .from('suppliers')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+    await loadSuppliers();
+  }, [user, loadSuppliers]);
+
+  // ✅ Utility functions
+  const getAvailableComponents = useCallback(() => {
+    return validateArray(products);
+  }, [products]);
 
   const getDashboardStats = useCallback(() => {
     const totalClients = clients.length;
@@ -1022,7 +1170,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       p.current_stock <= p.min_stock
     ).length;
 
-    // Garante arrays válidos para recentActivity
     const recentActivity = [
       ...(projects || []).slice(-3).map(p => ({
         type: "project",
@@ -1047,7 +1194,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 5);
 
-    // ✅ CORREÇÃO 9: Garante que os valores sejam numéricos
     return {
       totalClients: Number(totalClients) || 0,
       activeProjects: Number(activeProjects) || 0,
@@ -1058,192 +1204,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [clients, projects, sales, purchases, transactions, products]);
 
-  // ✅ Funções restantes com useCallback para consistência
-  const updateClient = useCallback(async (id: string, data: Partial<Client>) => {
-    ensureUser();
-    const { error } = await supabase
-      .from("clients")
-      .update({ ...data, updated_at: new Date().toISOString() })
-      .eq("id", id)
-      .eq("user_id", user.id);
-    if (error) throw error;
-    await loadClients();
-  }, [user, ensureUser]);
-
-  const deleteClient = useCallback(async (id: string) => {
-    ensureUser();
-    const { error } = await supabase
-      .from("clients")
-      .delete()
-      .eq("id", id)
-      .eq("user_id", user.id);
-    if (error) throw error;
-    await loadClients();
-  }, [user, ensureUser]);
-
-  const addProject = useCallback(async (data: Omit<Project, "id" | "created_at" | "updated_at" | "number" | "user_id">) => {
-    ensureUser();
-    
-    const maxNumber = (projects || []).reduce((max, p) => Math.max(max, p.number), 0);
-    const newProject = {
-      ...data,
-      number: maxNumber + 1,
-      user_id: user.id,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    
-    const { data: insertedProject, error } = await supabase
-      .from("projects")
-      .insert([newProject])
-      .select()
-      .single();
-    if (error) throw error;
-
-    if (data.products && data.products.length > 0) {
-      const projectProducts = data.products.map(p => ({
-        project_id: insertedProject.id,
-        product_id: p.product_id,
-        product_name: p.product_name,
-        quantity: p.quantity,
-        unit_price: p.unit_price,
-        total_price: p.total_price,
-        user_id: user.id,
-      })).filter(p => p.quantity > 0);
-
-      const { error: prodError } = await supabase.from("project_products").insert(projectProducts);
-      if (prodError) throw prodError;
-    }
-
-    await loadProjects();
-  }, [user, projects, ensureUser]);
-
-  const updateProject = useCallback(async (id: string, data: Partial<Project>) => {
-    ensureUser();
-    const { error } = await supabase
-      .from("projects")
-      .update({ ...data, updated_at: new Date().toISOString() })
-      .eq("id", id)
-      .eq("user_id", user.id);
-    if (error) throw error;
-    await loadProjects();
-  }, [user, ensureUser]);
-
-  const deleteProject = useCallback(async (id: string) => {
-    ensureUser();
-    const { error } = await supabase
-      .from("projects")
-      .delete()
-      .eq("id", id)
-      .eq("user_id", user.id);
-    if (error) throw error;
-    await loadProjects();
-  }, [user, ensureUser]);
-
-  const updateProduct = useCallback(async (data: Product) => {
-    ensureUser();
-    const { error } = await supabase
-      .from("products")
-      .update({ 
-        ...data, 
-        updated_at: new Date().toISOString() 
-      })
-      .eq("id", data.id);
-    if (error) throw error;
-    await loadProducts();
-  }, [user, ensureUser]);
-
-  const deleteProduct = useCallback(async (id: string) => {
-    ensureUser();
-    const { error } = await supabase
-      .from("products")
-      .delete()
-      .eq("id", id);
-    if (error) throw error;
-    await loadProducts();
-  }, [user, ensureUser]);
-
-  const addTransaction = useCallback(async (data: Omit<Transaction, "id" | "created_at" | "user_id">) => {
-    ensureUser();
-    const newTransaction = {
-      ...data,
-      user_id: user.id,
-      created_at: new Date().toISOString(),
-    };
-    const { error } = await supabase.from("transactions").insert([newTransaction]);
-    if (error) throw error;
-    await loadTransactions();
-  }, [user, ensureUser]);
-
-  const updateSale = useCallback(async (id: string, sale: Partial<Sale>) => {
-    ensureUser();
-    const { error } = await supabase
-      .from('sales')
-      .update({ ...sale, updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .eq('user_id', user.id);
-    if (error) throw error;
-    await loadSales();
-  }, [user, ensureUser]);
-
-  const deleteSale = useCallback(async (id: string) => {
-    ensureUser();
-    const { error } = await supabase
-      .from('sales')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', user.id);
-    if (error) throw error;
-    await loadSales();
-  }, [user, ensureUser]);
-
-  const updatePurchase = useCallback(async (id: string, purchase: Partial<Purchase>) => {
-    ensureUser();
-    const { error } = await supabase
-      .from('purchases')
-      .update({ ...purchase, updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .eq('user_id', user.id);
-    if (error) throw error;
-    await loadPurchases();
-  }, [user, ensureUser]);
-
-  const deletePurchase = useCallback(async (id: string) => {
-    ensureUser();
-    const { error } = await supabase
-      .from('purchases')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', user.id);
-    if (error) throw error;
-    await loadPurchases();
-  }, [user, ensureUser]);
-
-  const updateSupplier = useCallback(async (id: string, supplier: Partial<Supplier>) => {
-    ensureUser();
-    const { error } = await supabase
-      .from('suppliers')
-      .update({ ...supplier, updated_at: new Date().toISOString() })
-      .eq('id', id);
-    if (error) throw error;
-    await loadSuppliers();
-  }, [user, ensureUser]);
-
-  const deleteSupplier = useCallback(async (id: string) => {
-    ensureUser();
-    const { error } = await supabase
-      .from('suppliers')
-      .delete()
-      .eq('id', id);
-    if (error) throw error;
-    await loadSuppliers();
-  }, [user, ensureUser]);
-
-  const getAvailableComponents = useCallback(() => {
-    return validateArray(products);
-  }, [products]);
-
-  // ✅ Retorno final do Provider
+  // ✅ Provider return
   return (
     <AppContext.Provider
       value={{
