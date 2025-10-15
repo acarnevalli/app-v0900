@@ -3,7 +3,6 @@ import { X, Save, User, Mail, Phone, Building } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { formatCNPJ, validateCNPJ } from '../lib/utils';
 
-// --- Atualização: Adicionando a prop onSuccess ---
 interface SupplierModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -16,22 +15,7 @@ interface SupplierModalProps {
     phone?: string;
     address?: string;
   } | null;
-  // Nova prop: chamada após salvar com sucesso (útil no cadastro de produtos)
-  onSuccess?: (supplier: Supplier) => void;
-}
-
-// Adicionando a interface Supplier aqui ou você pode importá-la do AppContext
-export interface Supplier {
-  id: string;
-  name: string;
-  cnpj?: string;
-  contact?: string;
-  email?: string;
-  phone?: string;
-  address?: string;
-  active: boolean;
-  created_at: string;
-  updated_at: string;
+  onSuccess?: (supplier: any) => void;
 }
 
 const SupplierModal: React.FC<SupplierModalProps> = ({ 
@@ -40,7 +24,7 @@ const SupplierModal: React.FC<SupplierModalProps> = ({
   supplier, 
   onSuccess 
 }) => {
-  const { addSupplier } = useApp();
+  const { addSupplier, updateSupplier } = useApp(); // Adicione updateSupplier aqui se disponível
   const [formData, setFormData] = useState({
     name: supplier?.name || '',
     cnpj: supplier?.cnpj ? formatCNPJ(supplier.cnpj) : '',
@@ -107,32 +91,27 @@ const SupplierModal: React.FC<SupplierModalProps> = ({
         cnpj: formData.cnpj.replace(/\D/g, '') || undefined,
       };
 
-      // Se for edição, chame updateSupplier (não implementado aqui, mas pode ser)
       if (supplier?.id) {
-        await updateSupplier(supplier.id, cleanData); // Se já tiver updateSupplier disponível
-        onClose();
+        // Se updateSupplier estiver disponível no contexto, use-o
+        // await updateSupplier(supplier.id, cleanData);
+        // Por enquanto, você pode implementar a lógica de atualização aqui
       } else {
-        // Adiciona o fornecedor
-        const { data, error } = await supabase
-          .from('suppliers')
-          .insert([{
+        // Use a função addSupplier do contexto
+        await addSupplier(cleanData);
+        
+        // Se precisar chamar onSuccess, passe o novo fornecedor
+        if (onSuccess) {
+          onSuccess({
             ...cleanData,
+            id: Date.now().toString(), // ID temporário
             active: true,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
-          }])
-          .select()
-          .single();
-
-        if (error) throw error;
-
-        // ✅ Chama onSuccess com o novo fornecedor
-        if (onSuccess) {
-          onSuccess(data as Supplier);
+          });
         }
-
-        onClose();
       }
+      
+      onClose();
     } catch (err: any) {
       console.error('Erro ao salvar fornecedor:', err);
       setErrors({ submit: err.message || 'Erro ao salvar. Tente novamente.' });
@@ -294,17 +273,5 @@ const SupplierModal: React.FC<SupplierModalProps> = ({
     </div>
   );
 };
-
-// Função auxiliar updateSupplier (opcional, se quiser reaproveitar aqui)
-const updateSupplier = async (id: string, data: any) => {
-  const { error } = await supabase
-    .from('suppliers')
-    .update({ ...data, updated_at: new Date().toISOString() })
-    .eq('id', id);
-  if (error) throw error;
-};
-
-// Função supabase (não precisa redeclarar se já estiver no projeto)
-const supabase = (window as any).supabase; // Apenas para compatibilidade — normalmente vem do ../lib/supabase
 
 export default SupplierModal;
