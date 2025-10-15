@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Search, Plus } from 'lucide-react';
+import { X, Save, Search, Plus, ChevronDown } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import SupplierModal from './SupplierModal';
 
@@ -40,11 +40,20 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, o
   });
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [supplierSearchQuery, setSupplierSearchQuery] = useState('');
+  const [showSupplierDropdown, setShowSupplierDropdown] = useState(false);
   const [categoryQuery, setCategoryQuery] = useState('');
   const [filteredCategories, setFilteredCategories] = useState<typeof categories>([]);
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Filtra fornecedores baseado na busca
+  const filteredSuppliers = suppliers.filter(supplier =>
+    supplier.name.toLowerCase().includes(supplierSearchQuery.toLowerCase()) ||
+    supplier.cnpj?.includes(supplierSearchQuery) ||
+    supplier.email?.toLowerCase().includes(supplierSearchQuery.toLowerCase())
+  );
 
   // Carrega categorias ao abrir
   useEffect(() => {
@@ -86,6 +95,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, o
         current_stock: product.current_stock?.toString() || '0',
         supplier: product.supplier || '',
       });
+      setSupplierSearchQuery(product.supplier || '');
     } else {
       resetForm();
     }
@@ -106,6 +116,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, o
       current_stock: '0',
       supplier: '',
     });
+    setSupplierSearchQuery('');
   };
 
   // Calcula preço de venda: venda = custo / (1 - margem/100)
@@ -195,8 +206,30 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, o
 
   const handleSupplierCreated = (supplier: { name: string }) => {
     setFormData(prev => ({ ...prev, supplier: supplier.name }));
+    setSupplierSearchQuery(supplier.name);
     setIsSupplierModalOpen(false);
   };
+
+  const handleSelectSupplier = (supplier: any) => {
+    setFormData(prev => ({ ...prev, supplier: supplier.name }));
+    setSupplierSearchQuery(supplier.name);
+    setShowSupplierDropdown(false);
+  };
+
+  // Fecha o dropdown quando clica fora
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.supplier-dropdown-container')) {
+        setShowSupplierDropdown(false);
+      }
+    };
+
+    if (showSupplierDropdown) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [showSupplierDropdown]);
 
   if (!isOpen) return null;
 
@@ -409,29 +442,88 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, o
             </div>
           </div>
 
-          {/* Fornecedor */}
-          <div>
+          {/* Fornecedor - PARTE ATUALIZADA COM AUTOCOMPLETE */}
+          <div className="supplier-dropdown-container">
             <label className="block text-sm font-medium text-gray-700 mb-1">Fornecedor</label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
-                value={formData.supplier}
+                value={supplierSearchQuery}
                 onChange={(e) => {
-                  handleChange(e);
-                  setSearchQuery(e.target.value);
+                  setSupplierSearchQuery(e.target.value);
+                  setFormData(prev => ({ ...prev, supplier: e.target.value }));
+                  setShowSupplierDropdown(true);
                 }}
+                onFocus={() => setShowSupplierDropdown(true)}
                 placeholder="Buscar fornecedor..."
-                className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
+                className="w-full pl-10 pr-20 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
               />
-              <button
-                type="button"
-                onClick={() => setIsSupplierModalOpen(true)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-amber-600 hover:text-amber-700"
-              >
-                <Plus className="h-4 w-4" />
-              </button>
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center space-x-1">
+                <button
+                  type="button"
+                  onClick={() => setShowSupplierDropdown(!showSupplierDropdown)}
+                  className="p-1 text-gray-400 hover:text-gray-600"
+                >
+                  <ChevronDown className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsSupplierModalOpen(true)}
+                  className="p-1 text-amber-600 hover:text-amber-700"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Dropdown de fornecedores */}
+              {showSupplierDropdown && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto">
+                  {filteredSuppliers.length === 0 ? (
+                    <div className="px-4 py-3 text-sm text-gray-500">
+                      {supplierSearchQuery ? 'Nenhum fornecedor encontrado' : 'Nenhum fornecedor cadastrado'}
+                    </div>
+                  ) : (
+                    filteredSuppliers.map((supplier) => (
+                      <button
+                        key={supplier.id}
+                        type="button"
+                        onClick={() => handleSelectSupplier(supplier)}
+                        className="w-full px-4 py-2 text-left hover:bg-amber-50 focus:bg-amber-50 focus:outline-none transition-colors"
+                      >
+                        <div className="font-medium text-gray-900">{supplier.name}</div>
+                        {(supplier.cnpj || supplier.email) && (
+                          <div className="text-sm text-gray-500">
+                            {supplier.cnpj && <span>CNPJ: {supplier.cnpj}</span>}
+                            {supplier.cnpj && supplier.email && <span> • </span>}
+                            {supplier.email && <span>{supplier.email}</span>}
+                          </div>
+                        )}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
+            
+            {/* Mostra fornecedor selecionado */}
+            {formData.supplier && !showSupplierDropdown && (
+              <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between">
+                <span className="text-sm text-amber-800">
+                  Fornecedor selecionado: <strong>{formData.supplier}</strong>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormData(prev => ({ ...prev, supplier: '' }));
+                    setSupplierSearchQuery('');
+                  }}
+                  className="text-red-500 hover:text-red-600"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
