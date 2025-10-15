@@ -209,14 +209,15 @@ export interface Supplier {
   phone?: string;
   address?: string;
   active: boolean;
+  user_id?: string;
   created_at: string;
   updated_at: string;
 }
 
-// --- NOVA: Categoria ---
 export interface Category {
   id: string;
   name: string;
+  user_id?: string;
   created_at: string;
   updated_at: string;
 }
@@ -322,6 +323,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   // --- Carregar categorias ---
   const loadCategories = async () => {
+    if (!user) return;
+    
+    // Carrega categorias globais ou do usuário (dependendo da sua lógica de negócio)
     const { data, error } = await supabase
       .from('categories')
       .select('*')
@@ -329,18 +333,30 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     if (error) {
       console.error('Erro ao carregar categorias:', error);
+      throw error;
     } else {
       setCategories(data || []);
     }
   };
 
   const addCategory = async (name: string) => {
+    if (!user) throw new Error('Usuário não autenticado');
+    
     const cleanedName = name.trim();
     if (!cleanedName) throw new Error('Nome da categoria é obrigatório');
 
+    // Verifica duplicatas
+    const exists = categories.some(c => c.name.toLowerCase() === cleanedName.toLowerCase());
+    if (exists) {
+      throw new Error('Categoria já existe');
+    }
+
     const { data, error } = await supabase
       .from('categories')
-      .insert([{ name: cleanedName }])
+      .insert([{ 
+        name: cleanedName,
+        user_id: user.id 
+      }])
       .select()
       .single();
 
@@ -367,14 +383,20 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const loadProducts = async () => {
     if (!user) return;
+    
+    // ✅ Corrigido: Agora filtra por user_id
     const { data: productsData, error: prodErr } = await supabase
       .from("products")
-      .select("*");
+      .select("*")
+      .eq("user_id", user.id);
     if (prodErr) throw prodErr;
 
     const { data: componentsData, error: compErr } = await supabase
       .from("product_components")
-      .select(`*, component:products!product_components_component_id_fkey(id, name, unit, cost_price)`);
+      .select(`
+        *,
+        component:products!product_components_component_id_fkey(id, name, unit, cost_price)
+      `);
     if (compErr) throw compErr;
 
     const merged = (productsData || []).map((p) => ({
@@ -383,7 +405,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         .filter((c: any) => c.product_id === p.id)
         .map((c: any) => ({
           id: c.id,
-          product_id: c.component_id,
+          product_id: c.product_id,
           component_id: c.component_id,
           product_name: c.component?.name || "",
           quantity: c.quantity,
@@ -398,31 +420,29 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const loadProjects = async () => {
     if (!user) return;
+    
+    // ✅ Melhorado: Usa join do Supabase
     const { data: projectsData, error: projErr } = await supabase
       .from("projects")
-      .select("*, client:clients(name)")
+      .select(`
+        *,
+        client:clients(name),
+        products:project_products(*)
+      `)
       .eq("user_id", user.id);
     if (projErr) throw projErr;
-
-    const { data: projProds, error: projProdErr } = await supabase
-      .from("project_products")
-      .select("*")
-      .eq("user_id", user.id);
-    if (projProdErr) throw projProdErr;
 
     const merged = (projectsData || []).map((p: any) => ({
       ...p,
       client_name: p.client?.name,
-      products: (projProds || [])
-        .filter((pp: any) => pp.project_id === p.id)
-        .map((pp: any) => ({
-          id: pp.id,
-          product_id: pp.product_id,
-          product_name: pp.product?.name || "",
-          quantity: pp.quantity,
-          unit_price: pp.unit_price,
-          total_price: pp.total_price,
-        })),
+      products: (p.products || []).map((pp: any) => ({
+        id: pp.id,
+        product_id: pp.product_id,
+        product_name: pp.product_name || "",
+        quantity: pp.quantity,
+        unit_price: pp.unit_price,
+        total_price: pp.total_price,
+      })),
     }));
     setProjects(merged);
   };
@@ -432,7 +452,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const { data, error } = await supabase
       .from("transactions")
       .select("*")
-      .eq("user_id", user.id);
+      .eq("user_id", user.id)
+      .order('date', { ascending: false });
     if (error) throw error;
     setTransactions(data || []);
   };
@@ -442,16 +463,20 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const { data, error } = await supabase
       .from("stock_movements")
       .select("*")
-      .eq("user_id", user.id);
+      .eq("user_id", user.id)
+      .order('date', { ascending: false });
     if (error) throw error;
     setStockMovements(data || []);
   };
 
   const loadSuppliers = async () => {
     if (!user) return;
+    
+    // ✅ Agora filtra por user_id (ou remove o filtro se for global)
     const { data, error } = await supabase
       .from("suppliers")
       .select("*")
+      .eq("user_id", user.id)
       .order('name');
     if (error) throw error;
     setSuppliers(data || []);
@@ -460,32 +485,30 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const loadSales = async () => {
     if (!user) return;
     try {
+      // ✅ Melhorado: Usa join do Supabase
       const { data: salesData, error: salesErr } = await supabase
         .from("sales")
-        .select("*, client:clients(name)")
+        .select(`
+          *,
+          client:clients(name),
+          items:sale_items(*)
+        `)
         .eq("user_id", user.id)
         .order('date', { ascending: false });
       if (salesErr) throw salesErr;
 
-      const { data: saleItems, error: itemsErr } = await supabase
-        .from("sale_items")
-        .select("*");
-      if (itemsErr) throw itemsErr;
-
       const merged = (salesData || []).map((sale: any) => ({
         ...sale,
         client_name: sale.client?.name,
-        items: (saleItems || [])
-          .filter((item: any) => item.sale_id === sale.id)
-          .map((item: any) => ({
-            id: item.id,
-            sale_id: item.sale_id,
-            product_id: item.product_id,
-            product_name: item.product?.name || "",
-            quantity: item.quantity,
-            unit_price: item.unit_price,
-            total: item.total,
-          })),
+        items: (sale.items || []).map((item: any) => ({
+          id: item.id,
+          sale_id: item.sale_id,
+          product_id: item.product_id,
+          product_name: item.product_name || "",
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          total: item.total,
+        })),
       }));
       setSales(merged);
     } catch (error) {
@@ -497,32 +520,30 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const loadPurchases = async () => {
     if (!user) return;
     try {
+      // ✅ Melhorado: Usa join do Supabase
       const { data: purchasesData, error: purchasesErr } = await supabase
         .from("purchases")
-        .select("*, supplier:suppliers(name)")
+        .select(`
+          *,
+          supplier:suppliers(name),
+          items:purchase_items(*)
+        `)
         .eq("user_id", user.id)
         .order('date', { ascending: false });
       if (purchasesErr) throw purchasesErr;
 
-      const { data: purchaseItems, error: itemsErr } = await supabase
-        .from("purchase_items")
-        .select("*");
-      if (itemsErr) throw itemsErr;
-
       const merged = (purchasesData || []).map((purchase: any) => ({
         ...purchase,
         supplier_name: purchase.supplier?.name,
-        items: (purchaseItems || [])
-          .filter((item: any) => item.purchase_id === purchase.id)
-          .map((item: any) => ({
-            id: item.id,
-            purchase_id: item.purchase_id,
-            product_id: item.product_id,
-            product_name: item.product?.name || "",
-            quantity: item.quantity,
-            unit_cost: item.unit_cost,
-            total: item.total,
-          })),
+        items: (purchase.items || []).map((item: any) => ({
+          id: item.id,
+          purchase_id: item.purchase_id,
+          product_id: item.product_id,
+          product_name: item.product_name || "",
+          quantity: item.quantity,
+          unit_cost: item.unit_cost,
+          total: item.total,
+        })),
       }));
       setPurchases(merged);
     } catch (error) {
@@ -551,27 +572,43 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setLoading(false);
   };
 
+  // ✅ Corrigido: Adicionado cleanup
   useEffect(() => {
-    if (authLoading) return;
-    if (isAuthenticated && user) {
-      refreshData();
-    } else {
-      setClients([]);
-      setProjects([]);
-      setTransactions([]);
-      setProducts([]);
-      setStockMovements([]);
-      setSales([]);
-      setPurchases([]);
-      setSuppliers([]);
-      setCategories([]);
-      setLoading(false);
-      setError(null);
-    }
+    let cancelled = false;
+
+    const initializeData = async () => {
+      if (authLoading) return;
+      
+      if (!isAuthenticated || !user) {
+        setClients([]);
+        setProjects([]);
+        setTransactions([]);
+        setProducts([]);
+        setStockMovements([]);
+        setSales([]);
+        setPurchases([]);
+        setSuppliers([]);
+        setCategories([]);
+        setLoading(false);
+        setError(null);
+        return;
+      }
+
+      if (!cancelled) {
+        await refreshData();
+      }
+    };
+
+    initializeData();
+
+    return () => {
+      cancelled = true;
+    };
   }, [user, isAuthenticated, authLoading]);
 
   const addClient = async (data: Omit<Client, "id" | "created_at" | "updated_at" | "user_id">) => {
-    if (!user) return;
+    if (!user) throw new Error('Usuário não autenticado');
+    
     const newClient = {
       ...data,
       user_id: user.id,
@@ -584,7 +621,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const updateClient = async (id: string, data: Partial<Client>) => {
-    if (!user) return;
+    if (!user) throw new Error('Usuário não autenticado');
+    
     const { error } = await supabase
       .from("clients")
       .update({ ...data, updated_at: new Date().toISOString() })
@@ -595,7 +633,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const deleteClient = async (id: string) => {
-    if (!user) return;
+    if (!user) throw new Error('Usuário não autenticado');
+    
     const { error } = await supabase
       .from("clients")
       .delete()
@@ -606,7 +645,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const addProject = async (data: Omit<Project, "id" | "created_at" | "updated_at" | "number" | "user_id">) => {
-    if (!user) return;
+    if (!user) throw new Error('Usuário não autenticado');
+    
     const maxNumber = projects.reduce((max, p) => Math.max(max, p.number), 0);
     const newProject = {
       ...data,
@@ -615,6 +655,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
+    
     const { data: insertedProject, error } = await supabase
       .from("projects")
       .insert([newProject])
@@ -626,6 +667,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const projectProducts = data.products.map(p => ({
         project_id: insertedProject.id,
         product_id: p.product_id,
+        product_name: p.product_name,
+        quantity: p.quantity,
+        unit_price: p.unit_price,
+        total_price: p.total_price,
+        user_id: user.id,
+      }));
+      const projectProducts = data.products.map(p => ({
+        project_id: insertedProject.id,
+        product_id: p.product_id,
+        product_name: p.product_name,
         quantity: p.quantity,
         unit_price: p.unit_price,
         total_price: p.total_price,
@@ -639,7 +690,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const updateProject = async (id: string, data: Partial<Project>) => {
-    if (!user) return;
+    if (!user) throw new Error('Usuário não autenticado');
+    
     const { error } = await supabase
       .from("projects")
       .update({ ...data, updated_at: new Date().toISOString() })
@@ -650,7 +702,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const deleteProject = async (id: string) => {
-    if (!user) return;
+    if (!user) throw new Error('Usuário não autenticado');
+    
     const { error } = await supabase
       .from("projects")
       .delete()
@@ -661,12 +714,24 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const addProduct = async (data: Omit<Product, "id" | "created_at" | "updated_at" | "user_id">) => {
-    if (!user) return;
+    if (!user) throw new Error('Usuário não autenticado');
+    
     const newProduct = {
-      ...data,
+      name: data.name,
+      description: data.description,
+      category: data.category,
+      type: data.type,
+      unit: data.unit,
+      cost_price: data.cost_price,
+      sale_price: data.sale_price,
+      current_stock: data.current_stock,
+      min_stock: data.min_stock,
+      supplier: data.supplier,
+      user_id: user.id,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
+    
     const { data: insertedProduct, error } = await supabase
       .from("products")
       .insert([newProduct])
@@ -688,27 +753,44 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const updateProduct = async (data: Product) => {
-    if (!user) return;
+    if (!user) throw new Error('Usuário não autenticado');
+    
     const { error } = await supabase
       .from("products")
-      .update({ ...data, updated_at: new Date().toISOString() })
-      .eq("id", data.id);
+      .update({ 
+        name: data.name,
+        description: data.description,
+        category: data.category,
+        type: data.type,
+        unit: data.unit,
+        cost_price: data.cost_price,
+        sale_price: data.sale_price,
+        current_stock: data.current_stock,
+        min_stock: data.min_stock,
+        supplier: data.supplier,
+        updated_at: new Date().toISOString() 
+      })
+      .eq("id", data.id)
+      .eq("user_id", user.id);
     if (error) throw error;
     await loadProducts();
   };
 
   const deleteProduct = async (id: string) => {
-    if (!user) return;
+    if (!user) throw new Error('Usuário não autenticado');
+    
     const { error } = await supabase
       .from("products")
       .delete()
-      .eq("id", id);
+      .eq("id", id)
+      .eq("user_id", user.id);
     if (error) throw error;
     await loadProducts();
   };
 
   const addTransaction = async (data: Omit<Transaction, "id" | "created_at" | "user_id">) => {
-    if (!user) return;
+    if (!user) throw new Error('Usuário não autenticado');
+    
     const newTransaction = {
       ...data,
       user_id: user.id,
@@ -720,7 +802,22 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const addStockMovement = async (data: Omit<StockMovement, "id" | "created_at" | "user_id">) => {
-    if (!user) return;
+    if (!user) throw new Error('Usuário não autenticado');
+    
+    const product = products.find(p => p.id === data.product_id);
+    if (!product) {
+      throw new Error('Produto não encontrado');
+    }
+
+    // ✅ Corrigido: Validação de estoque
+    const newStock = data.movement_type === 'entrada'
+      ? product.current_stock + data.quantity
+      : product.current_stock - data.quantity;
+
+    if (newStock < 0) {
+      throw new Error(`Estoque insuficiente. Disponível: ${product.current_stock}, Solicitado: ${data.quantity}`);
+    }
+
     const newMovement = {
       ...data,
       user_id: user.id,
@@ -729,22 +826,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const { error } = await supabase.from("stock_movements").insert([newMovement]);
     if (error) throw error;
 
-    const product = products.find(p => p.id === data.product_id);
-    if (product) {
-      const newStock = data.movement_type === 'entrada'
-        ? product.current_stock + data.quantity
-        : product.current_stock - data.quantity;
-
-      await updateProduct({
-        ...product,
-        current_stock: Math.max(0, newStock),
-      });
-    }
+    // Atualiza o estoque do produto
+    await updateProduct({
+      ...product,
+      current_stock: newStock,
+    });
 
     await loadStockMovements();
   };
 
   const processProjectStockMovement = async (projectId: string, products: ProjectProduct[]) => {
+    if (!user) throw new Error('Usuário não autenticado');
+    
     for (const item of products) {
       await addStockMovement({
         product_id: item.product_id,
@@ -762,13 +855,20 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const addSale = async (sale: Omit<Sale, 'id' | 'created_at' | 'updated_at' | 'user_id'>) => {
-    if (!user) return;
+    if (!user) throw new Error('Usuário não autenticado');
+    
     const newSale = {
-      ...sale,
+      date: sale.date,
+      client_id: sale.client_id,
+      total: sale.total,
+      status: sale.status,
+      payment_method: sale.payment_method,
+      notes: sale.notes,
       user_id: user.id,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
+    
     const { data: insertedSale, error } = await supabase
       .from('sales')
       .insert([newSale])
@@ -780,6 +880,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const saleItems = sale.items.map(item => ({
         sale_id: insertedSale.id,
         product_id: item.product_id,
+        product_name: item.product_name,
         quantity: item.quantity,
         unit_price: item.unit_price,
         total: item.total,
@@ -788,6 +889,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       if (itemsError) throw itemsError;
     }
 
+    // ✅ Corrigido: Movimentação de estoque com reference_type correto
     for (const item of sale.items) {
       await addStockMovement({
         product_id: item.product_id,
@@ -796,17 +898,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         quantity: item.quantity,
         unit_price: item.unit_price,
         total_value: item.total,
-        referencia: 'manual',
+        reference_type: 'manual',
         date: sale.date,
         notes: `Venda #${insertedSale.id}`,
       });
     }
 
+    // ✅ Corrigido: Só cria transação se venda foi concluída
     if (sale.status === 'completed') {
       await addTransaction({
         type: 'entrada',
         category: 'venda',
-        description: `Venda para cliente`,
+        description: `Venda para ${sale.client_name || 'cliente'}`,
         amount: sale.total,
         date: sale.date,
       });
@@ -816,7 +919,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const updateSale = async (id: string, sale: Partial<Sale>) => {
-    if (!user) return;
+    if (!user) throw new Error('Usuário não autenticado');
+    
     const { error } = await supabase
       .from('sales')
       .update({ ...sale, updated_at: new Date().toISOString() })
@@ -827,7 +931,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const deleteSale = async (id: string) => {
-    if (!user) return;
+    if (!user) throw new Error('Usuário não autenticado');
+    
     const { error } = await supabase
       .from('sales')
       .delete()
@@ -838,13 +943,20 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const addPurchase = async (purchase: Omit<Purchase, 'id' | 'created_at' | 'updated_at' | 'user_id'>) => {
-    if (!user) return;
+    if (!user) throw new Error('Usuário não autenticado');
+    
     const newPurchase = {
-      ...purchase,
+      date: purchase.date,
+      supplier_id: purchase.supplier_id,
+      total: purchase.total,
+      status: purchase.status,
+      invoice_number: purchase.invoice_number,
+      notes: purchase.notes,
       user_id: user.id,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
+    
     const { data: insertedPurchase, error } = await supabase
       .from('purchases')
       .insert([newPurchase])
@@ -856,6 +968,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const purchaseItems = purchase.items.map(item => ({
         purchase_id: insertedPurchase.id,
         product_id: item.product_id,
+        product_name: item.product_name,
         quantity: item.quantity,
         unit_cost: item.unit_cost,
         total: item.total,
@@ -864,6 +977,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       if (itemsError) throw itemsError;
     }
 
+    // ✅ Corrigido: Só movimenta estoque se compra foi recebida
     if (purchase.status === 'received') {
       for (const item of purchase.items) {
         await addStockMovement({
@@ -878,21 +992,23 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           notes: `Compra #${insertedPurchase.id}`,
         });
       }
-    }
 
-    await addTransaction({
-      type: 'saida',
-      category: 'compra',
-      description: `Compra de fornecedor`,
-      amount: purchase.total,
-      date: purchase.date,
-    });
+      // ✅ Corrigido: Só cria transação se compra foi recebida
+      await addTransaction({
+        type: 'saida',
+        category: 'compra',
+        description: `Compra de ${purchase.supplier_name || 'fornecedor'}`,
+        amount: purchase.total,
+        date: purchase.date,
+      });
+    }
 
     await refreshData();
   };
 
   const updatePurchase = async (id: string, purchase: Partial<Purchase>) => {
-    if (!user) return;
+    if (!user) throw new Error('Usuário não autenticado');
+    
     const { error } = await supabase
       .from('purchases')
       .update({ ...purchase, updated_at: new Date().toISOString() })
@@ -903,7 +1019,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const deletePurchase = async (id: string) => {
-    if (!user) return;
+    if (!user) throw new Error('Usuário não autenticado');
+    
     const { error } = await supabase
       .from('purchases')
       .delete()
@@ -914,8 +1031,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const addSupplier = async (supplier: Omit<Supplier, 'id' | 'created_at' | 'updated_at'>) => {
+    if (!user) throw new Error('Usuário não autenticado');
+    
     const newSupplier = {
       ...supplier,
+      user_id: user.id,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -925,32 +1045,51 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const updateSupplier = async (id: string, supplier: Partial<Supplier>) => {
+    if (!user) throw new Error('Usuário não autenticado');
+    
     const { error } = await supabase
       .from('suppliers')
       .update({ ...supplier, updated_at: new Date().toISOString() })
-      .eq('id', id);
+      .eq('id', id)
+      .eq('user_id', user.id);
     if (error) throw error;
     await loadSuppliers();
   };
 
   const deleteSupplier = async (id: string) => {
+    if (!user) throw new Error('Usuário não autenticado');
+    
     const { error } = await supabase
       .from('suppliers')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('user_id', user.id);
     if (error) throw error;
     await loadSuppliers();
   };
 
-  const calculateProductCost = async (productId: string): Promise<number> => {
-    const product = products.find(p => p.id === productId);
-    if (!product) return 0;
+  // ✅ Corrigido: Proteção contra recursão infinita
+  const calculateProductCost = async (productId: string, visited = new Set<string>()): Promise<number> => {
+    if (visited.has(productId)) {
+      console.warn(`⚠️ Dependência circular detectada no produto: ${productId}`);
+      return 0;
+    }
 
-    if (product.type === "material_bruto") return product.cost_price;
+    visited.add(productId);
+    const product = products.find(p => p.id === productId);
+    if (!product) {
+      console.warn(`⚠️ Produto não encontrado: ${productId}`);
+      return 0;
+    }
+
+    if (product.type === "material_bruto") {
+      return product.cost_price || 0;
+    }
 
     let total = 0;
     for (const comp of product.components) {
-      total += (await calculateProductCost(comp.component_id)) * comp.quantity;
+      const componentCost = await calculateProductCost(comp.component_id, visited);
+      total += componentCost * comp.quantity;
     }
     return total;
   };
@@ -972,7 +1111,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                saleDate >= firstDayOfMonth &&
                saleDate <= lastDayOfMonth;
       })
-      .reduce((sum, s) => sum + s.total, 0);
+      .reduce((sum, s) => sum + (s.total || 0), 0);
 
     const monthlyTransactionRevenue = transactions
       .filter(t => {
@@ -981,17 +1120,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                transDate >= firstDayOfMonth &&
                transDate <= lastDayOfMonth;
       })
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => sum + (t.amount || 0), 0);
 
     const monthlyRevenue = monthlySalesRevenue + monthlyTransactionRevenue;
 
     const pendingSales = sales
       .filter(s => s.status === 'pending')
-      .reduce((sum, s) => sum + s.total, 0);
+      .reduce((sum, s) => sum + (s.total || 0), 0);
 
     const pendingProjects = projects
       .filter(p => ["concluido", "entregue"].includes(p.status))
-      .reduce((sum, p) => sum + (p.budget || 0) * 0.5, 0);
+      .reduce((sum, p) => sum + ((p.budget || 0) * 0.5), 0);
 
     const pendingPayments = pendingSales + pendingProjects;
 
@@ -1005,12 +1144,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       })),
       ...sales.slice(-3).map(s => ({
         type: "sale",
-        message: `Venda para ${s.client_name || 'Cliente'}: R$ ${s.total.toLocaleString('pt-BR')}`,
+        message: `Venda para ${s.client_name || 'Cliente'}: R$ ${(s.total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
         date: s.created_at,
       })),
       ...purchases.slice(-3).map(p => ({
         type: "purchase",
-        message: `Compra de ${p.supplier_name || 'Fornecedor'}: R$ ${p.total.toLocaleString('pt-BR')}`,
+        message: `Compra de ${p.supplier_name || 'Fornecedor'}: R$ ${(p.total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
         date: p.created_at,
       })),
     ]
