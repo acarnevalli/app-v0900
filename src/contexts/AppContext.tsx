@@ -358,19 +358,51 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setCategories(validateArray(data));
   }, [user]);
 
+  // ✅ FUNÇÃO loadClients ATUALIZADA COM PAGINAÇÃO
   const loadClients = useCallback(async () => {
     if (!user) return;
     
-    const { data, error } = await supabase
-      .from("clients")
-      .select("*")
-      .eq("user_id", user.id)
-      .order('name');
+    let allClients: Client[] = [];
+    let page = 0;
+    const pageSize = 1000;
+    let hasMore = true;
     
-    if (error) throw error;
-    setClients(validateArray(data));
+    console.log('Iniciando carregamento de clientes com paginação...');
+    
+    while (hasMore) {
+      const from = page * pageSize;
+      const to = from + pageSize - 1;
+      
+      const { data, error, count } = await supabase
+        .from("clients")
+        .select("*", { count: 'exact' })
+        .eq("user_id", user.id)
+        .order('name')
+        .range(from, to);
+      
+      if (error) {
+        console.error('Erro ao carregar clientes:', error);
+        throw error;
+      }
+      
+      if (data && data.length > 0) {
+        allClients = [...allClients, ...data];
+        console.log(`Página ${page + 1}: ${data.length} clientes carregados. Total até agora: ${allClients.length}`);
+      }
+      
+      // Verifica se há mais registros para buscar
+      hasMore = data && data.length === pageSize;
+      page++;
+      
+      // Verificação adicional usando o count
+      if (count && allClients.length >= count) {
+        hasMore = false;
+      }
+    }
+    
+    console.log(`Total de clientes carregados: ${allClients.length}`);
+    setClients(validateArray(allClients));
   }, [user]);
-
   const loadProducts = useCallback(async () => {
     if (!user) return;
     
@@ -654,8 +686,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     setCategories(prev => [...prev, data]);
   }, [user, categories]);
-
-  // ✅ Client functions
+    // ✅ Client functions
   const addClient = useCallback(async (data: Omit<Client, "id" | "created_at" | "updated_at" | "user_id">) => {
     ensureUser();
     const newClient = {
@@ -926,8 +957,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     await Promise.all(movementPromises);
   }, [addStockMovement]);
-
-  // ✅ Sale functions
+   // ✅ Sale functions
   const addSale = useCallback(async (sale: Omit<Sale, 'id' | 'created_at' | 'updated_at' | 'user_id'>) => {
     ensureUser();
 
@@ -1092,7 +1122,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (error) throw error;
     await loadPurchases();
   }, [user, loadPurchases]);
-    // ✅ Supplier functions
+
+  // ✅ Supplier functions
   const addSupplier = useCallback(async (supplier: Omit<Supplier, 'id' | 'created_at' | 'updated_at'>) => {
     ensureUser();
     const newSupplier = {
@@ -1203,7 +1234,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       recentActivity: Array.isArray(recentActivity) ? recentActivity : [],
     };
   }, [clients, projects, sales, purchases, transactions, products]);
-
   // ✅ Provider return
   return (
     <AppContext.Provider
