@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { formatCurrency, formatDate } from '../lib/utils';
-import SupplierModal from './SupplierModal';
+import SupplierModal from '../components/SupplierModal';
 
 interface FormData {
   supplier_id: string;
