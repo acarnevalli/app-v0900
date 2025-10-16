@@ -1,34 +1,114 @@
 import React, { useState } from 'react';
-import { X, Save, User, Mail, Phone, Smartphone, CreditCard, Home, Building, Building2 } from 'lucide-react';
-import { useApp } from '../contexts/AppContext';
+import { X, Save, User, Mail, Phone, Smartphone, CreditCard, Home, Building, Building2, Search } from 'lucide-react';
+import { useApp, Client } from '../contexts/AppContext';
 import { formatCPF, validateCPF } from '../lib/utils';
 
 interface ClientModalProps {
   isOpen: boolean;
   onClose: () => void;
-  client?: {
-    id?: string;
-    name: string;
-    type: 'pf' | 'pj';
-    cpf?: string;
-    cnpj?: string;
-    email?: string;
-    phone?: string;
-    mobile?: string;
-    razao_social?: string;
-    inscricao_estadual?: string;
-    isento_icms?: boolean;
-    country?: string;
-    state?: string;
-    city?: string;
-    zip_code?: string;
-    neighborhood?: string;
-    street_type?: string;
-    street?: string;
-    numero?: string;
-    complemento?: string;
-  } | null;
+  client?: Client | null;
 }
+
+// ====== FUNÇÕES DE FORMATAÇÃO E VALIDAÇÃO ======
+
+// Formatação de telefone com parênteses e traços
+const formatPhone = (value: string): string => {
+  const clean = value.replace(/\D/g, '');
+  
+  if (clean.length === 0) return '';
+  if (clean.length <= 2) return `(${clean}`;
+  if (clean.length <= 6) return `(${clean.slice(0, 2)}) ${clean.slice(2)}`;
+  if (clean.length <= 10) return `(${clean.slice(0, 2)}) ${clean.slice(2, 6)}-${clean.slice(6)}`;
+  return `(${clean.slice(0, 2)}) ${clean.slice(2, 7)}-${clean.slice(7, 11)}`;
+};
+
+// Formatação de CEP
+const formatZipCode = (value: string): string => {
+  const clean = value.replace(/\D/g, '');
+  if (clean.length <= 5) return clean;
+  return `${clean.slice(0, 5)}-${clean.slice(5, 8)}`;
+};
+
+// Formatação de CNPJ
+const formatCNPJ = (value: string): string => {
+  const clean = value.replace(/\D/g, '');
+  
+  if (clean.length === 0) return '';
+  if (clean.length <= 2) return clean;
+  if (clean.length <= 5) return `${clean.slice(0, 2)}.${clean.slice(2)}`;
+  if (clean.length <= 8) return `${clean.slice(0, 2)}.${clean.slice(2, 5)}.${clean.slice(5)}`;
+  if (clean.length <= 12) return `${clean.slice(0, 2)}.${clean.slice(2, 5)}.${clean.slice(5, 8)}/${clean.slice(8)}`;
+  return `${clean.slice(0, 2)}.${clean.slice(2, 5)}.${clean.slice(5, 8)}/${clean.slice(8, 12)}-${clean.slice(12, 14)}`;
+};
+
+// Validação de CNPJ
+const validateCNPJ = (cnpj: string): boolean => {
+  cnpj = cnpj.replace(/\D/g, '');
+  
+  if (cnpj.length !== 14) return false;
+  if (/^(\d)\1{13}$/.test(cnpj)) return false;
+  
+  let tamanho = cnpj.length - 2;
+  let numeros = cnpj.substring(0, tamanho);
+  let digitos = cnpj.substring(tamanho);
+  let soma = 0;
+  let pos = tamanho - 7;
+  
+  for (let i = tamanho; i >= 1; i--) {
+    soma += parseInt(numeros.charAt(tamanho - i)) * pos--;
+    if (pos < 2) pos = 9;
+  }
+  
+  let resultado = soma % 11 < 2 ? 0 : 11 - soma % 11;
+  if (resultado != parseInt(digitos.charAt(0))) return false;
+  
+  tamanho = tamanho + 1;
+  numeros = cnpj.substring(0, tamanho);
+  soma = 0;
+  pos = tamanho - 7;
+  
+  for (let i = tamanho; i >= 1; i--) {
+    soma += parseInt(numeros.charAt(tamanho - i)) * pos--;
+    if (pos < 2) pos = 9;
+  }
+  
+  resultado = soma % 11 < 2 ? 0 : 11 - soma % 11;
+  if (resultado != parseInt(digitos.charAt(1))) return false;
+  
+  return true;
+};
+
+// Interface para resposta da API de CEP
+interface ViaCEPResponse {
+  cep: string;
+  logradouro: string;
+  complemento: string;
+  bairro: string;
+  localidade: string;
+  uf: string;
+  erro?: boolean;
+}
+
+// Função para buscar CEP
+const fetchAddressByCEP = async (cep: string): Promise<ViaCEPResponse | null> => {
+  const cleanCep = cep.replace(/\D/g, '');
+  
+  if (cleanCep.length !== 8) return null;
+  
+  try {
+    const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+    const data = await response.json();
+    
+    if (data.erro) {
+      throw new Error('CEP não encontrado');
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Erro ao buscar CEP:', error);
+    return null;
+  }
+};
 
 const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) => {
   const { addClient, updateClient } = useApp();
@@ -36,94 +116,202 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) =>
   const [formData, setFormData] = useState({
     name: client?.name || '',
     email: client?.email || '',
-    phone: client?.phone || '',
-    mobile: client?.mobile || '',
+    phone: client?.phone ? formatPhone(client.phone) : '',
+    mobile: client?.mobile ? formatPhone(client.mobile) : '',
     cpf: client?.cpf ? formatCPF(client.cpf) : '',
-    cnpj: client?.cnpj || '',
-    type: client?.type || 'pf',
+    cnpj: client?.cnpj ? formatCNPJ(client.cnpj) : '',
+    type: client?.type || 'pf' as 'pf' | 'pj',
     razao_social: client?.razao_social || '',
     inscricao_estadual: client?.inscricao_estadual || '',
     isento_icms: client?.isento_icms || false,
     country: client?.country || 'Brasil',
     state: client?.state || '',
     city: client?.city || '',
-    zip_code: client?.zip_code || '',
+    zip_code: client?.zip_code ? formatZipCode(client.zip_code) : '',
     neighborhood: client?.neighborhood || '',
-    street_type: client?.street_type || 'rua',
+    street_type: client?.street_type || 'Rua',
     street: client?.street || '',
     numero: client?.numero || '',
     complemento: client?.complemento || '',
+    fl_ativo: client?.fl_ativo ?? true,
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSearchingCEP, setIsSearchingCEP] = useState(false);
 
   if (!isOpen) return null;
-
+  // ====== VALIDAÇÃO ======
   const validate = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.name.trim()) newErrors.name = 'Nome é obrigatório';
+    // Validações básicas
+    if (!formData.name.trim()) {
+      newErrors.name = formData.type === 'pf' ? 'Nome é obrigatório' : 'Razão Social é obrigatória';
+    }
 
-    if (formData.email && !/\S+@\S+\.\S+/.test(formData.email)) {
+    // Email obrigatório e válido
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email é obrigatório';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'Email inválido';
     }
 
-    if (formData.type === 'pf' && formData.cpf) {
-      const clean = formData.cpf.replace(/\D/g, '');
-      if (clean.length > 0 && clean.length < 11) {
-        newErrors.cpf = 'CPF incompleto';
-      } else if (clean.length === 11 && !validateCPF(formData.cpf)) {
-        newErrors.cpf = 'CPF inválido';
+    // Telefones obrigatórios
+    if (!formData.phone.trim()) newErrors.phone = 'Telefone é obrigatório';
+    if (!formData.mobile.trim()) newErrors.mobile = 'Celular é obrigatório';
+
+    // Validações específicas por tipo
+    if (formData.type === 'pf') {
+      if (formData.cpf) {
+        const cleanCPF = formData.cpf.replace(/\D/g, '');
+        if (cleanCPF.length > 0 && cleanCPF.length < 11) {
+          newErrors.cpf = 'CPF incompleto';
+        } else if (cleanCPF.length === 11 && !validateCPF(formData.cpf)) {
+          newErrors.cpf = 'CPF inválido';
+        }
+      }
+    } else {
+      // Validações para PJ
+      if (!formData.cnpj.trim()) {
+        newErrors.cnpj = 'CNPJ é obrigatório para Pessoa Jurídica';
+      } else {
+        const cleanCNPJ = formData.cnpj.replace(/\D/g, '');
+        if (cleanCNPJ.length < 14) {
+          newErrors.cnpj = 'CNPJ incompleto';
+        } else if (!validateCNPJ(formData.cnpj)) {
+          newErrors.cnpj = 'CNPJ inválido';
+        }
+      }
+      
+      if (!formData.razao_social.trim()) {
+        newErrors.razao_social = 'Razão Social é obrigatória para Pessoa Jurídica';
       }
     }
 
-    if (formData.type === 'pj' && !formData.razao_social.trim()) {
-      newErrors.razao_social = 'Razão Social é obrigatória para Pessoa Jurídica';
-    }
+    // Validações de endereço
+    if (!formData.zip_code.trim()) newErrors.zip_code = 'CEP é obrigatório';
+    if (!formData.street.trim()) newErrors.street = 'Logradouro é obrigatório';
+    if (!formData.numero.trim()) newErrors.numero = 'Número é obrigatório';
+    if (!formData.neighborhood.trim()) newErrors.neighborhood = 'Bairro é obrigatório';
+    if (!formData.city.trim()) newErrors.city = 'Cidade é obrigatória';
+    if (!formData.state.trim()) newErrors.state = 'Estado é obrigatório';
+    if (!formData.country.trim()) newErrors.country = 'País é obrigatório';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
+  // ====== BUSCA CEP ======
+  const handleCEPSearch = async () => {
+    const cleanCep = formData.zip_code.replace(/\D/g, '');
+    
+    if (cleanCep.length !== 8) {
+      setErrors(prev => ({ ...prev, zip_code: 'CEP deve ter 8 dígitos' }));
+      return;
+    }
+
+    setIsSearchingCEP(true);
+    setErrors(prev => {
+      const { zip_code, ...rest } = prev;
+      return rest;
+    });
+
+    try {
+      const addressData = await fetchAddressByCEP(formData.zip_code);
+      
+      if (addressData && !addressData.erro) {
+        setFormData(prev => ({
+          ...prev,
+          street: addressData.logradouro || prev.street,
+          neighborhood: addressData.bairro || prev.neighborhood,
+          city: addressData.localidade || prev.city,
+          state: addressData.uf || prev.state,
+          street_type: 'Rua', // Você pode melhorar isso extraindo do logradouro
+        }));
+        
+        // Limpar erros dos campos preenchidos
+        setErrors(prev => {
+          const { street, neighborhood, city, state, ...rest } = prev;
+          return rest;
+        });
+      } else {
+        setErrors(prev => ({ ...prev, zip_code: 'CEP não encontrado' }));
+      }
+    } catch (error) {
+      setErrors(prev => ({ ...prev, zip_code: 'Erro ao buscar CEP' }));
+    } finally {
+      setIsSearchingCEP(false);
+    }
+  };
+
+  // ====== CHANGE HANDLER ======
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
 
+    // Formatações específicas
     if (name === 'cpf') {
       const formatted = formatCPF(value);
-      setFormData((prev) => ({ ...prev, cpf: formatted }));
+      setFormData(prev => ({ ...prev, cpf: formatted }));
+    } else if (name === 'cnpj') {
+      const formatted = formatCNPJ(value);
+      setFormData(prev => ({ ...prev, cnpj: formatted }));
+    } else if (name === 'phone' || name === 'mobile') {
+      const formatted = formatPhone(value);
+      setFormData(prev => ({ ...prev, [name]: formatted }));
+    } else if (name === 'zip_code') {
+      const formatted = formatZipCode(value);
+      setFormData(prev => ({ ...prev, zip_code: formatted }));
+      
+      // Buscar CEP automaticamente quando completo
+      if (formatted.replace(/\D/g, '').length === 8) {
+        setTimeout(() => handleCEPSearch(), 500);
+      }
     } else if (name === 'type') {
-      setFormData((prev) => ({
+      setFormData(prev => ({
         ...prev,
         type: value as 'pf' | 'pj',
         cpf: value === 'pf' ? prev.cpf : '',
         cnpj: value === 'pj' ? prev.cnpj : '',
+        razao_social: value === 'pf' ? '' : prev.razao_social,
+        inscricao_estadual: value === 'pf' ? '' : prev.inscricao_estadual,
+        isento_icms: value === 'pf' ? false : prev.isento_icms,
       }));
     } else if (type === 'checkbox') {
       const checked = (e.target as HTMLInputElement).checked;
-      setFormData((prev) => ({ ...prev, [name]: checked }));
+      setFormData(prev => ({ ...prev, [name]: checked }));
     } else {
-      setFormData((prev) => ({ ...prev, [name]: value }));
+      setFormData(prev => ({ ...prev, [name]: value }));
     }
 
+    // Limpar erro do campo alterado
     if (errors[name]) {
-      setErrors((prev) => {
+      setErrors(prev => {
         const { [name]: _, ...rest } = prev;
         return rest;
       });
     }
   };
 
+  // ====== SUBMIT HANDLER ======
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
 
     setIsSubmitting(true);
     try {
-      const cleanData = {
+      const cleanData: any = {
         ...formData,
-        cpf: formData.cpf.replace(/\D/g, '') || undefined,
-        cnpj: formData.cnpj.replace(/\D/g, '') || undefined,
+        cpf: formData.type === 'pf' ? (formData.cpf.replace(/\D/g, '') || undefined) : undefined,
+        cnpj: formData.type === 'pj' ? (formData.cnpj.replace(/\D/g, '') || undefined) : undefined,
+        phone: formData.phone.replace(/\D/g, ''),
+        mobile: formData.mobile.replace(/\D/g, ''),
+        zip_code: formData.zip_code.replace(/\D/g, ''),
+        fl_ativo: formData.fl_ativo,
+        // Limpar campos específicos de PJ se for PF
+        razao_social: formData.type === 'pj' ? formData.razao_social : undefined,
+        inscricao_estadual: formData.type === 'pj' ? formData.inscricao_estadual : undefined,
+        isento_icms: formData.type === 'pj' ? formData.isento_icms : undefined,
       };
 
       if (client?.id) {
@@ -134,7 +322,21 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) =>
       onClose();
     } catch (err: any) {
       console.error('Erro ao salvar cliente:', err);
-      setErrors({ submit: err.message || 'Erro ao salvar. Tente novamente.' });
+      
+      // Tratamento específico de erros
+      if (err.code === '23505') {
+        if (err.message?.includes('cpf')) {
+          setErrors({ submit: 'Já existe um cliente cadastrado com este CPF' });
+        } else if (err.message?.includes('cnpj')) {
+          setErrors({ submit: 'Já existe um cliente cadastrado com este CNPJ' });
+        } else if (err.message?.includes('email')) {
+          setErrors({ submit: 'Este email já está cadastrado para outro cliente' });
+        } else {
+          setErrors({ submit: 'Já existe um cliente com estes dados' });
+        }
+      } else {
+        setErrors({ submit: err.message || 'Erro ao salvar. Tente novamente.' });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -144,11 +346,9 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) =>
     if (!isSubmitting) {
       onClose();
     }
-  };
-
-  return (
+  }; return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden border border-amber-100">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden border border-amber-100">
         <div className="flex justify-between items-center p-6 border-b border-amber-100">
           <div className="flex items-center space-x-3">
             <div className="bg-amber-100 p-2 rounded-lg">
@@ -234,7 +434,7 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) =>
             {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
           </div>
 
-          {/* CPF / CNPJ */}
+          {/* CPF / CNPJ e Dados PJ */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {formData.type === 'pf' ? (
               <div>
@@ -256,24 +456,73 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) =>
                 {errors.cpf && <p className="mt-1 text-sm text-red-600">{errors.cpf}</p>}
               </div>
             ) : (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">CNPJ</label>
-                <input
-                  type="text"
-                  name="cnpj"
-                  value={formData.cnpj}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                  placeholder="00.000.000/0000-00"
-                />
-              </div>
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">CNPJ *</label>
+                  <input
+                    type="text"
+                    name="cnpj"
+                    value={formData.cnpj}
+                    onChange={handleChange}
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
+                      errors.cnpj ? 'border-red-300' : 'border-gray-300'
+                    }`}
+                    placeholder="00.000.000/0000-00"
+                    maxLength={18}
+                  />
+                  {errors.cnpj && <p className="mt-1 text-sm text-red-600">{errors.cnpj}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Inscrição Estadual</label>
+                  <input
+                    type="text"
+                    name="inscricao_estadual"
+                    value={formData.inscricao_estadual}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    placeholder="ISENTO ou número"
+                  />
+                </div>
+              </>
             )}
           </div>
+
+          {/* Nome Fantasia para PJ */}
+          {formData.type === 'pj' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Razão Social *</label>
+              <input
+                type="text"
+                name="razao_social"
+                value={formData.razao_social}
+                onChange={handleChange}
+                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
+                  errors.razao_social ? 'border-red-300' : 'border-gray-300'
+                }`}
+                placeholder="Razão Social da empresa"
+              />
+              {errors.razao_social && <p className="mt-1 text-sm text-red-600">{errors.razao_social}</p>}
+            </div>
+          )}
+
+          {/* Checkbox Isento ICMS para PJ */}
+          {formData.type === 'pj' && (
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                name="isento_icms"
+                checked={formData.isento_icms}
+                onChange={handleChange}
+                className="w-4 h-4 text-amber-600 rounded focus:ring-amber-500"
+              />
+              <label className="text-sm text-gray-700">Isento de ICMS</label>
+            </div>
+          )}
 
           {/* Dados de Contato */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <input
@@ -291,7 +540,7 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) =>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Telefone Fixo</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Telefone Fixo *</label>
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <input
@@ -299,14 +548,18 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) =>
                   name="phone"
                   value={formData.phone}
                   onChange={handleChange}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
+                    errors.phone ? 'border-red-300' : 'border-gray-300'
+                  }`}
                   placeholder="(00) 0000-0000"
+                  maxLength={14}
                 />
               </div>
+              {errors.phone && <p className="mt-1 text-sm text-red-600">{errors.phone}</p>}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Celular</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Celular *</label>
               <div className="relative">
                 <Smartphone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <input
@@ -314,137 +567,222 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) =>
                   name="mobile"
                   value={formData.mobile}
                   onChange={handleChange}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
+                    errors.mobile ? 'border-red-300' : 'border-gray-300'
+                  }`}
                   placeholder="(00) 00000-0000"
+                  maxLength={15}
                 />
               </div>
+              {errors.mobile && <p className="mt-1 text-sm text-red-600">{errors.mobile}</p>}
             </div>
-
-            {/* Inscrição Estadual para PJ */}
-            {formData.type === 'pj' && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Inscrição Estadual</label>
-                <input
-                  type="text"
-                  name="inscricao_estadual"
-                  value={formData.inscricao_estadual}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                  placeholder="ISENTO ou número"
-                />
-              </div>
-            )}
           </div>
-
-          {/* Checkbox Isento ICMS para PJ */}
-          {formData.type === 'pj' && (
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                name="isento_icms"
-                checked={formData.isento_icms}
-                onChange={handleChange}
-                className="w-4 h-4 text-amber-600 rounded focus:ring-amber-500"
-              />
-              <label className="text-sm text-gray-700">Isento de ICMS</label>
-            </div>
-          )}
-
-          {/* Endereço */}
+           {/* Endereço */}
           <div className="border-t border-gray-100 pt-6">
             <h3 className="text-lg font-medium text-gray-800 mb-4 flex items-center">
               <Home className="h-5 w-5 text-amber-600 mr-2" />
               Endereço
             </h3>
 
+            {/* CEP com busca */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+              <div className="md:col-span-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1">CEP *</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    name="zip_code"
+                    value={formData.zip_code}
+                    onChange={handleChange}
+                    className={`w-full px-4 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
+                      errors.zip_code ? 'border-red-300' : 'border-gray-300'
+                    }`}
+                    placeholder="00000-000"
+                    maxLength={9}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCEPSearch}
+                    disabled={isSearchingCEP || formData.zip_code.replace(/\D/g, '').length !== 8}
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 text-amber-600 hover:text-amber-700 disabled:text-gray-300 disabled:cursor-not-allowed"
+                    title="Buscar CEP"
+                  >
+                    {isSearchingCEP ? (
+                      <div className="w-4 h-4 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Search className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+                {errors.zip_code && <p className="mt-1 text-sm text-red-600">{errors.zip_code}</p>}
+              </div>
+
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Logradouro</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Logradouro *</label>
                 <input
                   type="text"
                   name="street"
                   value={formData.street}
                   onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
+                    errors.street ? 'border-red-300' : 'border-gray-300'
+                  }`}
                   placeholder="Nome da rua/avenida"
                 />
+                {errors.street && <p className="mt-1 text-sm text-red-600">{errors.street}</p>}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Número</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Número *</label>
                 <input
                   type="text"
                   name="numero"
                   value={formData.numero}
                   onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
+                    errors.numero ? 'border-red-300' : 'border-gray-300'
+                  }`}
                   placeholder="000"
                 />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">CEP</label>
-                <input
-                  type="text"
-                  name="zip_code"
-                  value={formData.zip_code}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                  placeholder="00000-000"
-                />
+                {errors.numero && <p className="mt-1 text-sm text-red-600">{errors.numero}</p>}
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Bairro</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Complemento</label>
+                <input
+                  type="text"
+                  name="complemento"
+                  value={formData.complemento}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  placeholder="Apto, bloco, etc."
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Bairro *</label>
                 <input
                   type="text"
                   name="neighborhood"
                   value={formData.neighborhood}
                   onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
+                    errors.neighborhood ? 'border-red-300' : 'border-gray-300'
+                  }`}
                   placeholder="Bairro"
                 />
+                {errors.neighborhood && <p className="mt-1 text-sm text-red-600">{errors.neighborhood}</p>}
               </div>
+            </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Cidade</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Cidade *</label>
                 <input
                   type="text"
                   name="city"
                   value={formData.city}
                   onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
+                    errors.city ? 'border-red-300' : 'border-gray-300'
+                  }`}
                   placeholder="Cidade"
                 />
+                {errors.city && <p className="mt-1 text-sm text-red-600">{errors.city}</p>}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
-                <input
-                  type="text"
+                <label className="block text-sm font-medium text-gray-700 mb-1">Estado *</label>
+                <select
                   name="state"
                   value={formData.state}
                   onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                  placeholder="SP"
-                  maxLength={2}
+                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
+                    errors.state ? 'border-red-300' : 'border-gray-300'
+                  }`}
+                >
+                  <option value="">Selecione</option>
+                  <option value="AC">AC</option>
+                  <option value="AL">AL</option>
+                  <option value="AP">AP</option>
+                  <option value="AM">AM</option>
+                  <option value="BA">BA</option>
+                  <option value="CE">CE</option>
+                  <option value="DF">DF</option>
+                  <option value="ES">ES</option>
+                  <option value="GO">GO</option>
+                  <option value="MA">MA</option>
+                  <option value="MT">MT</option>
+                  <option value="MS">MS</option>
+                  <option value="MG">MG</option>
+                  <option value="PA">PA</option>
+                  <option value="PB">PB</option>
+                  <option value="PR">PR</option>
+                  <option value="PE">PE</option>
+                  <option value="PI">PI</option>
+                  <option value="RJ">RJ</option>
+                  <option value="RN">RN</option>
+                  <option value="RS">RS</option>
+                  <option value="RO">RO</option>
+                  <option value="RR">RR</option>
+                  <option value="SC">SC</option>
+                  <option value="SP">SP</option>
+                  <option value="SE">SE</option>
+                  <option value="TO">TO</option>
+                </select>
+                {errors.state && <p className="mt-1 text-sm text-red-600">{errors.state}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">País *</label>
+                <input
+                  type="text"
+                  name="country"
+                  value={formData.country}
+                  onChange={handleChange}
+                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
+                    errors.country ? 'border-red-300' : 'border-gray-300'
+                  }`}
+                  placeholder="Brasil"
                 />
+                {errors.country && <p className="mt-1 text-sm text-red-600">{errors.country}</p>}
               </div>
             </div>
 
             <div className="mt-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Complemento</label>
-              <input
-                type="text"
-                name="complemento"
-                value={formData.complemento}
+              <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Logradouro</label>
+              <select
+                name="street_type"
+                value={formData.street_type}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                placeholder="Apto, bloco, etc."
-              />
+              >
+                <option value="Rua">Rua</option>
+                <option value="Avenida">Avenida</option>
+                <option value="Praça">Praça</option>
+                <option value="Alameda">Alameda</option>
+                <option value="Estrada">Estrada</option>
+                <option value="Travessa">Travessa</option>
+                <option value="Rodovia">Rodovia</option>
+                <option value="Via">Via</option>
+                <option value="Viela">Viela</option>
+                <option value="Beco">Beco</option>
+              </select>
             </div>
+          </div>
+
+          {/* Status Ativo */}
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              name="fl_ativo"
+              checked={formData.fl_ativo}
+              onChange={handleChange}
+              className="w-4 h-4 text-amber-600 rounded focus:ring-amber-500"
+            />
+            <label className="text-sm text-gray-700">Cliente ativo</label>
           </div>
 
           {/* Ações */}
