@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { 
   ShoppingBag, 
   Package, 
@@ -26,6 +26,15 @@ interface FormData {
   notes: string;
 }
 
+interface PurchaseItem {
+  id: string;
+  product_id: string;
+  product_name: string;
+  quantity: number;
+  unit_cost: number;
+  total: number;
+}
+
 const Purchases: React.FC = () => {
   const { 
     purchases = [], 
@@ -37,6 +46,7 @@ const Purchases: React.FC = () => {
     deleteSupplier
   } = useApp();
 
+  // ====== ESTADOS ======
   const [activeTab, setActiveTab] = useState<'list' | 'new' | 'suppliers' | 'stock'>('list');
   const [searchTerm, setSearchTerm] = useState('');
   const [showProductSearch, setShowProductSearch] = useState(false);
@@ -46,26 +56,42 @@ const Purchases: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // ✅ FIX: Função para obter data atual com timezone correto
+  const getCurrentDate = useCallback(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }, []);
   
   // Estado do formulário
   const [formData, setFormData] = useState<FormData>({
     supplier_id: '',
-    date: new Date().toISOString().split('T')[0],
+    date: getCurrentDate(),
     invoice_number: '',
     status: 'pending',
     notes: ''
   });
 
   // Estado dos itens da compra
-  const [purchaseItems, setPurchaseItems] = useState<Array<{
-    id: string;
-    product_id: string;
-    product_name: string;
-    quantity: number;
-    unit_cost: number;
-    total: number;
-  }>>([]);
+  const [purchaseItems, setPurchaseItems] = useState<PurchaseItem[]>([]);
 
+  // ✅ FIX: Resetar estado do modal quando fecha
+  useEffect(() => {
+    if (!showSupplierModal) {
+      setEditingSupplier(null);
+    }
+  }, [showSupplierModal]);
+
+  // ✅ FIX: Gerador de ID único
+  const generateUniqueId = useCallback(() => {
+    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }, []);
+
+  // ====== CÁLCULOS E MEMOS ======
+  
   // Cálculo de estatísticas
   const stats = useMemo(() => {
     const today = new Date();
@@ -79,7 +105,7 @@ const Purchases: React.FC = () => {
              p.status === 'received';
     });
 
-    const monthlyTotal = monthlyPurchases.reduce((sum, p) => sum + p.total, 0);
+    const monthlyTotal = monthlyPurchases.reduce((sum, p) => sum + (p.total || 0), 0);
     const pendingPurchases = purchases.filter(p => p.status === 'pending').length;
     const activeSuppliers = suppliers.filter(s => s.active).length;
     const lowStockItems = products.filter(p => p.current_stock <= p.min_stock).length;
@@ -100,7 +126,7 @@ const Purchases: React.FC = () => {
     return purchases.filter(p => 
       p.supplier_name?.toLowerCase().includes(search) ||
       p.invoice_number?.toLowerCase().includes(search) ||
-      p.items.some(item => item.product_name.toLowerCase().includes(search))
+      p.items?.some(item => item.product_name?.toLowerCase().includes(search))
     );
   }, [purchases, searchTerm]);
 
@@ -110,37 +136,61 @@ const Purchases: React.FC = () => {
     
     const search = productSearch.toLowerCase();
     return products.filter(p => 
-      p.name.toLowerCase().includes(search) ||
+      p.name?.toLowerCase().includes(search) ||
       p.description?.toLowerCase().includes(search) ||
       p.category?.toLowerCase().includes(search)
     );
   }, [products, productSearch]);
 
-  // Validação do formulário
-  const validateForm = (): boolean => {
+  // Calcular total da compra
+  const purchaseTotal = useMemo(() => {
+    return purchaseItems.reduce((sum, item) => sum + (item.total || 0), 0);
+  }, [purchaseItems]);
+
+  // ====== VALIDAÇÃO ======
+  
+  // ✅ FIX: Validação melhorada
+  const validateForm = useCallback((): boolean => {
     const newErrors: Record<string, string> = {};
 
     if (!formData.supplier_id) {
       newErrors.supplier_id = 'Selecione um fornecedor';
     }
+    
     if (!formData.date) {
       newErrors.date = 'Data é obrigatória';
     }
+    
     if (purchaseItems.length === 0) {
       newErrors.items = 'Adicione pelo menos um produto';
     }
-    if (!formData.invoice_number?.trim()) {
+    
+    // ✅ Validação corrigida de invoice_number
+    if (!formData.invoice_number || formData.invoice_number.trim() === '') {
       newErrors.invoice_number = 'Número da NF é obrigatório';
+    }
+
+    // ✅ Validação de itens com valores inválidos
+    const hasInvalidItems = purchaseItems.some(
+      item => item.quantity <= 0 || item.unit_cost < 0
+    );
+    if (hasInvalidItems) {
+      newErrors.items = 'Verifique as quantidades e custos dos produtos';
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  };
+  }, [formData, purchaseItems]);
 
-  // Função para adicionar produto à compra
-  const addProductToPurchase = (productId: string) => {
+  // ====== MANIPULAÇÃO DE ITENS ======
+  
+  // ✅ FIX: Adicionar produto com validações e ID único
+  const addProductToPurchase = useCallback((productId: string) => {
     const product = products.find(p => p.id === productId);
-    if (!product) return;
+    if (!product) {
+      console.error('Produto não encontrado');
+      return;
+    }
     
     const existingItem = purchaseItems.find(item => item.product_id === productId);
     
@@ -156,10 +206,10 @@ const Purchases: React.FC = () => {
           : item
       ));
     } else {
-      // Adiciona novo item
+      // Adiciona novo item com ID único
       const unitCost = product.cost_price || 0;
       setPurchaseItems(prev => [...prev, {
-        id: Date.now().toString(),
+        id: generateUniqueId(), // ✅ ID único
         product_id: productId,
         product_name: product.name,
         quantity: 1,
@@ -170,14 +220,16 @@ const Purchases: React.FC = () => {
     
     setShowProductSearch(false);
     setProductSearch('');
-    // Limpa erro de items se existir
-    if (errors.items) {
-      setErrors(prev => ({ ...prev, items: '' }));
-    }
-  };
+    
+    // ✅ Limpar erro de forma consistente
+    setErrors(prev => {
+      const { items, ...rest } = prev;
+      return rest;
+    });
+  }, [products, purchaseItems, generateUniqueId]);
 
-  // Atualizar quantidade do item
-  const updateItemQuantity = (itemId: string, delta: number) => {
+  // ✅ FIX: Atualizar quantidade com validação
+  const updateItemQuantity = useCallback((itemId: string, delta: number) => {
     setPurchaseItems(prev => prev.map(item => {
       if (item.id === itemId) {
         const newQuantity = Math.max(1, item.quantity + delta);
@@ -189,10 +241,16 @@ const Purchases: React.FC = () => {
       }
       return item;
     }));
-  };
+  }, []);
 
-  // Atualizar custo unitário
-  const updateItemCost = (itemId: string, newCost: number) => {
+  // ✅ FIX: Atualizar custo com validação de valor negativo
+  const updateItemCost = useCallback((itemId: string, newCost: number) => {
+    // ✅ Validar valor não negativo
+    if (newCost < 0) {
+      console.warn('Custo não pode ser negativo');
+      return;
+    }
+
     setPurchaseItems(prev => prev.map(item => {
       if (item.id === itemId) {
         return {
@@ -203,31 +261,28 @@ const Purchases: React.FC = () => {
       }
       return item;
     }));
-  };
+  }, []);
 
   // Remover item
-  const removeItem = (itemId: string) => {
+  const removeItem = useCallback((itemId: string) => {
     setPurchaseItems(prev => prev.filter(item => item.id !== itemId));
-  };
+  }, []);
 
-  // Calcular total da compra
-  const purchaseTotal = useMemo(() => {
-    return purchaseItems.reduce((sum, item) => sum + item.total, 0);
-  }, [purchaseItems]);
-
-  // Limpar formulário
-  const resetForm = () => {
+  // ✅ FIX: Limpar formulário corrigido
+  const resetForm = useCallback(() => {
     setFormData({
       supplier_id: '',
-      date: new Date().toISOString().split('T')[0],
+      date: getCurrentDate(), // ✅ Data com timezone correto
       invoice_number: '',
       status: 'pending',
       notes: ''
     });
     setPurchaseItems([]);
     setErrors({});
-  };
+  }, [getCurrentDate]);
 
+  // ====== HANDLERS DE SUBMIT E DELETE ======
+  
   // Handler para submissão do formulário
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -241,7 +296,7 @@ const Purchases: React.FC = () => {
       await addPurchase({
         date: formData.date,
         supplier_id: formData.supplier_id,
-        supplier_name: supplier?.name,
+        supplier_name: supplier?.name || '',
         items: purchaseItems.map(item => ({
           product_id: item.product_id,
           product_name: item.product_name,
@@ -266,16 +321,27 @@ const Purchases: React.FC = () => {
     }
   };
 
-  // Handler para deletar compra
+  // ✅ FIX: Handler para deletar compra com melhor tratamento de erro
   const handleDeletePurchase = async (purchaseId: string) => {
     if (!window.confirm('Tem certeza que deseja excluir esta compra?')) return;
     
     setDeletingId(purchaseId);
     try {
       await deletePurchase(purchaseId);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao excluir compra:', error);
-      alert('Erro ao excluir compra');
+      
+      // ✅ Mensagem específica de erro
+      const message = error.message || 'Erro ao excluir compra. Tente novamente.';
+      setErrors(prev => ({ ...prev, delete: message }));
+      
+      // Limpar erro após 5 segundos
+      setTimeout(() => {
+        setErrors(prev => {
+          const { delete: _, ...rest } = prev;
+          return rest;
+        });
+      }, 5000);
     } finally {
       setDeletingId(null);
     }
@@ -287,24 +353,26 @@ const Purchases: React.FC = () => {
     
     try {
       await deleteSupplier(supplierId);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao excluir fornecedor:', error);
-      alert('Erro ao excluir fornecedor');
+      const message = error.message || 'Erro ao excluir fornecedor';
+      alert(message);
     }
   };
 
   // Handler para editar fornecedor
-  const handleEditSupplier = (supplier: any) => {
+  const handleEditSupplier = useCallback((supplier: any) => {
     setEditingSupplier(supplier);
     setShowSupplierModal(true);
-  };
+  }, []);
 
   // Fechar modal de fornecedor
-  const handleCloseSupplierModal = () => {
+  const handleCloseSupplierModal = useCallback(() => {
     setShowSupplierModal(false);
     setEditingSupplier(null);
-  };
-
+  }, []);
+  // ====== RENDER - COMPONENTE PRINCIPAL ======
+  
   return (
     <div className="p-6">
       {/* Header */}
@@ -312,6 +380,14 @@ const Purchases: React.FC = () => {
         <h1 className="text-3xl font-bold text-gray-800 mb-2">Compras</h1>
         <p className="text-gray-600">Gerencie suas compras, fornecedores e estoque</p>
       </div>
+
+      {/* ✅ FIX: Mostrar erro de delete se existir */}
+      {errors.delete && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center text-red-700">
+          <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0" />
+          <span>{errors.delete}</span>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex space-x-1 mb-6 bg-gray-100 p-1 rounded-lg">
@@ -357,7 +433,7 @@ const Purchases: React.FC = () => {
         </button>
       </div>
 
-      {/* Content */}
+      {/* ====== TAB: LISTA DE COMPRAS ====== */}
       {activeTab === 'list' && (
         <div>
           {/* Stats Cards */}
@@ -433,7 +509,7 @@ const Purchases: React.FC = () => {
                   {!searchTerm && (
                     <button
                       onClick={() => setActiveTab('new')}
-                      className="mt-4 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700"
+                      className="mt-4 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
                     >
                       Registrar Primeira Compra
                     </button>
@@ -459,7 +535,9 @@ const Purchases: React.FC = () => {
                           <td className="py-3 px-4 text-sm">{purchase.invoice_number || '-'}</td>
                           <td className="py-3 px-4 text-sm">{formatDate(purchase.date)}</td>
                           <td className="py-3 px-4 text-sm">{purchase.supplier_name || 'N/A'}</td>
-                          <td className="py-3 px-4 text-sm">{purchase.items.length} {purchase.items.length === 1 ? 'item' : 'itens'}</td>
+                          <td className="py-3 px-4 text-sm">
+                            {purchase.items?.length || 0} {purchase.items?.length === 1 ? 'item' : 'itens'}
+                          </td>
                           <td className="py-3 px-4 text-sm font-medium">{formatCurrency(purchase.total)}</td>
                           <td className="py-3 px-4">
                             <span className={`inline-flex px-2 py-1 text-xs rounded-full ${
@@ -477,7 +555,8 @@ const Purchases: React.FC = () => {
                               <button
                                 onClick={() => handleDeletePurchase(purchase.id)}
                                 disabled={deletingId === purchase.id}
-                                className="text-gray-600 hover:text-red-600 disabled:opacity-50"
+                                className="text-gray-600 hover:text-red-600 disabled:opacity-50 transition-colors"
+                                title="Excluir compra"
                               >
                                 {deletingId === purchase.id ? (
                                   <Loader className="h-4 w-4 animate-spin" />
@@ -498,14 +577,15 @@ const Purchases: React.FC = () => {
         </div>
       )}
 
+      {/* ====== TAB: NOVA COMPRA ====== */}
       {activeTab === 'new' && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <h3 className="text-lg font-semibold text-gray-800 mb-6">Nova Compra</h3>
           
           {errors.submit && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center text-red-700">
-              <AlertCircle className="h-4 w-4 mr-2" />
-              {errors.submit}
+              <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0" />
+              <span>{errors.submit}</span>
             </div>
           )}
           
@@ -520,7 +600,10 @@ const Purchases: React.FC = () => {
                   onChange={(e) => {
                     setFormData(prev => ({ ...prev, supplier_id: e.target.value }));
                     if (errors.supplier_id) {
-                      setErrors(prev => ({ ...prev, supplier_id: '' }));
+                      setErrors(prev => {
+                        const { supplier_id, ...rest } = prev;
+                        return rest;
+                      });
                     }
                   }}
                   className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
@@ -547,7 +630,10 @@ const Purchases: React.FC = () => {
                   onChange={(e) => {
                     setFormData(prev => ({ ...prev, date: e.target.value }));
                     if (errors.date) {
-                      setErrors(prev => ({ ...prev, date: '' }));
+                      setErrors(prev => {
+                        const { date, ...rest } = prev;
+                        return rest;
+                      });
                     }
                   }}
                   className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
@@ -570,7 +656,10 @@ const Purchases: React.FC = () => {
                   onChange={(e) => {
                     setFormData(prev => ({ ...prev, invoice_number: e.target.value }));
                     if (errors.invoice_number) {
-                      setErrors(prev => ({ ...prev, invoice_number: '' }));
+                      setErrors(prev => {
+                        const { invoice_number, ...rest } = prev;
+                        return rest;
+                      });
                     }
                   }}
                   className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
@@ -657,7 +746,7 @@ const Purchases: React.FC = () => {
                                   type="button"
                                   onClick={() => updateItemQuantity(item.id, -1)}
                                   disabled={item.quantity <= 1}
-                                  className="w-6 h-6 flex items-center justify-center bg-gray-100 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  className="w-6 h-6 flex items-center justify-center bg-gray-100 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                 >
                                   -
                                 </button>
@@ -665,7 +754,7 @@ const Purchases: React.FC = () => {
                                 <button 
                                   type="button"
                                   onClick={() => updateItemQuantity(item.id, 1)}
-                                  className="w-6 h-6 flex items-center justify-center bg-gray-100 rounded-md hover:bg-gray-200"
+                                  className="w-6 h-6 flex items-center justify-center bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
                                 >
                                   +
                                 </button>
@@ -692,6 +781,7 @@ const Purchases: React.FC = () => {
                                 type="button"
                                 onClick={() => removeItem(item.id)}
                                 className="text-red-600 hover:text-red-800 transition-colors"
+                                title="Remover item"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </button>
@@ -759,8 +849,7 @@ const Purchases: React.FC = () => {
           </form>
         </div>
       )}
-
-      {/* Modal de busca de produtos */}
+       {/* ====== MODAL DE BUSCA DE PRODUTOS ====== */}
       {showProductSearch && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
@@ -800,7 +889,7 @@ const Purchases: React.FC = () => {
                       className="w-full text-left p-3 border border-gray-200 rounded-lg hover:bg-amber-50 hover:border-amber-300 transition-colors"
                     >
                       <div className="flex justify-between items-start">
-                        <div>
+                        <div className="flex-1">
                           <h4 className="font-medium text-gray-800">{product.name}</h4>
                           {product.description && (
                             <p className="text-sm text-gray-600 mt-1">{product.description}</p>
@@ -810,7 +899,7 @@ const Purchases: React.FC = () => {
                             <span>Estoque: {product.current_stock} {product.unit}</span>
                           </div>
                         </div>
-                        <div className="text-right">
+                        <div className="text-right ml-4">
                           <p className="font-medium text-amber-600">{formatCurrency(product.cost_price || 0)}</p>
                           <p className="text-xs text-gray-500 mt-1">Custo unitário</p>
                         </div>
@@ -822,6 +911,11 @@ const Purchases: React.FC = () => {
                     <div className="text-center py-8">
                       <Package className="h-12 w-12 text-gray-300 mx-auto mb-3" />
                       <p className="text-gray-500">Nenhum produto encontrado</p>
+                      {productSearch && (
+                        <p className="text-sm text-gray-400 mt-1">
+                          Tente buscar por outro termo
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -831,7 +925,8 @@ const Purchases: React.FC = () => {
         </div>
       )}
 
-       {activeTab === 'suppliers' && (
+      {/* ====== TAB: FORNECEDORES ====== */}
+      {activeTab === 'suppliers' && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-lg font-semibold text-gray-800">Fornecedores</h3>
@@ -847,10 +942,13 @@ const Purchases: React.FC = () => {
           {suppliers.length === 0 ? (
             <div className="text-center py-12">
               <Truck className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500">Nenhum fornecedor cadastrado</p>
+              <p className="text-gray-500 mb-2">Nenhum fornecedor cadastrado</p>
+              <p className="text-sm text-gray-400 mb-4">
+                Cadastre fornecedores para começar a registrar compras
+              </p>
               <button
                 onClick={() => setShowSupplierModal(true)}
-                className="mt-4 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700"
+                className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
               >
                 Cadastrar Primeiro Fornecedor
               </button>
@@ -860,8 +958,8 @@ const Purchases: React.FC = () => {
               {suppliers.map(supplier => (
                 <div key={supplier.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                   <div className="flex justify-between items-start mb-3">
-                    <h4 className="font-medium text-gray-800">{supplier.name}</h4>
-                    <span className={`inline-flex px-2 py-1 text-xs rounded-full ${
+                    <h4 className="font-medium text-gray-800 flex-1 pr-2">{supplier.name}</h4>
+                    <span className={`inline-flex px-2 py-1 text-xs rounded-full flex-shrink-0 ${
                       supplier.active 
                         ? 'bg-green-100 text-green-800' 
                         : 'bg-red-100 text-red-800'
@@ -872,26 +970,26 @@ const Purchases: React.FC = () => {
                   
                   <div className="space-y-1 text-sm text-gray-600 mb-3">
                     {supplier.cnpj && (
-                      <p className="flex items-center">
-                        <span className="font-medium">CNPJ:</span>
+                      <p className="flex items-start">
+                        <span className="font-medium min-w-[60px]">CNPJ:</span>
                         <span className="ml-1">{supplier.cnpj}</span>
                       </p>
                     )}
                     {supplier.email && (
-                      <p className="flex items-center truncate">
-                        <span className="font-medium">Email:</span>
-                        <span className="ml-1">{supplier.email}</span>
+                      <p className="flex items-start">
+                        <span className="font-medium min-w-[60px]">Email:</span>
+                        <span className="ml-1 truncate">{supplier.email}</span>
                       </p>
                     )}
                     {supplier.phone && (
-                      <p className="flex items-center">
-                        <span className="font-medium">Tel:</span>
+                      <p className="flex items-start">
+                        <span className="font-medium min-w-[60px]">Tel:</span>
                         <span className="ml-1">{supplier.phone}</span>
                       </p>
                     )}
                     {supplier.contact && (
-                      <p className="flex items-center">
-                        <span className="font-medium">Contato:</span>
+                      <p className="flex items-start">
+                        <span className="font-medium min-w-[60px]">Contato:</span>
                         <span className="ml-1">{supplier.contact}</span>
                       </p>
                     )}
@@ -920,6 +1018,7 @@ const Purchases: React.FC = () => {
         </div>
       )}
 
+      {/* ====== TAB: ESTOQUE ====== */}
       {activeTab === 'stock' && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <h3 className="text-lg font-semibold text-gray-800 mb-6">Controle de Estoque</h3>
@@ -928,7 +1027,10 @@ const Purchases: React.FC = () => {
             {products.length === 0 ? (
               <div className="text-center py-12">
                 <Package className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500">Nenhum produto cadastrado</p>
+                <p className="text-gray-500 mb-2">Nenhum produto cadastrado</p>
+                <p className="text-sm text-gray-400">
+                  Cadastre produtos para gerenciar o estoque
+                </p>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -1015,21 +1117,50 @@ const Purchases: React.FC = () => {
             )}
           </div>
           
-          {/* Resumo de alertas */}
+          {/* Resumo de alertas de estoque */}
           {products.length > 0 && (
-            <div className="mt-6 p-4 bg-amber-50 rounded-lg border border-amber-200">
-              <h4 className="font-medium text-amber-800 mb-2">Alertas de Estoque</h4>
-              <div className="space-y-1 text-sm text-amber-700">
-                <p>• {products.filter(p => p.current_stock === 0).length} produtos sem estoque</p>
-                <p>• {products.filter(p => p.current_stock > 0 && p.current_stock <= p.min_stock).length} produtos com estoque baixo</p>
-                <p>• {products.filter(p => p.current_stock > p.min_stock * 2).length} produtos com estoque adequado</p>
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 bg-red-50 rounded-lg border border-red-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-red-800">Sem Estoque</p>
+                    <p className="text-2xl font-bold text-red-900 mt-1">
+                      {products.filter(p => p.current_stock === 0).length}
+                    </p>
+                  </div>
+                  <AlertCircle className="h-8 w-8 text-red-500" />
+                </div>
+              </div>
+              
+              <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-yellow-800">Estoque Baixo</p>
+                    <p className="text-2xl font-bold text-yellow-900 mt-1">
+                      {products.filter(p => p.current_stock > 0 && p.current_stock <= p.min_stock).length}
+                    </p>
+                  </div>
+                  <Package className="h-8 w-8 text-yellow-500" />
+                </div>
+              </div>
+              
+              <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-green-800">Estoque Adequado</p>
+                    <p className="text-2xl font-bold text-green-900 mt-1">
+                      {products.filter(p => p.current_stock > p.min_stock).length}
+                    </p>
+                  </div>
+                  <Check className="h-8 w-8 text-green-500" />
+                </div>
               </div>
             </div>
           )}
         </div>
       )}
 
-      {/* Modal de Fornecedor */}
+      {/* ====== MODAL DE FORNECEDOR ====== */}
       {showSupplierModal && (
         <SupplierModal
           isOpen={showSupplierModal}
