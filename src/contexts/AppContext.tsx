@@ -937,41 +937,6 @@ const addProject = useCallback(async (data: Omit<Project, "id" | "created_at" | 
   return insertedProject;  // ✅ Retornar projeto criado
 }, [user, loadProjects]);
     
-    
-    const maxNumber = (projects || []).reduce((max, p) => Math.max(max, p.number), 0);
-    const newProject = {
-      ...data,
-      number: maxNumber + 1,
-      user_id: user!.id,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    
-    const { data: insertedProject, error } = await supabase
-      .from("projects")
-      .insert([newProject])
-      .select()
-      .single();
-    if (error) throw error;
-
-    if (data.products && data.products.length > 0) {
-      const projectProducts = data.products.map(p => ({
-        project_id: insertedProject.id,
-        product_id: p.product_id,
-        product_name: p.product_name,
-        quantity: p.quantity,
-        unit_price: p.unit_price,
-        total_price: p.total_price,
-        user_id: user!.id,
-      })).filter(p => p.quantity > 0);
-
-      const { error: prodError } = await supabase.from("project_products").insert(projectProducts);
-      if (prodError) throw prodError;
-    }
-
-    await loadProjects();
-  }, [user, projects, loadProjects]);
-
   // ✅ FUNÇÃO updateProject ATUALIZADA
 const updateProject = useCallback(async (id: string, data: Partial<Project>) => {
   ensureUser();
