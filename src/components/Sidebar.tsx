@@ -1,5 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { Home, Users, Briefcase, DollarSign, Package, BarChart3, Settings, LogOut, Wifi, WifiOff, Cloud, UserCog, ShoppingCart, ShoppingBag, ChevronDown, ChevronRight, Folder } from 'lucide-react';
+import { 
+  Home, 
+  Users, 
+  DollarSign, 
+  Package, 
+  BarChart3, 
+  Settings, 
+  LogOut, 
+  Wifi, 
+  WifiOff, 
+  Cloud, 
+  UserCog, 
+  ShoppingCart, 
+  ShoppingBag, 
+  ChevronDown, 
+  ChevronRight,
+  FileText  // ✅ NOVO ÍCONE
+} from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { getStorageManager } from '../lib/storage';
 
@@ -56,7 +73,6 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage }) => {
       try {
         setExpandedGroups(JSON.parse(saved));
       } catch (e) {
-        // Se JSON falhar, mantém o padrão
         console.warn('Invalid sidebar-expanded-groups in localStorage');
       }
     }
@@ -81,12 +97,13 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage }) => {
     }));
   };
 
-  // Define se o item está ativo (ou subitem ativo)
+  // ✅ ATUALIZADO: Define se o item está ativo
   const isActive = (pageId: string) => {
     return currentPage === pageId;
   };
 
-  const salesIcon = isActive('clients') || isActive('products') || isActive('projects') || isActive('sales')
+  // ✅ ATUALIZADO: Ícone do grupo Vendas
+  const salesIcon = isActive('clients') || isActive('products') || isActive('ordersandquotes')
     ? ShoppingBag
     : ShoppingCart;
 
@@ -124,7 +141,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage }) => {
       </div>
       
       <nav className="mt-8 px-3 overflow-y-auto max-h-[calc(100vh-400px)]">
-        {/* Dashboard (único item de nível raiz) */}
+        {/* Dashboard */}
         <button
           key="dashboard"
           onClick={() => setCurrentPage('dashboard')}
@@ -138,7 +155,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage }) => {
           <span className="font-medium text-sm">Dashboard</span>
         </button>
 
-        {/* GRUPO VENDAS */}
+        {/* ✅ GRUPO VENDAS ATUALIZADO */}
         <div className="mb-1">
           <button
             onClick={() => toggleGroup('sales')}
@@ -160,8 +177,8 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage }) => {
             {[
               { id: 'clients', label: 'Clientes', icon: Users },
               { id: 'products', label: 'Produtos', icon: Package },
-              { id: 'projects', label: 'Projetos', icon: Briefcase },
-              { id: 'sales', label: 'Vendas', icon: ShoppingCart },
+              // ✅ NOVO ITEM UNIFICADO (substituiu Projects e Sales)
+              { id: 'ordersandquotes', label: 'Vendas e Orçamentos', icon: FileText },
             ].map((item) => {
               const Icon = item.icon;
               return (
@@ -225,7 +242,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage }) => {
           </div>
         </div>
 
-        {/* ITENS SOBRESSALENTES */}
+        {/* FINANÇAS */}
         <button
           onClick={() => setCurrentPage('finance')}
           className={`w-full flex items-center space-x-3 px-4 py-3 mb-2 mt-1 text-left transition-all duration-300 rounded-xl hover:bg-amber-700/70 hover:shadow-lg ${
@@ -310,11 +327,12 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage }) => {
         </button>
 
         <div className="text-center text-amber-200/80">
-           <p className="text-xs">Sistema de Gestão</p>
+          <p className="text-xs">Sistema de Gestão</p>
           <p className="text-xs">v1.0.0</p>
         </div>
       </div>
     </div>
   );
 };
+
 export default Sidebar;
