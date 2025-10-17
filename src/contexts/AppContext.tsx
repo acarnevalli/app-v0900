@@ -86,28 +86,36 @@ export interface ProductComponent {
   total_cost: number;
 }
 
+export type ItemType = 'produto' | 'servico';
+
 export interface ProjectProduct {
   id: string;
-  product_id: string;
+  product_id: string | null;  // ✅ Pode ser NULL para serviços
   product_name: string;
   quantity: number;
   unit_price: number;
   total_price: number;
+  item_type: ItemType;  // ✅ NOVO
+  item_description?: string;  // ✅ NOVO
+  service_hours?: number;  // ✅ NOVO (para serviços)
+  hourly_rate?: number;  // ✅ NOVO (para serviços)
 }
 
 export interface Project {
   id: string;
-  number: number;
+  order_number: string;  // ✅ NOVO: formato #2024-0001
+  number: number;  // ⚠️ Depreciado, manter por compatibilidade
   client_id: string;
   client_name?: string;
-  title: string;
-  description: string;
-  status: "orcamento" | "aprovado" | "em_producao" | "concluido" | "entregue";
-  type: "orcamento" | "venda";
+  // title REMOVIDO ❌
+  description: string;  // ✅ Agora é obrigatório
+  status: 'orcamento' | 'aprovado' | 'em_producao' | 'concluido' | 'entregue';
+  type: 'orcamento' | 'venda';
   products: ProjectProduct[];
   budget: number;
   start_date: string;
   end_date: string;
+  delivery_deadline_days: number;  // ✅ NOVO: prazo em dias
   materials_cost?: number;
   labor_cost?: number;
   profit_margin?: number;
