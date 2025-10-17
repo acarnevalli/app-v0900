@@ -1,6 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { X, Briefcase, FileText, User, Calendar, DollarSign, Package, Plus, Trash2, Search, ChevronDown, Check } from 'lucide-react';
-import { useApp, Project, ProjectProduct } from '../contexts/AppContext';
+import { 
+  X, 
+  Briefcase, 
+  FileText, 
+  User, 
+  Calendar, 
+  DollarSign, 
+  Package, 
+  Plus, 
+  Trash2, 
+  Search, 
+  ChevronDown, 
+  Check,
+  Wrench,
+  Clock,
+  AlertCircle
+} from 'lucide-react';
+import { useApp, Project, ProjectProduct, ItemType } from '../contexts/AppContext';
 
 interface ProjectFormModalProps {
   project?: Project | null;
@@ -9,47 +25,55 @@ interface ProjectFormModalProps {
 
 const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose }) => {
   const { clients, products, addProject, updateProject } = useApp();
+  
+  // ====== ESTADOS ======
+  
   const [formData, setFormData] = useState({
     client_id: '',
-    title: '',
-    description: '',
+    description: '',  // ✅ Substituiu "title"
     status: 'orcamento' as 'orcamento' | 'aprovado' | 'em_producao' | 'concluido' | 'entregue',
     type: 'orcamento' as 'orcamento' | 'venda',
     start_date: new Date().toISOString().split('T')[0],
-    end_date: '',
+    delivery_deadline_days: 15,  // ✅ NOVO: Prazo em dias
+    end_date: '',  // Será calculado automaticamente
     materials_cost: '',
     labor_cost: '',
     profit_margin: '20'
   });
-  
+
   const [projectProducts, setProjectProducts] = useState<ProjectProduct[]>([]);
   const [paymentTerms, setPaymentTerms] = useState({
     installments: 1,
-    payment_method: 'dinheiro' as 'dinheiro' | 'pix' | 'cartao_credito' | 'cartao_debito' | 'boleto' | 'transferencia',
+    payment_method: 'pix' as 'dinheiro' | 'pix' | 'cartao_credito' | 'cartao_debito' | 'boleto' | 'transferencia',
     discount_percentage: 0
   });
-  
+
   const [showProductSearch, setShowProductSearch] = useState(false);
   const [productSearch, setProductSearch] = useState('');
   const [clientSearch, setClientSearch] = useState('');
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [selectedClientName, setSelectedClientName] = useState('');
+  
+  // ✅ NOVO: Estado para controlar tipo de item sendo adicionado
+  const [itemTypeToAdd, setItemTypeToAdd] = useState<ItemType>('produto');
 
+  // ====== EFEITO DE CARREGAMENTO (EDIÇÃO) ======
+  
   useEffect(() => {
     if (project) {
       setFormData({
         client_id: project.client_id,
-        title: project.title,
-        description: project.description,
+        description: project.description,  // ✅ Não é mais "title"
         status: project.status,
         type: project.type,
         start_date: project.start_date,
+        delivery_deadline_days: project.delivery_deadline_days || 15,  // ✅ NOVO
         end_date: project.end_date,
         materials_cost: project.materials_cost?.toString() || '',
         labor_cost: project.labor_cost?.toString() || '',
         profit_margin: project.profit_margin?.toString() || '20'
       });
-      
+
       setProjectProducts(project.products || []);
       
       if (project.payment_terms) {
@@ -60,50 +84,73 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
         });
       }
       
-      // Set selected client name for display
       const client = clients.find(c => c.id === project.client_id);
       if (client) {
         setSelectedClientName(client.name);
         setClientSearch(client.name);
       }
     }
-  }, [project]);
+  }, [project, clients]);
 
+  // ====== CÁLCULO AUTOMÁTICO DA DATA DE ENTREGA ======
+  
+  useEffect(() => {
+    if (formData.start_date && formData.delivery_deadline_days) {
+      const startDate = new Date(formData.start_date);
+      const endDate = new Date(startDate);
+      endDate.setDate(endDate.getDate() + formData.delivery_deadline_days);
+      
+      setFormData(prev => ({
+        ...prev,
+        end_date: endDate.toISOString().split('T')[0]
+      }));
+    }
+  }, [formData.start_date, formData.delivery_deadline_days]);
+
+  // ====== CÁLCULO DE ORÇAMENTO ======
+  
   const calculateBudget = () => {
     const productsTotal = projectProducts.reduce((sum, p) => sum + p.total_price, 0);
     const materialsCost = parseFloat(formData.materials_cost) || 0;
     const laborCost = parseFloat(formData.labor_cost) || 0;
     const profitMargin = parseFloat(formData.profit_margin) || 0;
-    
+
     const totalCosts = productsTotal + materialsCost + laborCost;
     const budget = totalCosts * (1 + profitMargin / 100);
-    
+
     return budget;
   };
 
+  // ====== SUBMIT ======
+  
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.client_id) {
       alert('Por favor, selecione um cliente');
       return;
     }
     
+    if (!formData.description.trim()) {
+      alert('Por favor, adicione uma descrição');
+      return;
+    }
+
     const budget = calculateBudget();
     const discountAmount = budget * (paymentTerms.discount_percentage / 100);
     const finalValue = budget - discountAmount;
     const installmentValue = finalValue / paymentTerms.installments;
-    
+
     const projectData = {
       client_id: formData.client_id,
-      title: formData.title,
-      description: formData.description,
+      description: formData.description,  // ✅ Não é mais "title"
       status: formData.status,
       type: formData.type,
       products: projectProducts,
       budget,
       start_date: formData.start_date,
-      end_date: formData.end_date || formData.start_date,
+      end_date: formData.end_date,
+      delivery_deadline_days: formData.delivery_deadline_days,  // ✅ NOVO
       materials_cost: parseFloat(formData.materials_cost) || 0,
       labor_cost: parseFloat(formData.labor_cost) || 0,
       profit_margin: parseFloat(formData.profit_margin) || 20,
@@ -115,16 +162,18 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
         total_with_discount: finalValue
       }
     };
-    
+
     if (project) {
       updateProject(project.id, projectData);
     } else {
       addProject(projectData);
     }
-    
+
     onClose();
   };
 
+  // ====== HANDLERS DE FORMULÁRIO ======
+  
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setFormData(prev => ({
       ...prev,
@@ -139,35 +188,8 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
       [name]: name === 'installments' || name === 'discount_percentage' ? parseInt(value) || 0 : value
     }));
   };
-
-  const addProductToProject = (productId: string) => {
-    const product = products.find(p => p.id === productId);
-    if (!product) return;
-    
-    const existingProduct = projectProducts.find(p => p.product_id === productId);
-    
-    if (existingProduct) {
-      setProjectProducts(prev => prev.map(p => 
-        p.product_id === productId 
-          ? { ...p, quantity: p.quantity + 1, total_price: (p.quantity + 1) * p.unit_price }
-          : p
-      ));
-    } else {
-      const unitPrice = product.sale_price || product.cost_price * 1.5; // Usar preço de venda ou custo + 50%
-      setProjectProducts(prev => [...prev, {
-        id: Date.now().toString(),
-        product_id: productId,
-        product_name: product.name,
-        quantity: 1,
-        unit_price: unitPrice,
-        total_price: unitPrice
-      }]);
-    }
-    
-    setShowProductSearch(false);
-    setProductSearch('');
-  };
-
+    // ====== HANDLERS DE CLIENTE ======
+  
   const filteredClients = clients.filter(client =>
     client.name.toLowerCase().includes(clientSearch.toLowerCase()) ||
     client.email.toLowerCase().includes(clientSearch.toLowerCase()) ||
@@ -186,8 +208,7 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
     const value = e.target.value;
     setClientSearch(value);
     setShowClientDropdown(true);
-    
-    // Clear selection if search doesn't match exactly
+
     const exactMatch = clients.find(c => c.name.toLowerCase() === value.toLowerCase());
     if (!exactMatch) {
       setFormData(prev => ({ ...prev, client_id: '' }));
@@ -200,35 +221,157 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
   };
 
   const handleClientSearchBlur = () => {
-    // Delay hiding dropdown to allow for clicks
     setTimeout(() => {
       setShowClientDropdown(false);
     }, 200);
   };
 
-  const updateProductQuantity = (productId: string, quantity: number) => {
+  // ====== HANDLERS DE PRODUTOS/SERVIÇOS ======
+  
+  // ✅ NOVO: Adicionar produto do catálogo
+  const addProductToProject = (productId: string) => {
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+
+    const existingProduct = projectProducts.find(p => p.product_id === productId);
+
+    if (existingProduct) {
+      setProjectProducts(prev => prev.map(p => 
+        p.product_id === productId 
+          ? { ...p, quantity: p.quantity + 1, total_price: (p.quantity + 1) * p.unit_price }
+          : p
+      ));
+    } else {
+      const unitPrice = product.sale_price || product.cost_price * 1.5;
+      setProjectProducts(prev => [...prev, {
+        id: Date.now().toString(),
+        product_id: productId,
+        product_name: product.name,
+        quantity: 1,
+        unit_price: unitPrice,
+        total_price: unitPrice,
+        item_type: 'produto',  // ✅ Produto do catálogo sempre é "produto"
+        item_description: product.description || ''
+      }]);
+    }
+
+    setShowProductSearch(false);
+    setProductSearch('');
+  };
+
+  // ✅ NOVO: Adicionar serviço manualmente
+  const addServiceToProject = () => {
+    const newService: ProjectProduct = {
+      id: Date.now().toString(),
+      product_id: null,  // ✅ Serviços podem não ter product_id
+      product_name: 'Novo Serviço',
+      quantity: 1,
+      unit_price: 0,
+      total_price: 0,
+      item_type: 'servico',  // ✅ Tipo serviço
+      service_hours: 1,
+      hourly_rate: 50,
+      item_description: ''
+    };
+    
+    setProjectProducts(prev => [...prev, newService]);
+  };
+
+  // ✅ ATUALIZADO: Atualizar quantidade
+  const updateProductQuantity = (itemId: string, quantity: number) => {
     if (quantity <= 0) {
-      removeProduct(productId);
+      removeProduct(itemId);
       return;
     }
-    
+
+    setProjectProducts(prev => prev.map(p => {
+      if (p.id === itemId) {
+        const newQuantity = quantity;
+        let newTotal = newQuantity * p.unit_price;
+        
+        // ✅ Se for serviço, recalcular baseado em horas
+        if (p.item_type === 'servico' && p.service_hours && p.hourly_rate) {
+          newTotal = (p.service_hours * p.hourly_rate) * newQuantity;
+        }
+        
+        return { 
+          ...p, 
+          quantity: newQuantity, 
+          total_price: newTotal 
+        };
+      }
+      return p;
+    }));
+  };
+
+  // ✅ ATUALIZADO: Atualizar preço unitário
+  const updateProductPrice = (itemId: string, unitPrice: number) => {
+    setProjectProducts(prev => prev.map(p => {
+      if (p.id === itemId) {
+        return {
+          ...p,
+          unit_price: unitPrice,
+          total_price: p.quantity * unitPrice
+        };
+      }
+      return p;
+    }));
+  };
+
+  // ✅ NOVO: Atualizar horas de serviço
+  const updateServiceHours = (itemId: string, hours: number) => {
+    setProjectProducts(prev => prev.map(p => {
+      if (p.id === itemId && p.item_type === 'servico') {
+        const newHours = Math.max(0, hours);
+        const hourlyRate = p.hourly_rate || 0;
+        const unitPrice = newHours * hourlyRate;
+        
+        return {
+          ...p,
+          service_hours: newHours,
+          unit_price: unitPrice,
+          total_price: unitPrice * p.quantity
+        };
+      }
+      return p;
+    }));
+  };
+
+  // ✅ NOVO: Atualizar valor por hora
+  const updateHourlyRate = (itemId: string, rate: number) => {
+    setProjectProducts(prev => prev.map(p => {
+      if (p.id === itemId && p.item_type === 'servico') {
+        const newRate = Math.max(0, rate);
+        const hours = p.service_hours || 0;
+        const unitPrice = hours * newRate;
+        
+        return {
+          ...p,
+          hourly_rate: newRate,
+          unit_price: unitPrice,
+          total_price: unitPrice * p.quantity
+        };
+      }
+      return p;
+    }));
+  };
+
+  // ✅ NOVO: Atualizar nome do item
+  const updateItemName = (itemId: string, name: string) => {
     setProjectProducts(prev => prev.map(p => 
-      p.product_id === productId 
-        ? { ...p, quantity, total_price: quantity * p.unit_price }
-        : p
+      p.id === itemId ? { ...p, product_name: name } : p
     ));
   };
 
-  const updateProductPrice = (productId: string, unitPrice: number) => {
+  // ✅ NOVO: Atualizar descrição do item
+  const updateItemDescription = (itemId: string, description: string) => {
     setProjectProducts(prev => prev.map(p => 
-      p.product_id === productId 
-        ? { ...p, unit_price: unitPrice, total_price: p.quantity * unitPrice }
-        : p
+      p.id === itemId ? { ...p, item_description: description } : p
     ));
   };
 
-  const removeProduct = (productId: string) => {
-    setProjectProducts(prev => prev.filter(p => p.product_id !== productId));
+  const removeProduct = (itemId: string) => {
+    setProjectProducts(prev => prev.filter(p => p.id !== itemId));
   };
 
   const filteredProducts = products.filter(product =>
@@ -239,16 +382,17 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
   const budget = calculateBudget();
   const discountAmount = budget * (paymentTerms.discount_percentage / 100);
   const finalValue = budget - discountAmount;
-
+    // ====== RENDERIZAÇÃO ======
+  
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl mx-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-amber-600 to-orange-600 text-white rounded-t-xl">
           <h2 className="text-2xl font-bold">
-            {project ? 'Editar Projeto' : 'Novo Projeto'}
+            {project ? 'Editar Pedido/Orçamento' : 'Novo Pedido/Orçamento'}
           </h2>
-          <button
-            onClick={onClose}
+          <button 
+            onClick={onClose} 
             className="p-2 text-white hover:bg-white hover:bg-opacity-20 rounded-lg transition-colors"
           >
             <X className="h-6 w-6" />
@@ -258,12 +402,13 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {/* Dados Básicos */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Cliente */}
             <div>
               <div className="relative">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <User className="h-4 w-4 inline mr-2 text-amber-600" />
-                Cliente
-              </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <User className="h-4 w-4 inline mr-2 text-amber-600" />
+                  Cliente *
+                </label>
                 <div className="relative">
                   <input
                     type="text"
@@ -276,13 +421,12 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
                   />
                   <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                   
-                  {/* Validation indicator */}
                   {formData.client_id && (
                     <Check className="absolute right-10 top-1/2 transform -translate-y-1/2 h-5 w-5 text-green-500" />
                   )}
                 </div>
                 
-                {/* Dropdown */}
+                {/* Dropdown de clientes */}
                 {showClientDropdown && (
                   <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                     {filteredClients.length > 0 ? (
@@ -325,7 +469,6 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
                 )}
               </div>
               
-              {/* Required field validation */}
               {!formData.client_id && clientSearch && (
                 <p className="mt-1 text-sm text-red-600">
                   Por favor, selecione um cliente da lista
@@ -333,9 +476,10 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
               )}
             </div>
 
+            {/* Tipo do Pedido */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Tipo do Projeto
+                Tipo *
               </label>
               <select
                 name="type"
@@ -343,52 +487,17 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
                 onChange={handleChange}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
               >
-                <option value="orcamento">Orçamento</option>
-                <option value="venda">Venda</option>
+                <option value="orcamento">📋 Orçamento</option>
+                <option value="venda">✅ Venda</option>
               </select>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <Briefcase className="h-4 w-4 inline mr-2 text-amber-600" />
-                Título do Projeto
-              </label>
-              <input
-                type="text"
-                name="title"
-                value={formData.title}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                placeholder="Ex: Cozinha sob medida"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Status
-              </label>
-              <select
-                name="status"
-                value={formData.status}
-                onChange={handleChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-              >
-                <option value="orcamento">Orçamento</option>
-                <option value="aprovado">Aprovado</option>
-                <option value="em_producao">Em Produção</option>
-                <option value="concluido">Concluído</option>
-                <option value="entregue">Entregue</option>
-              </select>
-            </div>
-          </div>
-
+          {/* Descrição - ✅ SUBSTITUIU O CAMPO "TÍTULO" */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               <FileText className="h-4 w-4 inline mr-2 text-amber-600" />
-              Descrição
+              Descrição do Pedido *
             </label>
             <textarea
               name="description"
@@ -397,16 +506,38 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
               required
               rows={3}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-              placeholder="Descreva o projeto..."
+              placeholder="Descreva o pedido/orçamento..."
             />
+            <p className="mt-1 text-xs text-gray-500">
+              Ex: Cozinha planejada em MDF com bancada de granito
+            </p>
           </div>
 
-          {/* Datas */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Status */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Status
+            </label>
+            <select
+              name="status"
+              value={formData.status}
+              onChange={handleChange}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+            >
+              <option value="orcamento">Orçamento</option>
+              <option value="aprovado">Aprovado</option>
+              <option value="em_producao">Em Produção</option>
+              <option value="concluido">Concluído</option>
+              <option value="entregue">Entregue</option>
+            </select>
+          </div>
+
+          {/* Datas e Prazo - ✅ NOVO LAYOUT COM PRAZO EM DIAS */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 <Calendar className="h-4 w-4 inline mr-2 text-amber-600" />
-                Data de Início
+                Data de Início *
               </label>
               <input
                 type="date"
@@ -418,86 +549,265 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
               />
             </div>
 
+            {/* ✅ NOVO CAMPO: Prazo de Entrega em Dias */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Data de Entrega
+                <Clock className="h-4 w-4 inline mr-2 text-orange-600" />
+                Prazo de Entrega (dias) *
+              </label>
+              <input
+                type="number"
+                name="delivery_deadline_days"
+                value={formData.delivery_deadline_days}
+                onChange={handleChange}
+                min="1"
+                required
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Dias úteis para conclusão
+              </p>
+            </div>
+
+            {/* ✅ Data de Entrega (calculada automaticamente) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <Calendar className="h-4 w-4 inline mr-2 text-green-600" />
+                Data de Entrega *
               </label>
               <input
                 type="date"
                 name="end_date"
                 value={formData.end_date}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-gray-50"
+                readOnly
               />
+              <p className="mt-1 text-xs text-green-600">
+                ✓ Calculado automaticamente
+              </p>
             </div>
           </div>
-
-          {/* Produtos */}
-          <div className="bg-gray-50 p-4 rounded-lg">
+                    {/* ====== PRODUTOS E SERVIÇOS ====== */}
+          <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">Produtos do Projeto</h3>
-              <button
-                type="button"
-                onClick={() => setShowProductSearch(true)}
-                className="bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors flex items-center space-x-2"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Adicionar Produto</span>
-              </button>
+              <h3 className="text-lg font-semibold text-gray-800">
+                Produtos e Serviços
+              </h3>
+              <div className="flex space-x-2">
+                {/* Botão Adicionar Produto */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setItemTypeToAdd('produto');
+                    setShowProductSearch(true);
+                  }}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+                >
+                  <Package className="h-4 w-4" />
+                  <span>Adicionar Produto</span>
+                </button>
+                
+                {/* ✅ NOVO: Botão Adicionar Serviço */}
+                <button
+                  type="button"
+                  onClick={addServiceToProject}
+                  className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors flex items-center space-x-2"
+                >
+                  <Wrench className="h-4 w-4" />
+                  <span>Adicionar Serviço</span>
+                </button>
+              </div>
             </div>
 
-            <div className="space-y-3">
-              {projectProducts.map((projectProduct) => (
-                <div key={projectProduct.id} className="bg-white p-4 rounded-lg border flex items-center justify-between">
-                  <div className="flex-1">
-                    <h4 className="font-medium text-gray-800">{projectProduct.product_name}</h4>
-                  </div>
-                  <div className="flex items-center space-x-3">
+            {/* Lista de Itens */}
+            <div className="space-y-4">
+              {projectProducts.map((item) => (
+                <div 
+                  key={item.id} 
+                  className={`bg-white p-4 rounded-lg border-2 ${
+                    item.item_type === 'servico' 
+                      ? 'border-orange-200 bg-orange-50' 
+                      : 'border-blue-200 bg-blue-50'
+                  }`}
+                >
+                  {/* Cabeçalho do Item */}
+                  <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center space-x-2">
-                      <label className="text-sm text-gray-600">Qtd:</label>
-                      <input
-                        type="number"
-                        value={projectProduct.quantity}
-                        onChange={(e) => updateProductQuantity(projectProduct.product_id, parseInt(e.target.value))}
-                        min="1"
-                        className="w-16 px-2 py-1 border border-gray-300 rounded text-center focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                      />
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <label className="text-sm text-gray-600">Preço:</label>
-                      <input
-                        type="number"
-                        value={projectProduct.unit_price}
-                        onChange={(e) => updateProductPrice(projectProduct.product_id, parseFloat(e.target.value))}
-                        min="0"
-                        step="0.01"
-                        className="w-24 px-2 py-1 border border-gray-300 rounded text-center focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                      />
-                    </div>
-                    <div className="text-sm font-medium text-gray-800">
-                      Total: R$ {projectProduct.total_price.toFixed(2)}
+                      {item.item_type === 'servico' ? (
+                        <>
+                          <Wrench className="h-5 w-5 text-orange-600" />
+                          <span className="text-sm font-medium text-orange-700">SERVIÇO</span>
+                        </>
+                      ) : (
+                        <>
+                          <Package className="h-5 w-5 text-blue-600" />
+                          <span className="text-sm font-medium text-blue-700">PRODUTO</span>
+                        </>
+                      )}
                     </div>
                     <button
                       type="button"
-                      onClick={() => removeProduct(projectProduct.product_id)}
+                      onClick={() => removeProduct(item.id)}
                       className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
+
+                  {/* Nome do Item (editável para serviços) */}
+                  <div className="mb-3">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Nome do {item.item_type === 'servico' ? 'Serviço' : 'Produto'}
+                    </label>
+                    {item.item_type === 'servico' ? (
+                      <input
+                        type="text"
+                        value={item.product_name}
+                        onChange={(e) => updateItemName(item.id, e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                        placeholder="Ex: Instalação de móveis"
+                      />
+                    ) : (
+                      <div className="text-sm font-medium text-gray-800">{item.product_name}</div>
+                    )}
+                  </div>
+
+                  {/* Descrição (editável) */}
+                  <div className="mb-3">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Descrição
+                    </label>
+                    <textarea
+                      value={item.item_description || ''}
+                      onChange={(e) => updateItemDescription(item.id, e.target.value)}
+                      rows={2}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm"
+                      placeholder="Descrição detalhada do item..."
+                    />
+                  </div>
+
+                  {/* ✅ CAMPOS DIFERENTES PARA PRODUTOS VS SERVIÇOS */}
+                  {item.item_type === 'produto' ? (
+                    // ==== LAYOUT PARA PRODUTOS ====
+                    <div className="grid grid-cols-4 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Quantidade
+                        </label>
+                        <input
+                          type="number"
+                          value={item.quantity}
+                          onChange={(e) => updateProductQuantity(item.id, parseInt(e.target.value) || 1)}
+                          min="1"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Preço Unit. (R$)
+                        </label>
+                        <input
+                          type="number"
+                          value={item.unit_price}
+                          onChange={(e) => updateProductPrice(item.id, parseFloat(e.target.value) || 0)}
+                          min="0"
+                          step="0.01"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Total
+                        </label>
+                        <div className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm font-bold text-gray-800">
+                          R$ {item.total_price.toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    // ==== LAYOUT PARA SERVIÇOS ====
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            Horas *
+                          </label>
+                          <input
+                            type="number"
+                            value={item.service_hours || 0}
+                            onChange={(e) => updateServiceHours(item.id, parseFloat(e.target.value) || 0)}
+                            min="0"
+                            step="0.5"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                            placeholder="6.0"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">Ex: 6.0 horas</p>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            Valor/Hora (R$) *
+                          </label>
+                          <input
+                            type="number"
+                            value={item.hourly_rate || 0}
+                            onChange={(e) => updateHourlyRate(item.id, parseFloat(e.target.value) || 0)}
+                            min="0"
+                            step="0.01"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                            placeholder="50.00"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">Ex: R$ 50/h</p>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            Quantidade
+                          </label>
+                          <input
+                            type="number"
+                            value={item.quantity}
+                            onChange={(e) => updateProductQuantity(item.id, parseInt(e.target.value) || 1)}
+                            min="1"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-center"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">Qtd de vezes</p>
+                        </div>
+                      </div>
+                      
+                      {/* Cálculo Automático do Serviço */}
+                      <div className="bg-orange-100 border border-orange-300 rounded-lg p-3">
+                        <div className="flex items-center justify-between">
+                          <div className="text-xs text-orange-700">
+                            <span className="font-medium">Cálculo: </span>
+                            {item.service_hours || 0}h × R$ {(item.hourly_rate || 0).toFixed(2)}/h 
+                            {item.quantity > 1 && ` × ${item.quantity}`}
+                          </div>
+                          <div className="text-sm font-bold text-orange-900">
+                            Total: R$ {item.total_price.toFixed(2)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
 
+            {/* Empty State */}
             {projectProducts.length === 0 && (
-              <div className="text-center py-8 text-gray-500">
-                <Package className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                <p>Nenhum produto adicionado</p>
+              <div className="text-center py-12 bg-white rounded-lg border-2 border-dashed border-gray-300">
+                <div className="flex justify-center space-x-4 mb-4">
+                  <Package className="h-12 w-12 text-gray-300" />
+                  <Wrench className="h-12 w-12 text-gray-300" />
+                </div>
+                <p className="text-gray-500 mb-2">Nenhum item adicionado</p>
+                <p className="text-sm text-gray-400">
+                  Adicione produtos do catálogo ou serviços personalizados
+                </p>
               </div>
             )}
           </div>
-
-          {/* Custos */}
+                    {/* Custos */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -631,6 +941,7 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
             </div>
           </div>
 
+          {/* Botões de Ação */}
           <div className="flex space-x-4 pt-4">
             <button
               type="button"
@@ -643,7 +954,7 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
               type="submit"
               className="flex-1 px-6 py-3 bg-gradient-to-r from-amber-600 to-orange-600 text-white rounded-lg hover:from-amber-700 hover:to-orange-700 font-medium transition-all duration-200 shadow-lg hover:shadow-xl"
             >
-              {project ? 'Atualizar' : 'Criar'} Projeto
+              {project ? 'Atualizar' : 'Criar'} Pedido
             </button>
           </div>
         </form>
@@ -693,6 +1004,12 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
                         <h4 className="font-medium text-gray-800">{product.name}</h4>
                         <p className="text-sm text-gray-600">{product.description}</p>
                         <p className="text-xs text-gray-500">Categoria: {product.category}</p>
+                      </div>
+                      <div className="ml-4">
+                        <p className="text-sm font-semibold text-green-600">
+                          R$ {(product.sale_price || product.cost_price).toFixed(2)}
+                        </p>
+                        <p className="text-xs text-gray-500">Estoque: {product.current_stock}</p>
                       </div>
                     </div>
                   </button>
