@@ -3,9 +3,8 @@ import Sidebar from './components/Sidebar';
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './pages/Dashboard';
 import Clients from './pages/Clients';
-import OrdersAndQuotes './pages/OrdersAndQuotes';
+import OrdersAndQuotes from './pages/OrdersAndQuotes';  // ✅ CORRIGIDO
 import Purchases from './pages/Purchases';
-import Projects from './pages/Projects';
 import Finance from './pages/Finance';
 import Products from './pages/Products';
 import Stock from './pages/Stock';
@@ -16,8 +15,6 @@ import { AppProvider } from './contexts/AppContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { DebugAuth } from './components/DebugAuth';
-
-
 
 // Componente AppContent separado - FORA do return
 const AppContent: React.FC = () => {
@@ -62,14 +59,22 @@ const AppContent: React.FC = () => {
         return <Dashboard />;
       case 'clients':
         return <Clients />;
-      case 'suppliers': // ✅ Novo caso
+      case 'suppliers':
         return <Suppliers />;
+      
+      // ✅ NOVA ROTA UNIFICADA
       case 'ordersandquotes':
         return <OrdersAndQuotes />;
+      
+      // ✅ REDIRECIONAMENTOS DAS ROTAS ANTIGAS
+      case 'projects':
+      case 'sales':
+        // Redireciona automaticamente para a nova página
+        setTimeout(() => setCurrentPage('ordersandquotes'), 0);
+        return <OrdersAndQuotes />;
+      
       case 'purchases':
         return <Purchases />;
-      case 'projects':
-        return <Projects />;
       case 'finance':
         return <Finance />;
       case 'products':
