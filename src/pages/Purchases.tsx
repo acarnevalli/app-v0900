@@ -1274,9 +1274,6 @@ const Purchases: React.FC = () => {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="flex-1 py-3 bg
-                              type="submit"
-                disabled={isSubmitting}
                 className="flex-1 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 transition-colors"
               >
                 {isSubmitting ? (
