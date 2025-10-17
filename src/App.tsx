@@ -3,7 +3,7 @@ import Sidebar from './components/Sidebar';
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './pages/Dashboard';
 import Clients from './pages/Clients';
-import Sales from './pages/Sales';
+import OrdersAndQuotes './pages/OrdersAndQuotes';
 import Purchases from './pages/Purchases';
 import Projects from './pages/Projects';
 import Finance from './pages/Finance';
@@ -64,8 +64,8 @@ const AppContent: React.FC = () => {
         return <Clients />;
       case 'suppliers': // ✅ Novo caso
         return <Suppliers />;
-      case 'sales':
-        return <Sales />;
+      case 'ordersandquotes':
+        return <OrdersAndQuotes />;
       case 'purchases':
         return <Purchases />;
       case 'projects':
