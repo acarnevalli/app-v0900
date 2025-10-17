@@ -738,6 +738,57 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }, [user, loadClients]);
 
   // ✅ Product functions
+
+  // ====== FUNÇÃO ADD PAYMENTS ======
+
+const createFinancialTransactionsFromProject = useCallback(async (
+  projectId: string, 
+  projectData: any
+) => {
+  // Só criar transações se for uma VENDA (não orçamento)
+  if (projectData.type !== 'venda') {
+    return;
+  }
+
+  const client = clients.find(c => c.id === projectData.client_id);
+  const { payment_terms } = projectData;
+
+  if (!payment_terms) {
+    console.warn('Projeto sem termos de pagamento');
+    return;
+  }
+
+  try {
+    // Criar uma transação para cada parcela
+    for (let i = 0; i < payment_terms.installments; i++) {
+      // Calcular data de vencimento de cada parcela
+      const dueDate = new Date(projectData.start_date);
+      dueDate.setMonth(dueDate.getMonth() + i);
+      
+      const transaction = {
+        type: 'entrada' as const,
+        category: 'Vendas',
+        description: `${projectData.order_number || 'Venda'} - ${client?.name || 'Cliente'} - Parcela ${i + 1}/${payment_terms.installments}`,
+        amount: payment_terms.installment_value || 0,
+        date: dueDate.toISOString().split('T')[0],
+        project_id: projectId,
+        project_title: projectData.description || 'Sem descrição',
+        user_id: user!.id,
+        created_at: new Date().toISOString()
+      };
+      
+      await supabase
+        .from('transactions')
+        .insert([transaction]);
+    }
+
+    console.log(`✅ ${payment_terms.installments} transação(ões) criada(s) para o projeto ${projectData.order_number}`);
+  } catch (error) {
+    console.error('❌ Erro ao criar transações financeiras:', error);
+    throw error;
+  }
+}, [user, clients]);
+  
   const addProduct = useCallback(async (data: Omit<Product, "id" | "created_at" | "updated_at" | "user_id">) => {
     ensureUser();
     
@@ -782,6 +833,20 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       
       if (compError) throw compError;
     }
+
+     // ✅ ADICIONAR AQUI: Criar transações financeiras
+  if (data.type === 'venda') {
+    try {
+      await createFinancialTransactionsFromProject(insertedProject.id, {
+        ...data,
+        order_number: insertedProject.order_number
+      });
+    } catch (error) {
+      console.error('Erro ao criar transações, mas projeto foi salvo:', error);
+      // Não dar throw aqui para não reverter o projeto
+    }
+  }
+
 
     await loadProducts();
   }, [user, loadProducts]);
