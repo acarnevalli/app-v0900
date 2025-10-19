@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';  // ✅ Adicionei useRef
 import { 
   X, 
   Briefcase, 
@@ -26,16 +26,19 @@ interface ProjectFormModalProps {
 const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose }) => {
   const { clients, products, addProject, updateProject } = useApp();
   
+  // ✅ NOVO: Flag para controlar se já carregou os dados
+  const hasLoadedData = useRef(false);
+  
   // ====== ESTADOS ======
   
   const [formData, setFormData] = useState({
     client_id: '',
-    description: '',  // ✅ Substituiu "title"
+    description: '',
     status: 'orcamento' as 'orcamento' | 'aprovado' | 'em_producao' | 'concluido' | 'entregue',
     type: 'orcamento' as 'orcamento' | 'venda',
     start_date: new Date().toISOString().split('T')[0],
-    delivery_deadline_days: 15,  // ✅ NOVO: Prazo em dias
-    end_date: '',  // Será calculado automaticamente
+    delivery_deadline_days: 15,
+    end_date: '',
     materials_cost: '',
     labor_cost: '',
     profit_margin: '20'
@@ -53,44 +56,99 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
   const [clientSearch, setClientSearch] = useState('');
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [selectedClientName, setSelectedClientName] = useState('');
-  
-  // ✅ NOVO: Estado para controlar tipo de item sendo adicionado
   const [itemTypeToAdd, setItemTypeToAdd] = useState<ItemType>('produto');
 
-  // ====== EFEITO DE CARREGAMENTO (EDIÇÃO) ======
+  // ====== 🔧 EFEITO DE CARREGAMENTO CORRIGIDO ======
   
   useEffect(() => {
-    if (project) {
+    // ✅ Verifica se já carregou ou se não tem projeto
+    if (!project || hasLoadedData.current) {
+      console.log('🔄 useEffect: Ignorando execução (já carregado ou sem projeto)');
+      return;
+    }
+
+    console.log('📥 useEffect: Carregando dados do projeto para edição:', project);
+    
+    // ✅ Marca como carregado ANTES de fazer qualquer coisa
+    hasLoadedData.current = true;
+
+    try {
+      // ✅ Carrega dados do formulário
       setFormData({
-        client_id: project.client_id,
-        description: project.description,  // ✅ Não é mais "title"
-        status: project.status,
-        type: project.type,
-        start_date: project.start_date,
-        delivery_deadline_days: project.delivery_deadline_days || 15,  // ✅ NOVO
-        end_date: project.end_date,
+        client_id: project.client_id || '',
+        description: project.description || '',
+        status: project.status || 'orcamento',
+        type: project.type || 'orcamento',
+        start_date: project.start_date || new Date().toISOString().split('T')[0],
+        delivery_deadline_days: project.delivery_deadline_days || 15,
+        end_date: project.end_date || '',
         materials_cost: project.materials_cost?.toString() || '',
         labor_cost: project.labor_cost?.toString() || '',
         profit_margin: project.profit_margin?.toString() || '20'
       });
 
-      setProjectProducts(project.products || []);
+      // ✅ Carrega produtos com validação e clone profundo
+      if (project.products && Array.isArray(project.products) && project.products.length > 0) {
+        console.log('📦 Produtos encontrados:', project.products.length);
+        
+        // ✅ Clone profundo para evitar mutação do objeto original
+        const clonedProducts = project.products.map(p => ({
+          ...p,
+          id: p.id || Date.now().toString() + Math.random(),
+          product_id: p.product_id || null,
+          product_name: p.product_name || 'Produto sem nome',
+          quantity: p.quantity || 1,
+          unit_price: p.unit_price || 0,
+          total_price: p.total_price || 0,
+          item_type: p.item_type || 'produto',
+          item_description: p.item_description || '',
+          service_hours: p.service_hours || 0,
+          hourly_rate: p.hourly_rate || 0
+        }));
+        
+        setProjectProducts(clonedProducts);
+        console.log('✅ Produtos carregados com sucesso:', clonedProducts);
+      } else {
+        console.log('⚠️ Nenhum produto encontrado no projeto');
+        setProjectProducts([]);
+      }
       
+      // ✅ Carrega termos de pagamento
       if (project.payment_terms) {
+        console.log('💳 Termos de pagamento encontrados');
         setPaymentTerms({
-          installments: project.payment_terms.installments,
-          payment_method: project.payment_terms.payment_method,
-          discount_percentage: project.payment_terms.discount_percentage
+          installments: project.payment_terms.installments || 1,
+          payment_method: project.payment_terms.payment_method || 'pix',
+          discount_percentage: project.payment_terms.discount_percentage || 0
         });
       }
       
+      // ✅ Carrega informações do cliente
       const client = clients.find(c => c.id === project.client_id);
       if (client) {
+        console.log('👤 Cliente encontrado:', client.name);
         setSelectedClientName(client.name);
         setClientSearch(client.name);
+      } else {
+        console.log('⚠️ Cliente não encontrado para ID:', project.client_id);
       }
+
+      console.log('✅ Todos os dados carregados com sucesso!');
+      
+    } catch (error) {
+      console.error('❌ Erro ao carregar dados do projeto:', error);
+      alert('Erro ao carregar dados do projeto. Por favor, tente novamente.');
     }
-  }, [project, clients]);
+
+  }, [project?.id]);
+
+  // ✅ NOVO: Reset da flag quando o modal fecha
+  useEffect(() => {
+    return () => {
+      hasLoadedData.current = false;
+      console.log('🔄 Modal fechado, resetando flag de carregamento');
+    };
+  }, []);
 
   // ====== CÁLCULO AUTOMÁTICO DA DATA DE ENTREGA ======
   
@@ -143,14 +201,14 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
 
     const projectData = {
       client_id: formData.client_id,
-      description: formData.description,  // ✅ Não é mais "title"
+      description: formData.description,
       status: formData.status,
       type: formData.type,
       products: projectProducts,
       budget,
       start_date: formData.start_date,
       end_date: formData.end_date,
-      delivery_deadline_days: formData.delivery_deadline_days,  // ✅ NOVO
+      delivery_deadline_days: formData.delivery_deadline_days,
       materials_cost: parseFloat(formData.materials_cost) || 0,
       labor_cost: parseFloat(formData.labor_cost) || 0,
       profit_margin: parseFloat(formData.profit_margin) || 20,
@@ -188,7 +246,8 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
       [name]: name === 'installments' || name === 'discount_percentage' ? parseInt(value) || 0 : value
     }));
   };
-    // ====== HANDLERS DE CLIENTE ======
+
+  // ====== HANDLERS DE CLIENTE ======
   
   const filteredClients = clients.filter(client =>
     client.name.toLowerCase().includes(clientSearch.toLowerCase()) ||
@@ -228,7 +287,6 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
 
   // ====== HANDLERS DE PRODUTOS/SERVIÇOS ======
   
-  // ✅ NOVO: Adicionar produto do catálogo
   const addProductToProject = (productId: string) => {
     const product = products.find(p => p.id === productId);
     if (!product) return;
@@ -250,7 +308,7 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
         quantity: 1,
         unit_price: unitPrice,
         total_price: unitPrice,
-        item_type: 'produto',  // ✅ Produto do catálogo sempre é "produto"
+        item_type: 'produto',
         item_description: product.description || ''
       }]);
     }
@@ -259,16 +317,15 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
     setProductSearch('');
   };
 
-  // ✅ NOVO: Adicionar serviço manualmente
   const addServiceToProject = () => {
     const newService: ProjectProduct = {
       id: Date.now().toString(),
-      product_id: null,  // ✅ Serviços podem não ter product_id
+      product_id: null,
       product_name: 'Novo Serviço',
       quantity: 1,
       unit_price: 0,
       total_price: 0,
-      item_type: 'servico',  // ✅ Tipo serviço
+      item_type: 'servico',
       service_hours: 1,
       hourly_rate: 50,
       item_description: ''
@@ -277,7 +334,6 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
     setProjectProducts(prev => [...prev, newService]);
   };
 
-  // ✅ ATUALIZADO: Atualizar quantidade
   const updateProductQuantity = (itemId: string, quantity: number) => {
     if (quantity <= 0) {
       removeProduct(itemId);
@@ -289,7 +345,6 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
         const newQuantity = quantity;
         let newTotal = newQuantity * p.unit_price;
         
-        // ✅ Se for serviço, recalcular baseado em horas
         if (p.item_type === 'servico' && p.service_hours && p.hourly_rate) {
           newTotal = (p.service_hours * p.hourly_rate) * newQuantity;
         }
@@ -304,7 +359,6 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
     }));
   };
 
-  // ✅ ATUALIZADO: Atualizar preço unitário
   const updateProductPrice = (itemId: string, unitPrice: number) => {
     setProjectProducts(prev => prev.map(p => {
       if (p.id === itemId) {
@@ -318,7 +372,6 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
     }));
   };
 
-  // ✅ NOVO: Atualizar horas de serviço
   const updateServiceHours = (itemId: string, hours: number) => {
     setProjectProducts(prev => prev.map(p => {
       if (p.id === itemId && p.item_type === 'servico') {
@@ -337,7 +390,6 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
     }));
   };
 
-  // ✅ NOVO: Atualizar valor por hora
   const updateHourlyRate = (itemId: string, rate: number) => {
     setProjectProducts(prev => prev.map(p => {
       if (p.id === itemId && p.item_type === 'servico') {
@@ -356,14 +408,12 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
     }));
   };
 
-  // ✅ NOVO: Atualizar nome do item
   const updateItemName = (itemId: string, name: string) => {
     setProjectProducts(prev => prev.map(p => 
       p.id === itemId ? { ...p, product_name: name } : p
     ));
   };
 
-  // ✅ NOVO: Atualizar descrição do item
   const updateItemDescription = (itemId: string, description: string) => {
     setProjectProducts(prev => prev.map(p => 
       p.id === itemId ? { ...p, item_description: description } : p
@@ -382,7 +432,8 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
   const budget = calculateBudget();
   const discountAmount = budget * (paymentTerms.discount_percentage / 100);
   const finalValue = budget - discountAmount;
-    // ====== RENDERIZAÇÃO ======
+
+  // ====== RENDERIZAÇÃO ======
   
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -399,7 +450,7 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+                <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {/* Dados Básicos */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Cliente */}
@@ -493,7 +544,7 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
             </div>
           </div>
 
-          {/* Descrição - ✅ SUBSTITUIU O CAMPO "TÍTULO" */}
+          {/* Descrição */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               <FileText className="h-4 w-4 inline mr-2 text-amber-600" />
@@ -532,7 +583,7 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
             </select>
           </div>
 
-          {/* Datas e Prazo - ✅ NOVO LAYOUT COM PRAZO EM DIAS */}
+          {/* Datas e Prazo */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -549,7 +600,6 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
               />
             </div>
 
-            {/* ✅ NOVO CAMPO: Prazo de Entrega em Dias */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 <Clock className="h-4 w-4 inline mr-2 text-orange-600" />
@@ -569,7 +619,6 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
               </p>
             </div>
 
-            {/* ✅ Data de Entrega (calculada automaticamente) */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 <Calendar className="h-4 w-4 inline mr-2 text-green-600" />
@@ -588,14 +637,14 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
               </p>
             </div>
           </div>
-                    {/* ====== PRODUTOS E SERVIÇOS ====== */}
+
+          {/* PRODUTOS E SERVIÇOS */}
           <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-800">
                 Produtos e Serviços
               </h3>
               <div className="flex space-x-2">
-                {/* Botão Adicionar Produto */}
                 <button
                   type="button"
                   onClick={() => {
@@ -608,7 +657,6 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
                   <span>Adicionar Produto</span>
                 </button>
                 
-                {/* ✅ NOVO: Botão Adicionar Serviço */}
                 <button
                   type="button"
                   onClick={addServiceToProject}
@@ -655,7 +703,7 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
                     </button>
                   </div>
 
-                  {/* Nome do Item (editável para serviços) */}
+                  {/* Nome do Item */}
                   <div className="mb-3">
                     <label className="block text-xs font-medium text-gray-600 mb-1">
                       Nome do {item.item_type === 'servico' ? 'Serviço' : 'Produto'}
@@ -673,7 +721,7 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
                     )}
                   </div>
 
-                  {/* Descrição (editável) */}
+                  {/* Descrição */}
                   <div className="mb-3">
                     <label className="block text-xs font-medium text-gray-600 mb-1">
                       Descrição
@@ -687,9 +735,8 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
                     />
                   </div>
 
-                  {/* ✅ CAMPOS DIFERENTES PARA PRODUTOS VS SERVIÇOS */}
+                  {/* Campos diferentes para Produtos vs Serviços */}
                   {item.item_type === 'produto' ? (
-                    // ==== LAYOUT PARA PRODUTOS ====
                     <div className="grid grid-cols-4 gap-3">
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -726,7 +773,6 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
                       </div>
                     </div>
                   ) : (
-                    // ==== LAYOUT PARA SERVIÇOS ====
                     <div className="space-y-3">
                       <div className="grid grid-cols-3 gap-3">
                         <div>
@@ -774,7 +820,6 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
                         </div>
                       </div>
                       
-                      {/* Cálculo Automático do Serviço */}
                       <div className="bg-orange-100 border border-orange-300 rounded-lg p-3">
                         <div className="flex items-center justify-between">
                           <div className="text-xs text-orange-700">
@@ -807,6 +852,7 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
               </div>
             )}
           </div>
+
                     {/* Custos */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
