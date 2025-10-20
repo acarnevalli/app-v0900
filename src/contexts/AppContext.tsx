@@ -464,6 +464,30 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     
   if (error) throw error;
 
+    // 🔥 ADICIONE ESTE LOG
+  console.log('🔍 [AppContext] Dados brutos do Supabase para projetos:', data);
+
+  const merged = validateArray(data).map((p: any) => ({
+    ...p,
+    client_name: p.client?.name,
+    products: validateArray(p.products).map((pp: any) => ({
+      id: pp.id,
+      product_id: pp.product_id || null,
+      product_name: pp.product_name || "",
+      quantity: pp.quantity || 0,
+      unit_price: pp.unit_price || 0,
+      total_price: pp.total_price || 0,
+      item_type: pp.item_type || 'produto',
+      item_description: pp.item_description,
+      service_hours: pp.service_hours,
+      hourly_rate: pp.hourly_rate,
+    })),
+  }));
+  
+  setProjects(merged);
+}, [user]);
+
+
   const merged = validateArray(data).map((p: any) => ({
     ...p,
     client_name: p.client?.name,
