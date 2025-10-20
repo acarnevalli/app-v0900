@@ -485,7 +485,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }));
   
   setProjects(merged);
-}, [user]);
+}, [user];
 
 
   const merged = validateArray(data).map((p: any) => ({
