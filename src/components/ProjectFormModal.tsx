@@ -60,95 +60,146 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
 
   // ====== 🔧 EFEITO DE CARREGAMENTO CORRIGIDO ======
   
-  useEffect(() => {
-    // ✅ Verifica se já carregou ou se não tem projeto
-    if (!project || hasLoadedData.current) {
-      console.log('🔄 useEffect: Ignorando execução (já carregado ou sem projeto)');
-      return;
-    }
+useEffect(() => {
+  // ✅ NOVO: Executa sempre que o modal abre com um projeto
+  if (!project) {
+    console.log('🔄 useEffect: Sem projeto, resetando formulário');
+    // Reseta o formulário para novo projeto
+    setFormData({
+      client_id: '',
+      description: '',
+      status: 'orcamento',
+      type: 'orcamento',
+      start_date: new Date().toISOString().split('T')[0],
+      delivery_deadline_days: 15,
+      end_date: '',
+      materials_cost: '',
+      labor_cost: '',
+      profit_margin: '20'
+    });
+    setProjectProducts([]);
+    setPaymentTerms({
+      installments: 1,
+      payment_method: 'pix',
+      discount_percentage: 0
+    });
+    setClientSearch('');
+    setSelectedClientName('');
+    hasLoadedData.current = false;
+    return;
+  }
 
-    console.log('📥 useEffect: Carregando dados do projeto para edição:', project);
-    
-    // ✅ Marca como carregado ANTES de fazer qualquer coisa
-    hasLoadedData.current = true;
+  console.log('📥 useEffect: Carregando dados do projeto para edição');
+  console.log('🔍 Projeto recebido:', {
+    id: project.id,
+    order_number: project.order_number,
+    description: project.description,
+    products: project.products,
+    productsLength: project.products?.length
+  });
+  
+  // ✅ VALIDAÇÃO: Verificar se os produtos existem
+  if (!project.products) {
+    console.warn('⚠️ ATENÇÃO: project.products é undefined/null');
+  } else if (!Array.isArray(project.products)) {
+    console.warn('⚠️ ATENÇÃO: project.products NÃO é um array:', typeof project.products);
+  } else if (project.products.length === 0) {
+    console.warn('⚠️ ATENÇÃO: project.products está vazio');
+  } else {
+    console.log('✅ project.products é válido:', project.products.length, 'itens');
+  }
 
-    try {
-      // ✅ Carrega dados do formulário
-      setFormData({
-        client_id: project.client_id || '',
-        description: project.description || '',
-        status: project.status || 'orcamento',
-        type: project.type || 'orcamento',
-        start_date: project.start_date || new Date().toISOString().split('T')[0],
-        delivery_deadline_days: project.delivery_deadline_days || 15,
-        end_date: project.end_date || '',
-        materials_cost: project.materials_cost?.toString() || '',
-        labor_cost: project.labor_cost?.toString() || '',
-        profit_margin: project.profit_margin?.toString() || '20'
-      });
+  try {
+    // ✅ Carrega dados do formulário
+    setFormData({
+      client_id: project.client_id || '',
+      description: project.description || '',
+      status: project.status || 'orcamento',
+      type: project.type || 'orcamento',
+      start_date: project.start_date || new Date().toISOString().split('T')[0],
+      delivery_deadline_days: project.delivery_deadline_days || 15,
+      end_date: project.end_date || '',
+      materials_cost: project.materials_cost?.toString() || '',
+      labor_cost: project.labor_cost?.toString() || '',
+      profit_margin: project.profit_margin?.toString() || '20'
+    });
 
-      // ✅ Carrega produtos com validação e clone profundo
-      if (project.products && Array.isArray(project.products) && project.products.length > 0) {
-        console.log('📦 Produtos encontrados:', project.products.length);
-        
-        // ✅ Clone profundo para evitar mutação do objeto original
-        const clonedProducts = project.products.map(p => ({
-          ...p,
-          id: p.id || Date.now().toString() + Math.random(),
+    // ✅ Carrega produtos com validação FORTE
+    if (Array.isArray(project.products) && project.products.length > 0) {
+      console.log('📦 Processando produtos:', project.products);
+      
+      // ✅ Clone profundo para evitar mutação do objeto original
+      const clonedProducts: ProjectProduct[] = project.products.map(p => {
+        const cloned = {
+          id: p.id || `${Date.now()}-${Math.random()}`,
           product_id: p.product_id || null,
           product_name: p.product_name || 'Produto sem nome',
-          quantity: p.quantity || 1,
-          unit_price: p.unit_price || 0,
-          total_price: p.total_price || 0,
-          item_type: p.item_type || 'produto',
+          quantity: Number(p.quantity) || 1,
+          unit_price: Number(p.unit_price) || 0,
+          total_price: Number(p.total_price) || 0,
+          item_type: (p.item_type || 'produto') as ItemType,
           item_description: p.item_description || '',
-          service_hours: p.service_hours || 0,
-          hourly_rate: p.hourly_rate || 0
-        }));
+          service_hours: p.item_type === 'servico' ? (Number(p.service_hours) || 0) : undefined,
+          hourly_rate: p.item_type === 'servico' ? (Number(p.hourly_rate) || 0) : undefined
+        };
         
-        setProjectProducts(clonedProducts);
-        console.log('✅ Produtos carregados com sucesso:', clonedProducts);
-      } else {
-        console.log('⚠️ Nenhum produto encontrado no projeto');
-        setProjectProducts([]);
-      }
+        console.log('  ➡️ Produto clonado:', cloned);
+        return cloned;
+      });
       
-      // ✅ Carrega termos de pagamento
-      if (project.payment_terms) {
-        console.log('💳 Termos de pagamento encontrados');
-        setPaymentTerms({
-          installments: project.payment_terms.installments || 1,
-          payment_method: project.payment_terms.payment_method || 'pix',
-          discount_percentage: project.payment_terms.discount_percentage || 0
-        });
-      }
+      console.log('✅ Total de produtos clonados:', clonedProducts.length);
+      setProjectProducts(clonedProducts);
+      console.log('✅ setProjectProducts executado com sucesso');
       
-      // ✅ Carrega informações do cliente
-      const client = clients.find(c => c.id === project.client_id);
-      if (client) {
-        console.log('👤 Cliente encontrado:', client.name);
-        setSelectedClientName(client.name);
-        setClientSearch(client.name);
-      } else {
-        console.log('⚠️ Cliente não encontrado para ID:', project.client_id);
-      }
-
-      console.log('✅ Todos os dados carregados com sucesso!');
-      
-    } catch (error) {
-      console.error('❌ Erro ao carregar dados do projeto:', error);
-      alert('Erro ao carregar dados do projeto. Por favor, tente novamente.');
+    } else {
+      console.log('⚠️ Nenhum produto válido encontrado, inicializando array vazio');
+      setProjectProducts([]);
+    }
+    
+    // ✅ Carrega termos de pagamento
+    if (project.payment_terms) {
+      console.log('💳 Carregando termos de pagamento:', project.payment_terms);
+      setPaymentTerms({
+        installments: project.payment_terms.installments || 1,
+        payment_method: project.payment_terms.payment_method || 'pix',
+        discount_percentage: project.payment_terms.discount_percentage || 0
+      });
+    } else {
+      console.log('💳 Sem termos de pagamento, usando padrão');
+    }
+    
+    // ✅ Carrega informações do cliente
+    const client = clients.find(c => c.id === project.client_id);
+    if (client) {
+      console.log('👤 Cliente encontrado:', client.name);
+      setSelectedClientName(client.name);
+      setClientSearch(client.name);
+    } else {
+      console.log('⚠️ Cliente não encontrado para ID:', project.client_id);
     }
 
-  }, [project?.id]);
+    console.log('✅ Todos os dados carregados com sucesso!');
+    hasLoadedData.current = true;
+    
+  } catch (error) {
+    console.error('❌ Erro ao carregar dados do projeto:', error);
+    alert('Erro ao carregar dados do projeto. Por favor, tente novamente.');
+  }
 
-  // ✅ NOVO: Reset da flag quando o modal fecha
-  useEffect(() => {
-    return () => {
-      hasLoadedData.current = false;
-      console.log('🔄 Modal fechado, resetando flag de carregamento');
-    };
-  }, []);
+}, [project, clients]);  // ✅ CORRIGIDO: Depende do project completo e clients
+
+// ✅ NOVO: Efeito para DEBUG - Monitorar mudanças em projectProducts
+useEffect(() => {
+  console.log('🔔 [DEBUG] projectProducts mudou:', {
+    length: projectProducts.length,
+    items: projectProducts.map(p => ({
+      id: p.id,
+      name: p.product_name,
+      type: p.item_type,
+      quantity: p.quantity
+    }))
+  });
+}, [projectProducts]);
 
   // ====== CÁLCULO AUTOMÁTICO DA DATA DE ENTREGA ======
   
