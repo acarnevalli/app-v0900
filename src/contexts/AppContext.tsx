@@ -411,46 +411,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     console.log(`Total de clientes carregados: ${allClients.length}`);
     setClients(validateArray(allClients));
   }, [user]);
-  const loadProducts = useCallback(async () => {
-    if (!user) return;
-    
-    const { data: productsData, error: prodErr } = await supabase
-      .from("products")
-      .select("*")
-      .eq("user_id", user.id);
-    if (prodErr) throw prodErr;
 
-    const { data: componentsData, error: compErr } = await supabase
-      .from("product_components")
-      .select(`
-        *,
-        component:products!product_components_component_id_fkey(
-          id, name, unit, cost_price
-        )
-      `);
-    if (compErr) throw compErr;
-
-    const merged = validateArray(productsData).map((p) => ({
-      ...p,
-      components: validateArray(componentsData)
-        .filter((c: any) => c.product_id === p.id)
-        .map((c: any) => ({
-          id: c.id,
-          product_id: c.product_id,
-          component_id: c.component_id,
-          product_name: c.component?.name || "",
-          quantity: c.quantity || 0,
-          unit: c.component?.unit || "",
-          unit_cost: c.component?.cost_price || 0,
-          total_cost: ((c.component?.cost_price || 0) * (c.quantity || 0)),
-        })),
-    }));
-
-    setProducts(merged);
-  }, [user]);
-
+// Função Carregar Projetos 
+  
   const loadProjects = useCallback(async () => {
   if (!user) return;
+  
+  console.log('🔄 [AppContext] Carregando projetos...');
   
   const { data, error } = await supabase
     .from("projects")
@@ -462,52 +429,59 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     .eq("user_id", user.id)
     .order('created_at', { ascending: false });
     
-  if (error) throw error;
+  if (error) {
+    console.error('❌ [AppContext] Erro ao carregar projetos:', error);
+    throw error;
+  }
 
-    // 🔥 ADICIONE ESTE LOG
-  console.log('🔍 [AppContext] Dados brutos do Supabase para projetos:', data);
-
-  const merged = validateArray(data).map((p: any) => ({
-    ...p,
-    client_name: p.client?.name,
-    products: validateArray(p.products).map((pp: any) => ({
-      id: pp.id,
-      product_id: pp.product_id || null,
-      product_name: pp.product_name || "",
-      quantity: pp.quantity || 0,
-      unit_price: pp.unit_price || 0,
-      total_price: pp.total_price || 0,
-      item_type: pp.item_type || 'produto',
-      item_description: pp.item_description,
-      service_hours: pp.service_hours,
-      hourly_rate: pp.hourly_rate,
-    })),
-  }));
+  console.log('🔍 [AppContext] Dados brutos do Supabase:', data);
   
-  setProjects(merged);
-}, [user];
+  if (!data || data.length === 0) {
+    console.log('⚠️ [AppContext] Nenhum projeto encontrado');
+    setProjects([]);
+    return;
+  }
 
-
-  const merged = validateArray(data).map((p: any) => ({
-    ...p,
-    client_name: p.client?.name,
-    products: validateArray(p.products).map((pp: any) => ({
-      id: pp.id,
-      product_id: pp.product_id || null,  // ✅ Pode ser NULL
-      product_name: pp.product_name || "",
-      quantity: pp.quantity || 0,
-      unit_price: pp.unit_price || 0,
-      total_price: pp.total_price || 0,
-      item_type: pp.item_type || 'produto',  // ✅ NOVO
-      item_description: pp.item_description,  // ✅ NOVO
-      service_hours: pp.service_hours,  // ✅ NOVO
-      hourly_rate: pp.hourly_rate,  // ✅ NOVO
-    })),
-  }));
+  const merged = validateArray(data).map((p: any) => {
+    console.log(`📋 [AppContext] Processando projeto ${p.id}:`, {
+      order_number: p.order_number,
+      description: p.description,
+      raw_products: p.products
+    });
+    
+    const processedProducts = validateArray(p.products).map((pp: any) => {
+      const processed = {
+        id: pp.id,
+        product_id: pp.product_id || null,
+        product_name: pp.product_name || "",
+        quantity: pp.quantity || 0,
+        unit_price: pp.unit_price || 0,
+        total_price: pp.total_price || 0,
+        item_type: pp.item_type || 'produto',
+        item_description: pp.item_description,
+        service_hours: pp.service_hours,
+        hourly_rate: pp.hourly_rate,
+      };
+      
+      console.log(`  ➡️ Produto processado:`, processed);
+      return processed;
+    });
+    
+    console.log(`✅ [AppContext] Projeto ${p.id} processado com ${processedProducts.length} produtos`);
+    
+    return {
+      ...p,
+      client_name: p.client?.name,
+      products: processedProducts
+    };
+  });
   
+  console.log(`✅ [AppContext] Total de projetos carregados: ${merged.length}`);
   setProjects(merged);
 }, [user]);
 
+// Carregando Transações Financeiras 
+  
   const loadTransactions = useCallback(async () => {
     if (!user) return;
     
