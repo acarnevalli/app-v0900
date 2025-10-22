@@ -481,7 +481,6 @@ interface AppContextType {
  // ============================================
   reloadProject: (projectId: string) => Promise<any>;
   debugProject: (projectId: string) => Promise<any>;
-}
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
