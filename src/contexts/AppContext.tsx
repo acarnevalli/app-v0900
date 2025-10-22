@@ -241,6 +241,126 @@ export interface Category {
   updated_at: string;
 }
 
+// ============================================
+// INTERFACES FINANCEIRAS
+// ============================================
+
+export interface FinancialTransaction {
+  id: string;
+  
+  // Tipo e categoria
+  type: 'income' | 'expense';
+  category: string;
+  subcategory?: string;
+  description: string;
+  
+  // Valores
+  amount: number;
+  paid_amount?: number;
+  discount?: number;
+  interest?: number;
+  fine?: number;
+  
+  // Datas
+  date: string;
+  due_date: string;
+  payment_date?: string;
+  
+  // Status e pagamento
+  status: 'pending' | 'paid' | 'overdue' | 'cancelled' | 'partial';
+  payment_method?: 'dinheiro' | 'pix' | 'cartao_credito' | 'cartao_debito' | 'boleto' | 'transferencia' | 'cheque';
+  
+  // Parcelamento
+  installment_number?: number;
+  total_installments?: number;
+  
+  // Referências
+  reference_type?: 'sale' | 'purchase' | 'project' | 'manual' | 'recurring';
+  reference_id?: string;
+  reference_number?: string;
+  
+  // Relacionamentos (IDs e nomes)
+  client_id?: string;
+  client_name?: string;
+  supplier_id?: string;
+  supplier_name?: string;
+  project_id?: string;
+  project_number?: string;
+  bank_account_id?: string;
+  bank_account_name?: string;
+  cost_center_id?: string;
+  cost_center_name?: string;
+  
+  // Observações
+  notes?: string;
+  attachments?: string[];
+  
+  // Metadados
+  user_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BankAccount {
+  id: string;
+  name: string;
+  bank_name?: string;
+  account_number?: string;
+  agency?: string;
+  account_type: 'checking' | 'savings' | 'cash' | 'investment';
+  initial_balance: number;
+  current_balance: number;
+  active: boolean;
+  notes?: string;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CostCenter {
+  id: string;
+  name: string;
+  code?: string;
+  description?: string;
+  parent_id?: string;
+  parent_name?: string;
+  active: boolean;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Estrutura de informações de pagamento (usada em Purchase e Project)
+export interface PaymentInfo {
+  payment_method: 'dinheiro' | 'pix' | 'cartao_credito' | 'cartao_debito' | 'boleto' | 'transferencia' | 'cheque';
+  installments: number;
+  installment_value: number;
+  first_due_date: string;
+  has_shipping?: boolean;
+  shipping_cost?: number;
+  shipping_type?: string;
+  paid?: boolean;
+  paid_date?: string;
+}
+
+// Dados para criar transação financeira
+export type CreateFinancialTransactionData = Omit<
+  FinancialTransaction, 
+  'id' | 'created_at' | 'updated_at' | 'user_id' | 'client_name' | 'supplier_name' | 'project_number' | 'bank_account_name' | 'cost_center_name'
+>;
+
+// Dados para atualizar transação financeira
+export type UpdateFinancialTransactionData = Partial<CreateFinancialTransactionData>;
+
+// Dados para pagamento de transação
+export interface PayTransactionData {
+  payment_date: string;
+  paid_amount?: number;
+  payment_method?: string;
+  bank_account_id?: string;
+  notes?: string;
+}
+
 // ---------------------------------------------------------------
 // Contexto
 // ---------------------------------------------------------------
@@ -255,6 +375,9 @@ interface AppContextType {
   purchases: Purchase[];
   suppliers: Supplier[];
   categories: Category[];
+  financialTransactions: FinancialTransaction[];
+  bankAccounts: BankAccount[];
+  costCenters: CostCenter[];
   loading: boolean;
   error: string | null;
 
@@ -267,6 +390,21 @@ interface AppContextType {
   deleteProject: (id: string) => Promise<void>;
 
   addTransaction: (data: Omit<Transaction, "id" | "created_at" | "user_id">) => Promise<void>;
+  addFinancialTransaction: (data: CreateFinancialTransactionData) => Promise<FinancialTransaction>;
+  updateFinancialTransaction: (id: string, data: UpdateFinancialTransactionData) => Promise<void>;
+  deleteFinancialTransaction: (id: string) => Promise<void>;
+  payTransaction: (id: string, paymentData: PayTransactionData) => Promise<void>;
+  getTransactionsByPeriod: (startDate: string, endDate: string) => FinancialTransaction[];
+  getOverdueTransactions: () => FinancialTransaction[];
+
+  addBankAccount: (data: Omit<BankAccount, 'id' | 'created_at' | 'updated_at' | 'user_id' | 'current_balance'>) => Promise<void>;
+  updateBankAccount: (id: string, data: Partial<BankAccount>) => Promise<void>;
+  deleteBankAccount: (id: string) => Promise<void>;
+  updateBankAccountBalance: (accountId: string, amount: number, operation: 'add' | 'subtract') => Promise<void>;
+
+  addCostCenter: (data: Omit<CostCenter, 'id' | 'created_at' | 'updated_at' | 'user_id' | 'parent_name'>) => Promise<void>;
+  updateCostCenter: (id: string, data: Partial<CostCenter>) => Promise<void>;
+  deleteCostCenter: (id: string) => Promise<void>;
   
   addProduct: (data: Omit<Product, "id" | "created_at" | "updated_at" | "user_id">) => Promise<void>;
   updateProduct: (data: Product) => Promise<void>;
@@ -302,8 +440,45 @@ interface AppContextType {
   };
 
   refreshData: () => Promise<void>;
+
+  // ============================================
+  // MÉTODOS DE INTEGRAÇÃO AUTOMÁTICA
+  // ============================================
   
+  // Criar transações a partir de vendas/compras/projetos
+  createTransactionsFromSale: (saleId: string, saleData: Sale) => Promise<void>;
+  createTransactionsFromPurchase: (purchaseId: string, purchaseData: Purchase) => Promise<void>;
+  createTransactionsFromProject: (projectId: string, projectData: Project) => Promise<void>;
+  
+  // ============================================
+  // MÉTODOS DE RELATÓRIOS
+  // ============================================
+  
+  getFinancialSummary: (startDate: string, endDate: string) => {
+    totalIncome: number;
+    totalExpense: number;
+    balance: number;
+    pendingIncome: number;
+    pendingExpense: number;
+  };
+  
+  getCashFlow: (months: number) => Array<{
+    month: string;
+    income: number;
+    expense: number;
+    balance: number;
+  }>;
+  
+  getExpensesByCategory: (startDate: string, endDate: string) => Array<{
+    category: string;
+    total: number;
+    percentage: number;
+  }>;
+}
+
+   // ============================================
   // ✅ NOVOS MÉTODOS PARA DEBUG
+ // ============================================
   reloadProject: (projectId: string) => Promise<any>;
   debugProject: (projectId: string) => Promise<any>;
 }
@@ -333,6 +508,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [financialTransactions, setFinancialTransactions] = useState<FinancialTransaction[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
+
   const [error, setError] = useState<string | null>(null);
 
   const safeLoad = async (fn: () => Promise<void>, name: string) => {
@@ -450,7 +629,100 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setProducts(merged);
   }, [user]);
 
+  // ============================================
+// FUNÇÕES DE CARREGAMENTO - FINANCEIRO
+// ============================================
+
+const loadFinancialTransactions = useCallback(async () => {
+  if (!user) return;
+  
+  console.log('📊 Carregando transações financeiras...');
+  
+  const { data, error } = await supabase
+    .from('financial_transactions')
+    .select(`
+      *,
+      client:clients(name),
+      supplier:suppliers(name),
+      project:projects(order_number),
+      bank_account:bank_accounts(name),
+      cost_center:cost_centers(name)
+    `)
+    .eq('user_id', user.id)
+    .order('due_date', { ascending: false });
+  
+  if (error) {
+    console.error('❌ Erro ao carregar transações financeiras:', error);
+    throw error;
+  }
+  
+  // Processar dados com joins
+  const merged = validateArray(data).map((t: any) => ({
+    ...t,
+    client_name: t.client?.name,
+    supplier_name: t.supplier?.name,
+    project_number: t.project?.order_number,
+    bank_account_name: t.bank_account?.name,
+    cost_center_name: t.cost_center?.name
+  }));
+  
+  console.log(`✅ ${merged.length} transações financeiras carregadas`);
+  setFinancialTransactions(merged);
+}, [user]);
+
+const loadBankAccounts = useCallback(async () => {
+  if (!user) return;
+  
+  console.log('🏦 Carregando contas bancárias...');
+  
+  const { data, error } = await supabase
+    .from('bank_accounts')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('name');
+  
+  if (error) {
+    console.error('❌ Erro ao carregar contas bancárias:', error);
+    throw error;
+  }
+  
+  console.log(`✅ ${validateArray(data).length} contas bancárias carregadas`);
+  setBankAccounts(validateArray(data));
+}, [user]);
+
+const loadCostCenters = useCallback(async () => {
+  if (!user) return;
+  
+  console.log('🎯 Carregando centros de custo...');
+  
+  const { data, error } = await supabase
+    .from('cost_centers')
+    .select(`
+      *,
+      parent:cost_centers!parent_id(name)
+    `)
+    .eq('user_id', user.id)
+    .order('name');
+  
+  if (error) {
+    console.error('❌ Erro ao carregar centros de custo:', error);
+    throw error;
+  }
+  
+  // Processar dados com parent
+  const merged = validateArray(data).map((cc: any) => ({
+    ...cc,
+    parent_name: cc.parent?.name
+  }));
+  
+  console.log(`✅ ${merged.length} centros de custo carregados`);
+  setCostCenters(merged);
+}, [user]);
+
+
+  // ============================================
   // ✅ CORREÇÃO CRÍTICA: loadProjects melhorada
+  // ============================================
   const loadProjects = useCallback(async () => {
     if (!user) return;
     
@@ -758,6 +1030,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       safeLoad(loadSales, "Vendas"),
       safeLoad(loadPurchases, "Compras"),
       safeLoad(loadCategories, "Categorias"),
+      safeLoad(loadFinancialTransactions, "Transações Financeiras"),
+    safeLoad(loadBankAccounts, "Contas Bancárias"),
+    safeLoad(loadCostCenters, "Centros de Custo"),
     ]);
 
     const hasErrors = results.some(r => r.status === 'rejected');
@@ -776,7 +1051,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     loadSuppliers,
     loadSales,
     loadPurchases,
-    loadCategories
+    loadCategories,
+    loadFinancialTransactions,
+    loadBankAccounts,
+    loadCostCenters
   ]);
 
   useEffect(() => {
@@ -1669,6 +1947,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         purchases: validateArray(purchases),
         suppliers: validateArray(suppliers),
         categories: validateArray(categories),
+        financialTransactions: validateArray(financialTransactions),
+        bankAccounts: validateArray(bankAccounts),
+        costCenters: validateArray(costCenters),
         loading,
         error,
 
@@ -1706,11 +1987,36 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         calculateProductCost,
         getAvailableComponents,
         getDashboardStats,
-        refreshData,
+
+        addFinancialTransaction: async () => { throw new Error('Not implemented yet') },
+        updateFinancialTransaction: async () => { throw new Error('Not implemented yet') },
+        deleteFinancialTransaction: async () => { throw new Error('Not implemented yet') },
+        payTransaction: async () => { throw new Error('Not implemented yet') },
+        getTransactionsByPeriod: () => [],
+        getOverdueTransactions: () => [],
+      
+        addBankAccount: async () => { throw new Error('Not implemented yet') },
+        updateBankAccount: async () => { throw new Error('Not implemented yet') },
+        deleteBankAccount: async () => { throw new Error('Not implemented yet') },
+        updateBankAccountBalance: async () => { throw new Error('Not implemented yet') },
+      
+        addCostCenter: async () => { throw new Error('Not implemented yet') },
+        updateCostCenter: async () => { throw new Error('Not implemented yet') },
+        deleteCostCenter: async () => { throw new Error('Not implemented yet') },
+      
+        createTransactionsFromSale: async () => { throw new Error('Not implemented yet') },
+        createTransactionsFromPurchase: async () => { throw new Error('Not implemented yet') },
+        createTransactionsFromProject: async () => { throw new Error('Not implemented yet') },
+      
+        getFinancialSummary: () => ({ totalIncome: 0, totalExpense: 0, balance: 0, pendingIncome: 0, pendingExpense: 0 }),
+        getCashFlow: () => [],
+        getExpensesByCategory: () => [],
         
-        // ✅ NOVOS MÉTODOS PARA DEBUG
+        refreshData,
         reloadProject,
         debugProject,
+
+        
       }}
     >
       {loading ? (
