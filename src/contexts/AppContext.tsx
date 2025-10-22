@@ -1144,6 +1144,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     ensureUser();
     
     console.log('💾 [AppContext] Atualizando projeto:', { id, data });
+    console.log('💾 [AppContext] Produtos recebidos:', data.products);
     
     // ✅ Calcular end_date se necessário
     if (data.delivery_deadline_days && data.start_date) {
@@ -1174,21 +1175,26 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       console.log('📦 [AppContext] Novos produtos:', data.products);
       
       // ✅ 1. Primeiro, remover todos os produtos existentes
-      const { error: deleteError } = await supabase
+    console.log('🗑️ [AppContext] Removendo produtos antigos...');
+    const { error: deleteError } = await supabase
         .from("project_products")
         .delete()
-        .eq("project_id", id);
+        .eq("project_id", id)
         
       if (deleteError) {
         console.error('❌ [AppContext] Erro ao remover produtos antigos:', deleteError);
         throw deleteError;
       }
+      console.log('✅ [AppContext] Produtos antigos removidos');
+
 
       // ✅ 2. Inserir novos produtos (se houver)
       if (data.products && data.products.length > 0) {
-        const projectProducts = data.products.map(p => {
-          console.log('📋 [AppContext] Processando produto para inserção:', p);
-          
+      console.log('📋 [AppContext] Preparando inserção de produtos...');
+      
+      const projectProducts = data.products.map(p => {
+        console.log('📋 [AppContext] Processando produto para inserção:', p);
+        
           // ✅ Validações para serviços
           if (p.item_type === 'servico') {
             if (!p.service_hours || p.service_hours <= 0) {
@@ -1219,24 +1225,45 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const { error: prodError } = await supabase
           .from("project_products")
           .insert(projectProducts);
+        
+      console.log('📦 [AppContext] Produtos finais para inserção:', projectProducts);
+
+         if (projectProducts.length > 0) {
+        console.log(`🔄 [AppContext] Inserindo ${projectProducts.length} produtos...`);
+        
+        const { error: prodError, data: insertedProducts } = await supabase
+          .from("project_products")
+          .insert(projectProducts)
+          .select(); // ✅ Adicionado .select() para retornar dados inseridos
           
         if (prodError) {
           console.error('❌ [AppContext] Erro ao inserir novos produtos:', prodError);
           throw prodError;
         }
         
-        console.log(`✅ [AppContext] ${projectProducts.length} produtos inseridos com sucesso`);
+        console.log('✅ [AppContext] Produtos inseridos com sucesso:', insertedProducts);
+        console.log(`🎉 [AppContext] ${projectProducts.length} produtos inseridos no banco`);
       } else {
-        console.log('ℹ️ [AppContext] Nenhum produto para inserir');
+        console.log('⚠️ [AppContext] Nenhum produto válido para inserir');
       }
+    } else {
+      console.log('ℹ️ [AppContext] Nenhum produto para inserir (array vazio)');
     }
+  } else {
+    console.log('ℹ️ [AppContext] products não foi enviado, pulando atualização de produtos');
+  }
+    
 
     // ✅ 3. Recarregar projetos para garantir sincronização
-    await loadProjects();
     
-    console.log('✅ [AppContext] Projeto atualizado com sucesso');
-  }, [user, loadProjects]);
+   console.log('🔄 [AppContext] Recarregando projetos...');
+  await loadProjects();
+  
+  console.log('🎉 [AppContext] Projeto atualizado com sucesso');
+}, [user, loadProjects]);
 
+   // ✅ 4. Deletar projetos
+  
   const deleteProject = useCallback(async (id: string) => {
     ensureUser();
     const { error } = await supabase
