@@ -1115,14 +1115,36 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           user_id: user!.id,
         };
       }).filter(p => p.quantity > 0);
+      
+      if (projectProducts.length > 0) {
+    console.log(`🔄 [AppContext] Inserindo ${projectProducts.length} produtos...`);
 
-      const { error: prodError } = await supabase
-        .from("project_products")
-        .insert(projectProducts);
-        
-      if (prodError) throw prodError;
-    }
+     // ✅ CORREÇÃO APLICADA AQUI:
+  const { error: prodError, data: insertedProducts } = await supabase
+    .from("project_products")
+    .insert(projectProducts)
+    .select();
+    
+  if (prodError) {
+    console.error('❌ [AppContext] ERRO DETALHADO ao inserir produtos (addProject):', {
+      error: prodError,
+      code: prodError.code,
+      message: prodError.message,
+      details: prodError.details,
+      hint: prodError.hint,
+      products: projectProducts,
+      projectId: id
+    });
+    
+    alert(`Erro ao salvar produtos no projeto: ${prodError.message}`);
+    throw prodError;
+  }
+  
+  console.log('✅ [AppContext] Produtos atualizados com sucesso:', insertedProducts);
+    console.log(`🎉 [AppContext] ${projectProducts.length} produtos inseridos no banco`);
+  }
 
+console.log('✅ [AppContext] Produtos inseridos no novo projeto:', insertedProducts);
     // ✅ CORRIGIDO: Criar transações financeiras se for venda
     if (data.type === 'venda') {
       try {
