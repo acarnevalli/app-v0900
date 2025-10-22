@@ -641,11 +641,11 @@ const loadFinancialTransactions = useCallback(async () => {
     .from('financial_transactions')
     .select(`
       *,
-      client:clients(name),
-      supplier:suppliers(name),
-      project:projects(order_number),
-      bank_account:bank_accounts(name),
-      cost_center:cost_centers(name)
+      client:clients!client_id(name),
+      supplier:suppliers!supplier_id(name),
+      project:projects!project_id(order_number),
+      bank_account:bank_accounts!bank_account_id(name),
+      cost_center:cost_centers!cost_center_id(name)
     `)
     .eq('user_id', user.id)
     .order('due_date', { ascending: false });
@@ -717,7 +717,6 @@ const loadCostCenters = useCallback(async () => {
   console.log(`✅ ${merged.length} centros de custo carregados`);
   setCostCenters(merged);
 }, [user]);
-
 
   // ============================================
   // ✅ CORREÇÃO CRÍTICA: loadProjects melhorada
