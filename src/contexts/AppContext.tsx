@@ -240,7 +240,6 @@ export interface Category {
   created_at: string;
   updated_at: string;
 }
-
 // ---------------------------------------------------------------
 // Contexto
 // ---------------------------------------------------------------
@@ -302,6 +301,10 @@ interface AppContextType {
   };
 
   refreshData: () => Promise<void>;
+  
+  // ✅ NOVOS MÉTODOS PARA DEBUG
+  reloadProject: (projectId: string) => Promise<any>;
+  debugProject: (projectId: string) => Promise<any>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -345,6 +348,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const ensureUser = () => {
     if (!user) throw new Error('Usuário não autenticado');
   };
+
+  // ---------------------------------------------------------------
+  // FUNÇÕES DE CARREGAMENTO (load*)
+  // ---------------------------------------------------------------
 
   const loadCategories = useCallback(async () => {
     if (!user) return;
@@ -405,7 +412,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setClients(validateArray(allClients));
   }, [user]);
   
-    // ✅ FUNÇÃO loadProducts ADICIONADA (estava faltando!)
   const loadProducts = useCallback(async () => {
     if (!user) return;
     
@@ -444,6 +450,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setProducts(merged);
   }, [user]);
 
+  // ✅ CORREÇÃO CRÍTICA: loadProjects melhorada
   const loadProjects = useCallback(async () => {
     if (!user) return;
     
@@ -454,7 +461,19 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       .select(`
         *,
         client:clients(name),
-        products:project_products(*)
+        products:project_products(
+          id,
+          project_id,
+          product_id,
+          product_name,
+          quantity,
+          unit_price,
+          total_price,
+          item_type,
+          item_description,
+          service_hours,
+          hourly_rate
+        )
       `)
       .eq("user_id", user.id)
       .order('created_at', { ascending: false });
@@ -476,41 +495,72 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       console.log(`📋 [AppContext] Processando projeto ${p.id}:`, {
         order_number: p.order_number,
         description: p.description,
-        raw_products: p.products
+        raw_products: p.products,
+        products_length: Array.isArray(p.products) ? p.products.length : 'não é array'
       });
       
-      const processedProducts = validateArray(p.products).map((pp: any) => {
-        const processed = {
-          id: pp.id,
-          product_id: pp.product_id || null,
-          product_name: pp.product_name || "",
-          quantity: pp.quantity || 0,
-          unit_price: pp.unit_price || 0,
-          total_price: pp.total_price || 0,
-          item_type: pp.item_type || 'produto',
-          item_description: pp.item_description,
-          service_hours: pp.service_hours,
-          hourly_rate: pp.hourly_rate,
-        };
-        
-        console.log(`  ➡️ Produto processado:`, processed);
-        return processed;
-      });
+      let processedProducts: ProjectProduct[] = [];
+      
+      if (p.products && Array.isArray(p.products)) {
+        processedProducts = p.products
+          .filter((pp: any) => pp && typeof pp === 'object')
+          .map((pp: any) => {
+            const processed = {
+              id: pp.id || `temp-${Date.now()}-${Math.random()}`,
+              product_id: pp.product_id || null,
+              product_name: pp.product_name || pp.name || 'Produto sem nome',
+              quantity: Number(pp.quantity) || 1,
+              unit_price: Number(pp.unit_price) || 0,
+              total_price: Number(pp.total_price) || 0,
+              item_type: (pp.item_type || 'produto') as ItemType,
+              item_description: pp.item_description || pp.description || '',
+              service_hours: pp.item_type === 'servico' ? (Number(pp.service_hours) || undefined) : undefined,
+              hourly_rate: pp.item_type === 'servico' ? (Number(pp.hourly_rate) || undefined) : undefined,
+            };
+            
+            console.log(`  ➡️ Produto processado:`, processed);
+            return processed;
+          });
+      } else {
+        console.log(`  ⚠️ Produtos inválidos ou ausentes para projeto ${p.id}:`, p.products);
+      }
       
       console.log(`✅ [AppContext] Projeto ${p.id} processado com ${processedProducts.length} produtos`);
       
       return {
-        ...p,
-        client_name: p.client?.name,
-        products: processedProducts
+        id: p.id,
+        order_number: p.order_number || `P-${p.number || '000'}`,
+        number: p.number || 0,
+        client_id: p.client_id,
+        client_name: p.client?.name || 'Cliente não encontrado',
+        description: p.description || '',
+        status: p.status || 'orcamento',
+        type: p.type || 'orcamento',
+        products: processedProducts,
+        budget: Number(p.budget) || 0,
+        start_date: p.start_date || new Date().toISOString().split('T')[0],
+        end_date: p.end_date || new Date().toISOString().split('T')[0],
+        delivery_deadline_days: Number(p.delivery_deadline_days) || 15,
+        materials_cost: p.materials_cost ? Number(p.materials_cost) : undefined,
+        labor_cost: p.labor_cost ? Number(p.labor_cost) : undefined,
+        profit_margin: p.profit_margin ? Number(p.profit_margin) : undefined,
+        payment_terms: p.payment_terms || undefined,
+        user_id: p.user_id,
+        created_at: p.created_at,
+        updated_at: p.updated_at
       };
     });
     
     console.log(`✅ [AppContext] Total de projetos carregados: ${merged.length}`);
+    console.log('🔍 [AppContext] Projetos processados:', merged.map(p => ({
+      id: p.id,
+      order_number: p.order_number,
+      products_count: p.products?.length || 0
+    })));
+    
     setProjects(merged);
   }, [user]);
-
-  const loadTransactions = useCallback(async () => {
+    const loadTransactions = useCallback(async () => {
     if (!user) return;
     
     const { data, error } = await supabase
@@ -609,6 +659,90 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       })),
     }));
     setPurchases(merged);
+  }, [user]);
+
+  // ✅ NOVO: Método para debug de projeto específico
+  const debugProject = useCallback(async (projectId: string) => {
+    if (!user) return;
+    
+    console.log('🐛 [AppContext] DEBUG - Investigando projeto:', projectId);
+    
+    // 1. Dados básicos do projeto
+    const { data: projectData, error: projectError } = await supabase
+      .from("projects")
+      .select("*")
+      .eq("id", projectId)
+      .eq("user_id", user.id)
+      .single();
+      
+    console.log('🐛 [AppContext] Dados básicos do projeto:', projectData, projectError);
+    
+    // 2. Produtos do projeto
+    const { data: productsData, error: productsError } = await supabase
+      .from("project_products")
+      .select("*")
+      .eq("project_id", projectId);
+      
+    console.log('🐛 [AppContext] Produtos do projeto:', productsData, productsError);
+    
+    // 3. Join completo
+    const { data: joinData, error: joinError } = await supabase
+      .from("projects")
+      .select(`
+        *,
+        client:clients(name),
+        products:project_products(*)
+      `)
+      .eq("id", projectId)
+      .eq("user_id", user.id)
+      .single();
+      
+    console.log('🐛 [AppContext] Join completo:', joinData, joinError);
+    
+    return {
+      project: projectData,
+      products: productsData,
+      joined: joinData,
+      errors: { projectError, productsError, joinError }
+    };
+  }, [user]);
+
+  // ✅ NOVO: Recarregar projeto específico
+  const reloadProject = useCallback(async (projectId: string) => {
+    if (!user) return null;
+    
+    console.log('🔄 [AppContext] Recarregando projeto específico:', projectId);
+    
+    const { data, error } = await supabase
+      .from("projects")
+      .select(`
+        *,
+        client:clients(name),
+        products:project_products(
+          id,
+          project_id,
+          product_id,
+          product_name,
+          quantity,
+          unit_price,
+          total_price,
+          item_type,
+          item_description,
+          service_hours,
+          hourly_rate
+        )
+      `)
+      .eq("id", projectId)
+      .eq("user_id", user.id)
+      .single();
+      
+    if (error) {
+      console.error('❌ [AppContext] Erro ao recarregar projeto:', error);
+      return null;
+    }
+
+    console.log('🔍 [AppContext] Projeto recarregado:', data);
+    return data;
   }, [user]);
 
   const refreshData = useCallback(async () => {
@@ -1005,9 +1139,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     return insertedProject;
   }, [user, loadProjects, createFinancialTransactionsFromProject]);
     
+  // ✅ CORREÇÃO CRÍTICA: updateProject melhorado
   const updateProject = useCallback(async (id: string, data: Partial<Project>) => {
     ensureUser();
     
+    console.log('💾 [AppContext] Atualizando projeto:', { id, data });
+    
+    // ✅ Calcular end_date se necessário
     if (data.delivery_deadline_days && data.start_date) {
       const startDate = new Date(data.start_date);
       const endDate = new Date(startDate);
@@ -1015,6 +1153,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       data.end_date = endDate.toISOString().split('T')[0];
     }
     
+    // ✅ Atualizar dados básicos do projeto
     const { error } = await supabase
       .from("projects")
       .update({ 
@@ -1024,38 +1163,78 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       .eq("id", id)
       .eq("user_id", user!.id);
       
-    if (error) throw error;
+    if (error) {
+      console.error('❌ [AppContext] Erro ao atualizar projeto:', error);
+      throw error;
+    }
 
-    if (data.products) {
-      await supabase
+    // ✅ CORREÇÃO: Melhor gerenciamento dos produtos
+    if (data.products !== undefined) { // Só processa se products foi enviado
+      console.log('🔄 [AppContext] Atualizando produtos do projeto...');
+      console.log('📦 [AppContext] Novos produtos:', data.products);
+      
+      // ✅ 1. Primeiro, remover todos os produtos existentes
+      const { error: deleteError } = await supabase
         .from("project_products")
         .delete()
         .eq("project_id", id);
+        
+      if (deleteError) {
+        console.error('❌ [AppContext] Erro ao remover produtos antigos:', deleteError);
+        throw deleteError;
+      }
 
-      if (data.products.length > 0) {
-        const projectProducts = data.products.map(p => ({
-          project_id: id,
-          product_id: p.product_id || null,
-          product_name: p.product_name,
-          quantity: p.quantity,
-          unit_price: p.unit_price,
-          total_price: p.total_price,
-          item_type: p.item_type || 'produto',
-          item_description: p.item_description,
-          service_hours: p.item_type === 'servico' ? p.service_hours : null,
-          hourly_rate: p.item_type === 'servico' ? p.hourly_rate : null,
-          user_id: user!.id,
-        }));
+      // ✅ 2. Inserir novos produtos (se houver)
+      if (data.products && data.products.length > 0) {
+        const projectProducts = data.products.map(p => {
+          console.log('📋 [AppContext] Processando produto para inserção:', p);
+          
+          // ✅ Validações para serviços
+          if (p.item_type === 'servico') {
+            if (!p.service_hours || p.service_hours <= 0) {
+              throw new Error(`Serviço "${p.product_name}" precisa ter horas definidas`);
+            }
+            if (!p.hourly_rate || p.hourly_rate <= 0) {
+              throw new Error(`Serviço "${p.product_name}" precisa ter valor por hora definido`);
+            }
+          }
+          
+          return {
+            project_id: id,
+            product_id: p.product_id || null,
+            product_name: p.product_name || 'Produto sem nome',
+            quantity: Number(p.quantity) || 1,
+            unit_price: Number(p.unit_price) || 0,
+            total_price: Number(p.total_price) || 0,
+            item_type: p.item_type || 'produto',
+            item_description: p.item_description || '',
+            service_hours: p.item_type === 'servico' ? Number(p.service_hours) : null,
+            hourly_rate: p.item_type === 'servico' ? Number(p.hourly_rate) : null,
+            user_id: user!.id,
+          };
+        }).filter(p => p.quantity > 0); // Remove produtos com quantidade 0
+
+        console.log('✅ [AppContext] Produtos processados para inserção:', projectProducts);
 
         const { error: prodError } = await supabase
           .from("project_products")
           .insert(projectProducts);
           
-        if (prodError) throw prodError;
+        if (prodError) {
+          console.error('❌ [AppContext] Erro ao inserir novos produtos:', prodError);
+          throw prodError;
+        }
+        
+        console.log(`✅ [AppContext] ${projectProducts.length} produtos inseridos com sucesso`);
+      } else {
+        console.log('ℹ️ [AppContext] Nenhum produto para inserir');
       }
     }
 
+    // ✅ 3. Recarregar projetos para garantir sincronização
     await loadProjects();
+    
+    console.log('✅ [AppContext] Projeto atualizado com sucesso');
   }, [user, loadProjects]);
 
   const deleteProject = useCallback(async (id: string) => {
@@ -1336,6 +1515,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     return validateArray(products);
   }, [products]);
 
+  // ✅ CORREÇÃO: getDashboardStats sem campo 'title'
   const getDashboardStats = useCallback(() => {
     const totalClients = clients.length;
     const activeProjects = projects.filter(p => 
@@ -1375,7 +1555,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       p.current_stock <= p.min_stock
     ).length;
 
-    // ✅ CORRIGIDO: Removido p.title que não existe mais
+    // ✅ CORREÇÃO: Usando description em vez de title
     const recentActivity = [
       ...(projects || []).slice(-3).map(p => ({
         type: "project",
@@ -1410,7 +1590,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [clients, projects, sales, purchases, transactions, products]);
 
-  return (
+    return (
     <AppContext.Provider
       value={{
         clients: validateArray(clients),
@@ -1460,6 +1640,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         getAvailableComponents,
         getDashboardStats,
         refreshData,
+        
+        // ✅ NOVOS MÉTODOS PARA DEBUG
+        reloadProject,
+        debugProject,
       }}
     >
       {loading ? (
