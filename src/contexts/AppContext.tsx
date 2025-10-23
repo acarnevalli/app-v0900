@@ -445,37 +445,279 @@ interface AppContextType {
   // MÉTODOS DE INTEGRAÇÃO AUTOMÁTICA
   // ============================================
   
-  // Criar transações a partir de vendas/compras/projetos
-  createTransactionsFromSale: (saleId: string, saleData: Sale) => Promise<void>;
-  createTransactionsFromPurchase: (purchaseId: string, purchaseData: Purchase) => Promise<void>;
-  createTransactionsFromProject: (projectId: string, projectData: Project) => Promise<void>;
+  const createTransactionsFromSale = useCallback(async (
+  saleId: string,
+  saleData: Sale
+) => {
+  ensureUser();
   
+  console.log('🛒 Criando transações a partir da venda:', saleId);
+  
+  // Buscar dados do cliente
+  const client = clients.find(c => c.id === saleData.client_id);
+  
+  // Se a venda já foi completada, criar transação de entrada
+  if (saleData.status === 'completed') {
+    const transaction: CreateFinancialTransactionData = {
+      type: 'income',
+      category: 'Vendas',
+      description: `Venda #${saleId.substring(0, 8)} - ${client?.name || 'Cliente'}`,
+      amount: saleData.total,
+      date: saleData.date,
+      due_date: saleData.date,
+      payment_date: saleData.date,
+      status: 'paid',
+      payment_method: (saleData.payment_method as any) || 'dinheiro',
+      reference_type: 'sale',
+      reference_id: saleId,
+      client_id: saleData.client_id,
+      notes: saleData.notes,
+    };
+    
+    await addFinancialTransaction(transaction);
+    console.log('✅ Transação de venda criada');
+  }
+}, [user, clients, addFinancialTransaction]);
+
+const createTransactionsFromPurchase = useCallback(async (
+  purchaseId: string,
+  purchaseData: Purchase
+) => {
+  ensureUser();
+  
+  console.log('🛍️ Criando transações a partir da compra:', purchaseId);
+  
+  // Buscar dados do fornecedor
+  const supplier = suppliers.find(s => s.id === purchaseData.supplier_id);
+  
+  // Verificar se há informações de pagamento
+  const paymentInfo = (purchaseData as any).payment_info;
+  
+  if (!paymentInfo) {
+    console.warn('⚠️ Compra sem informações de pagamento');
+    return;
+  }
+  
+  // Criar transações para cada parcela
+  const installments = paymentInfo.installments || 1;
+  const installmentValue = paymentInfo.installment_value || (purchaseData.total / installments);
+  const firstDueDate = new Date(paymentInfo.first_due_date || purchaseData.date);
+  
+  for (let i = 0; i < installments; i++) {
+    // Calcular data de vencimento de cada parcela
+    const dueDate = new Date(firstDueDate);
+    dueDate.setMonth(dueDate.getMonth() + i);
+    
+    const transaction: CreateFinancialTransactionData = {
+      type: 'expense',
+      category: 'Compras',
+      description: `Compra NF ${purchaseData.invoice_number || purchaseId.substring(0, 8)} - ${supplier?.name || 'Fornecedor'} - Parcela ${i + 1}/${installments}`,
+      amount: installmentValue,
+      date: purchaseData.date,
+      due_date: dueDate.toISOString().split('T')[0],
+      status: paymentInfo.paid ? 'paid' : 'pending',
+      payment_date: paymentInfo.paid ? paymentInfo.paid_date : undefined,
+      payment_method: paymentInfo.payment_method,
+      installment_number: i + 1,
+      total_installments: installments,
+      reference_type: 'purchase',
+      reference_id: purchaseId,
+      reference_number: purchaseData.invoice_number,
+      supplier_id: purchaseData.supplier_id,
+      notes: purchaseData.notes,
+    };
+    
+    await addFinancialTransaction(transaction);
+  }
+  
+  // Criar transação separada para frete, se houver
+  if (paymentInfo.has_shipping && paymentInfo.shipping_cost > 0) {
+    const shippingTransaction: CreateFinancialTransactionData = {
+      type: 'expense',
+      category: 'Frete',
+      description: `Frete - Compra NF ${purchaseData.invoice_number || purchaseId.substring(0, 8)} - ${paymentInfo.shipping_type || 'Entrega'}`,
+      amount: paymentInfo.shipping_cost,
+      date: purchaseData.date,
+      due_date: paymentInfo.first_due_date || purchaseData.date,
+      status: paymentInfo.paid ? 'paid' : 'pending',
+      payment_date: paymentInfo.paid ? paymentInfo.paid_date : undefined,
+      payment_method: paymentInfo.payment_method,
+      reference_type: 'purchase',
+      reference_id: purchaseId,
+      supplier_id: purchaseData.supplier_id,
+    };
+    
+    await addFinancialTransaction(shippingTransaction);
+  }
+  
+  console.log(`✅ ${installments} transação(ões) de compra criada(s)`);
+}, [user, suppliers, addFinancialTransaction]);
+
+const createTransactionsFromProject = useCallback(async (
+  projectId: string,
+  projectData: Project
+) => {
+  ensureUser();
+  
+  console.log('📋 Criando transações a partir do projeto:', projectId);
+  
+  // Só criar transações para vendas (não orçamentos)
+  if (projectData.type !== 'venda') {
+    console.log('ℹ️ Projeto é orçamento, pulando criação de transações');
+    return;
+  }
+  
+  // Buscar dados do cliente
+  const client = clients.find(c => c.id === projectData.client_id);
+  
+  // Verificar se há termos de pagamento
+  const paymentTerms = projectData.payment_terms;
+  
+  if (!paymentTerms) {
+    console.warn('⚠️ Projeto sem termos de pagamento');
+    return;
+  }
+  
+  // Calcular valor final com desconto
+  const discount = projectData.budget * (paymentTerms.discount_percentage / 100);
+  const finalValue = projectData.budget - discount;
+  const installmentValue = paymentTerms.installment_value || (finalValue / paymentTerms.installments);
+  
+  // Criar transações para cada parcela
+  for (let i = 0; i < paymentTerms.installments; i++) {
+    // Calcular data de vencimento de cada parcela
+    const dueDate = new Date(projectData.start_date);
+    dueDate.setMonth(dueDate.getMonth() + i);
+    
+    const transaction: CreateFinancialTransactionData = {
+      type: 'income',
+      category: 'Vendas',
+      subcategory: 'Projetos',
+      description: `${projectData.order_number} - ${client?.name || 'Cliente'} - Parcela ${i + 1}/${paymentTerms.installments}`,
+      amount: installmentValue,
+      discount: i === 0 ? discount : 0, // Desconto só na primeira parcela
+      date: projectData.start_date,
+      due_date: dueDate.toISOString().split('T')[0],
+      status: 'pending',
+      payment_method: paymentTerms.payment_method,
+      installment_number: i + 1,
+      total_installments: paymentTerms.installments,
+      reference_type: 'project',
+      reference_id: projectId,
+      reference_number: projectData.order_number,
+      client_id: projectData.client_id,
+      project_id: projectId,
+    };
+    
+    await addFinancialTransaction(transaction);
+  }
+  
+  console.log(`✅ ${paymentTerms.installments} transação(ões) do projeto criada(s)`);
+}, [user, clients, addFinancialTransaction]);
+
+
   // ============================================
   // MÉTODOS DE RELATÓRIOS
   // ============================================
   
-  getFinancialSummary: (startDate: string, endDate: string) => {
-    totalIncome: number;
-    totalExpense: number;
-    balance: number;
-    pendingIncome: number;
-    pendingExpense: number;
-  };
+const getFinancialSummary = useCallback((
+  startDate: string,
+  endDate: string
+) => {
+  const transactions = getTransactionsByPeriod(startDate, endDate);
   
-  getCashFlow: (months: number) => Array<{
+  const totalIncome = transactions
+    .filter(t => t.type === 'income' && t.status === 'paid')
+    .reduce((sum, t) => sum + (t.paid_amount || t.amount), 0);
+  
+  const totalExpense = transactions
+    .filter(t => t.type === 'expense' && t.status === 'paid')
+    .reduce((sum, t) => sum + (t.paid_amount || t.amount), 0);
+  
+  const pendingIncome = transactions
+    .filter(t => t.type === 'income' && t.status === 'pending')
+    .reduce((sum, t) => sum + t.amount, 0);
+  
+  const pendingExpense = transactions
+    .filter(t => t.type === 'expense' && t.status === 'pending')
+    .reduce((sum, t) => sum + t.amount, 0);
+  
+  return {
+    totalIncome,
+    totalExpense,
+    balance: totalIncome - totalExpense,
+    pendingIncome,
+    pendingExpense,
+  };
+}, [getTransactionsByPeriod]);
+
+const getCashFlow = useCallback((months: number) => {
+  const result: Array<{
     month: string;
     income: number;
     expense: number;
     balance: number;
-  }>;
+  }> = [];
   
-  getExpensesByCategory: (startDate: string, endDate: string) => Array<{
-    category: string;
-    total: number;
-    percentage: number;
-  }>;
-}
+  const today = new Date();
+  
+  for (let i = 0; i < months; i++) {
+    const monthDate = new Date(today.getFullYear(), today.getMonth() - i, 1);
+    const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+    const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+    
+    const monthTransactions = getTransactionsByPeriod(
+      monthStart.toISOString().split('T')[0],
+      monthEnd.toISOString().split('T')[0]
+    );
+    
+    const income = monthTransactions
+      .filter(t => t.type === 'income' && t.status === 'paid')
+      .reduce((sum, t) => sum + (t.paid_amount || t.amount), 0);
+    
+    const expense = monthTransactions
+      .filter(t => t.type === 'expense' && t.status === 'paid')
+      .reduce((sum, t) => sum + (t.paid_amount || t.amount), 0);
+    
+    result.push({
+      month: monthDate.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }),
+      income,
+      expense,
+      balance: income - expense,
+    });
+  }
+  
+  return result.reverse();
+}, [getTransactionsByPeriod]);
 
+const getExpensesByCategory = useCallback((
+  startDate: string,
+  endDate: string
+) => {
+  const transactions = getTransactionsByPeriod(startDate, endDate);
+  
+  const expenses = transactions.filter(t => 
+    t.type === 'expense' && t.status === 'paid'
+  );
+  
+  const total = expenses.reduce((sum, t) => sum + (t.paid_amount || t.amount), 0);
+  
+  const byCategory: { [key: string]: number } = {};
+  
+  expenses.forEach(t => {
+    const category = t.category || 'Sem categoria';
+    byCategory[category] = (byCategory[category] || 0) + (t.paid_amount || t.amount);
+  });
+  
+  return Object.entries(byCategory)
+    .map(([category, amount]) => ({
+      category,
+      total: amount,
+      percentage: total > 0 ? (amount / total) * 100 : 0,
+    }))
+    .sort((a, b) => b.total - a.total);
+}, [getTransactionsByPeriod]);
+  
    // ============================================
   // ✅ NOVOS MÉTODOS PARA DEBUG
  // ============================================
@@ -1685,136 +1927,141 @@ const deleteCostCenter = useCallback(async (id: string) => {
 
   // ✅ FUNÇÃO addProject CORRIGIDA
   const addProject = useCallback(async (data: Omit<Project, "id" | "created_at" | "updated_at" | "number" | "order_number" | "user_id">) => {
-    ensureUser();
+  ensureUser();
+  
+  console.log('🆕 [AppContext] Criando novo projeto...');
+  console.log('🆕 [AppContext] Dados recebidos:', data);
+  
+  if (!data.description || data.description.trim() === '') {
+    throw new Error('Descrição é obrigatória');
+  }
+  
+  if (!data.client_id) {
+    throw new Error('Cliente é obrigatório');
+  }
+  
+  if (!data.products || data.products.length === 0) {
+    throw new Error('Adicione pelo menos um produto ou serviço');
+  }
+  
+  const deliveryDeadlineDays = data.delivery_deadline_days || 15;
+  const startDate = new Date(data.start_date);
+  const endDate = new Date(startDate);
+  endDate.setDate(endDate.getDate() + deliveryDeadlineDays);
+  
+  const newProject = {
+    client_id: data.client_id,
+    description: data.description.trim(),
+    status: data.status,
+    type: data.type,
+    budget: data.budget,
+    start_date: data.start_date,
+    end_date: data.end_date || endDate.toISOString().split('T')[0],
+    delivery_deadline_days: deliveryDeadlineDays,
+    materials_cost: data.materials_cost,
+    labor_cost: data.labor_cost,
+    profit_margin: data.profit_margin,
+    payment_terms: data.payment_terms,
+    number: 0,
+    user_id: user!.id,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  
+  console.log('🆕 [AppContext] Criando projeto no banco...');
+  const { data: insertedProject, error } = await supabase
+    .from("projects")
+    .insert([cleanUndefined(newProject)])
+    .select()
+    .single();
     
-    console.log('🆕 [AppContext] Criando novo projeto...');
-    console.log('🆕 [AppContext] Dados recebidos:', data);
-    
-    if (!data.description || data.description.trim() === '') {
-      throw new Error('Descrição é obrigatória');
-    }
-    
-    if (!data.client_id) {
-      throw new Error('Cliente é obrigatório');
-    }
-    
-    if (!data.products || data.products.length === 0) {
-      throw new Error('Adicione pelo menos um produto ou serviço');
-    }
-    
-    const deliveryDeadlineDays = data.delivery_deadline_days || 15;
-    const startDate = new Date(data.start_date);
-    const endDate = new Date(startDate);
-    endDate.setDate(endDate.getDate() + deliveryDeadlineDays);
-    
-    const newProject = {
-      client_id: data.client_id,
-      description: data.description.trim(),
-      status: data.status,
-      type: data.type,
-      budget: data.budget,
-      start_date: data.start_date,
-      end_date: data.end_date || endDate.toISOString().split('T')[0],
-      delivery_deadline_days: deliveryDeadlineDays,
-      materials_cost: data.materials_cost,
-      labor_cost: data.labor_cost,
-      profit_margin: data.profit_margin,
-      payment_terms: data.payment_terms,
-      number: 0,
-      user_id: user!.id,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    
-    console.log('🆕 [AppContext] Criando projeto no banco...');
-    const { data: insertedProject, error } = await supabase
-      .from("projects")
-      .insert([cleanUndefined(newProject)])
-      .select()
-      .single();
-      
-    if (error) {
-      console.error('❌ [AppContext] Erro ao criar projeto:', error);
-      throw error;
-    }
-    
-    console.log('✅ [AppContext] Projeto criado com ID:', insertedProject.id);
+  if (error) {
+    console.error('❌ [AppContext] Erro ao criar projeto:', error);
+    throw error;
+  }
+  
+  console.log('✅ [AppContext] Projeto criado com ID:', insertedProject.id);
 
-    if (data.products && data.products.length > 0) {
-      console.log('🆕 [AppContext] Preparando produtos para inserção...');
-      
-      const projectProducts = data.products.map(p => {
-        if (p.item_type === 'servico') {
-          if (!p.service_hours || p.service_hours <= 0) {
-            throw new Error(`Serviço "${p.product_name}" precisa ter horas definidas`);
-          }
-          if (!p.hourly_rate || p.hourly_rate <= 0) {
-            throw new Error(`Serviço "${p.product_name}" precisa ter valor por hora definido`);
-          }
+  if (data.products && data.products.length > 0) {
+    console.log('🆕 [AppContext] Preparando produtos para inserção...');
+    
+    const projectProducts = data.products.map(p => {
+      if (p.item_type === 'servico') {
+        if (!p.service_hours || p.service_hours <= 0) {
+          throw new Error(`Serviço "${p.product_name}" precisa ter horas definidas`);
         }
-        
-        const processedProduct = {
-          project_id: insertedProject.id,
-          product_id: p.product_id || null,
-          product_name: p.product_name,
-          quantity: p.quantity,
-          unit_price: p.unit_price,
-          total_price: p.total_price,
-          item_type: p.item_type || 'produto',
-          item_description: p.item_description,
-          service_hours: p.item_type === 'servico' ? p.service_hours : null,
-          hourly_rate: p.item_type === 'servico' ? p.hourly_rate : null,
-          user_id: user!.id,
-        };
-        
-        console.log('🆕 [AppContext] Produto processado:', processedProduct);
-        return processedProduct;
-      }).filter(p => p.quantity > 0);
-
-      if (projectProducts.length > 0) {
-        console.log(`🆕 [AppContext] Inserindo ${projectProducts.length} produtos...`);
-
-        // ✅ CORREÇÃO APLICADA:
-        const { error: prodError, data: insertedProducts } = await supabase
-          .from("project_products")
-          .insert(projectProducts)
-          .select();
-        
-        if (prodError) {
-          console.error('❌ [AppContext] ERRO DETALHADO ao inserir produtos (addProject):', {
-            error: prodError,
-            code: prodError.code,
-            message: prodError.message,
-            details: prodError.details,
-            hint: prodError.hint,
-            products: projectProducts,
-            projectId: insertedProject.id
-          });
-          
-          alert(`Erro ao salvar produtos no novo projeto: ${prodError.message}`);
-          throw prodError;
+        if (!p.hourly_rate || p.hourly_rate <= 0) {
+          throw new Error(`Serviço "${p.product_name}" precisa ter valor por hora definido`);
         }
-        
-        console.log('✅ [AppContext] Produtos inseridos no novo projeto:', insertedProducts);
-        console.log(`🎉 [AppContext] ${projectProducts.length} produtos inseridos no banco`);
       }
-    }
+      
+      const processedProduct = {
+        project_id: insertedProject.id,
+        product_id: p.product_id || null,
+        product_name: p.product_name,
+        quantity: p.quantity,
+        unit_price: p.unit_price,
+        total_price: p.total_price,
+        item_type: p.item_type || 'produto',
+        item_description: p.item_description,
+        service_hours: p.item_type === 'servico' ? p.service_hours : null,
+        hourly_rate: p.item_type === 'servico' ? p.hourly_rate : null,
+        user_id: user!.id,
+      };
+      
+      console.log('🆕 [AppContext] Produto processado:', processedProduct);
+      return processedProduct;
+    }).filter(p => p.quantity > 0);
 
-    // ✅ Criar transações financeiras se for venda
-    if (data.type === 'venda') {
-      try {
-        await createFinancialTransactionsFromProject(insertedProject.id, {
-          ...data,
-          order_number: insertedProject.order_number
+    if (projectProducts.length > 0) {
+      console.log(`🆕 [AppContext] Inserindo ${projectProducts.length} produtos...`);
+
+      const { error: prodError, data: insertedProducts } = await supabase
+        .from("project_products")
+        .insert(projectProducts)
+        .select();
+      
+      if (prodError) {
+        console.error('❌ [AppContext] ERRO DETALHADO ao inserir produtos (addProject):', {
+          error: prodError,
+          code: prodError.code,
+          message: prodError.message,
+          details: prodError.details,
+          hint: prodError.hint,
+          products: projectProducts,
+          projectId: insertedProject.id
         });
-      } catch (error) {
-        console.error('Erro ao criar transações, mas projeto foi salvo:', error);
+        
+        alert(`Erro ao salvar produtos no novo projeto: ${prodError.message}`);
+        throw prodError;
       }
+      
+      console.log('✅ [AppContext] Produtos inseridos no novo projeto:', insertedProducts);
+      console.log(`🎉 [AppContext] ${projectProducts.length} produtos inseridos no banco`);
     }
+  }
 
-    await loadProjects();
-    return insertedProject;
-  }, [user, loadProjects, createFinancialTransactionsFromProject]);
+  // ✅ CRIAR TRANSAÇÕES FINANCEIRAS SE FOR VENDA (APENAS UMA VEZ)
+  if (insertedProject && insertedProject.id && data.type === 'venda') {
+    try {
+      await createTransactionsFromProject(insertedProject.id, {
+        ...data,
+        id: insertedProject.id,
+        order_number: insertedProject.order_number,
+        client_id: data.client_id,
+        start_date: data.start_date,
+        budget: data.budget,
+        payment_terms: data.payment_terms,
+      } as Project);
+      console.log('✅ Transações financeiras criadas para o projeto');
+    } catch (error) {
+      console.error('❌ Erro ao criar transações financeiras, mas projeto foi salvo:', error);
+    }
+  }
+
+  await loadProjects();
+  return insertedProject;
+}, [user, loadProjects, createTransactionsFromProject]); // ✅ adicionar na dependência
     
   // ✅ FUNÇÃO updateProject CORRIGIDA
   const updateProject = useCallback(async (id: string, data: Partial<Project>) => {
@@ -2100,70 +2347,75 @@ const deleteCostCenter = useCallback(async (id: string) => {
   }, [user, loadSales]);
 
     const addPurchase = useCallback(async (purchase: Omit<Purchase, 'id' | 'created_at' | 'updated_at' | 'user_id'>) => {
-    ensureUser();
+  ensureUser();
 
-    const newPurchase = {
-      date: purchase.date,
-      supplier_id: purchase.supplier_id,
-      total: purchase.total,
-      status: purchase.status,
-      invoice_number: purchase.invoice_number,
-      notes: purchase.notes,
-      user_id: user!.id,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+  const newPurchase = {
+    date: purchase.date,
+    supplier_id: purchase.supplier_id,
+    total: purchase.total,
+    status: purchase.status,
+    invoice_number: purchase.invoice_number,
+    notes: purchase.notes,
+    user_id: user!.id,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
 
-    const { data: insertedPurchase, error: purchaseError } = await supabase
-      .from('purchases')
-      .insert([newPurchase])
-      .select()
-      .single();
+  const { data: insertedPurchase, error: purchaseError } = await supabase
+    .from('purchases')
+    .insert([newPurchase])
+    .select()
+    .single();
 
-    if (purchaseError) throw purchaseError;
+  if (purchaseError) throw purchaseError;
 
-    if (purchase.items && purchase.items.length > 0) {
-      const purchaseItems = purchase.items.map(item => ({
-        purchase_id: insertedPurchase.id,
+  if (purchase.items && purchase.items.length > 0) {
+    const purchaseItems = purchase.items.map(item => ({
+      purchase_id: insertedPurchase.id,
+      product_id: item.product_id,
+      product_name: item.product_name,
+      quantity: item.quantity,
+      unit_cost: item.unit_cost,
+      total: item.total,
+    })).filter(item => item.quantity > 0);
+
+    const { error: itemsError } = await supabase.from('purchase_items').insert(purchaseItems);
+    if (itemsError) throw itemsError;
+  }
+
+  if (purchase.status === 'received') {
+    const movements = purchase.items?.map(item => 
+      addStockMovement({
         product_id: item.product_id,
         product_name: item.product_name,
+        movement_type: 'entrada',
         quantity: item.quantity,
-        unit_cost: item.unit_cost,
-        total: item.total,
-      })).filter(item => item.quantity > 0);
-
-      const { error: itemsError } = await supabase.from('purchase_items').insert(purchaseItems);
-      if (itemsError) throw itemsError;
-    }
-
-    if (purchase.status === 'received') {
-      const movements = purchase.items?.map(item => 
-        addStockMovement({
-          product_id: item.product_id,
-          product_name: item.product_name,
-          movement_type: 'entrada',
-          quantity: item.quantity,
-          unit_price: item.unit_cost,
-          total_value: item.total,
-          reference_type: 'manual',
-          date: purchase.date,
-          notes: `Compra #${insertedPurchase.id}`,
-        })
-      ) || [];
-
-      await Promise.all(movements);
-
-      await addTransaction({
-        type: 'saida',
-        category: 'compra',
-        description: `Compra do fornecedor #${purchase.supplier_id}`,
-        amount: purchase.total,
+        unit_price: item.unit_cost,
+        total_value: item.total,
+        reference_type: 'manual',
         date: purchase.date,
-      });
-    }
+        notes: `Compra #${insertedPurchase.id}`,
+      })
+    ) || [];
 
-    await refreshData();
-  }, [user, addStockMovement, addTransaction, refreshData]);
+    await Promise.all(movements);
+
+    await addTransaction({
+      type: 'saida',
+      category: 'compra',
+      description: `Compra do fornecedor #${purchase.supplier_id}`,
+      amount: purchase.total,
+      date: purchase.date,
+    });
+  }
+
+  if (insertedPurchase && insertedPurchase.id) {
+    await createTransactionsFromPurchase(insertedPurchase.id, purchase);
+  }
+
+  await refreshData();
+}, [user, addStockMovement, addTransaction, refreshData, createTransactionsFromPurchase]);
+  
 
   const updatePurchase = useCallback(async (id: string, purchase: Partial<Purchase>) => {
     ensureUser();
