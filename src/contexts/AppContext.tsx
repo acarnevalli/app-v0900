@@ -975,6 +975,372 @@ const loadCostCenters = useCallback(async () => {
     };
   }, [user]);
 
+  // ============================================
+// MÉTODOS CRUD - TRANSAÇÕES FINANCEIRAS
+// ============================================
+
+const addFinancialTransaction = useCallback(async (
+  data: CreateFinancialTransactionData
+): Promise<FinancialTransaction> => {
+  ensureUser();
+  
+  console.log('💰 Criando transação financeira:', data);
+  
+  const newTransaction = {
+    ...cleanUndefined(data),
+    user_id: user!.id,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  
+  const { data: inserted, error } = await supabase
+    .from('financial_transactions')
+    .insert([newTransaction])
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('❌ Erro ao criar transação:', error);
+    throw error;
+  }
+  
+  console.log('✅ Transação criada:', inserted);
+  
+  // ✅ Atualizar saldo da conta bancária se especificado
+  if (data.bank_account_id && data.status === 'paid') {
+    await updateBankAccountBalance(
+      data.bank_account_id,
+      data.paid_amount || data.amount,
+      data.type === 'income' ? 'add' : 'subtract'
+    );
+  }
+  
+  await loadFinancialTransactions();
+  return inserted;
+}, [user, loadFinancialTransactions]);
+
+const updateFinancialTransaction = useCallback(async (
+  id: string,
+  data: UpdateFinancialTransactionData
+) => {
+  ensureUser();
+  
+  console.log('💰 Atualizando transação:', id, data);
+  
+  const { error } = await supabase
+    .from('financial_transactions')
+    .update({
+      ...cleanUndefined(data),
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', id)
+    .eq('user_id', user!.id);
+  
+  if (error) {
+    console.error('❌ Erro ao atualizar transação:', error);
+    throw error;
+  }
+  
+  console.log('✅ Transação atualizada');
+  await loadFinancialTransactions();
+}, [user, loadFinancialTransactions]);
+
+const deleteFinancialTransaction = useCallback(async (id: string) => {
+  ensureUser();
+  
+  console.log('🗑️ Deletando transação:', id);
+  
+  const { error } = await supabase
+    .from('financial_transactions')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', user!.id);
+  
+  if (error) {
+    console.error('❌ Erro ao deletar transação:', error);
+    throw error;
+  }
+  
+  console.log('✅ Transação deletada');
+  await loadFinancialTransactions();
+}, [user, loadFinancialTransactions]);
+
+const payTransaction = useCallback(async (
+  id: string,
+  paymentData: PayTransactionData
+) => {
+  ensureUser();
+  
+  console.log('💳 Marcando transação como paga:', id, paymentData);
+  
+  // Buscar transação atual
+  const { data: transaction, error: fetchError } = await supabase
+    .from('financial_transactions')
+    .select('*')
+    .eq('id', id)
+    .eq('user_id', user!.id)
+    .single();
+  
+  if (fetchError || !transaction) {
+    console.error('❌ Transação não encontrada');
+    throw new Error('Transação não encontrada');
+  }
+  
+  // Atualizar transação
+  const { error } = await supabase
+    .from('financial_transactions')
+    .update({
+      status: 'paid',
+      payment_date: paymentData.payment_date,
+      paid_amount: paymentData.paid_amount || transaction.amount,
+      payment_method: paymentData.payment_method || transaction.payment_method,
+      bank_account_id: paymentData.bank_account_id || transaction.bank_account_id,
+      notes: paymentData.notes ? `${transaction.notes || ''}\n${paymentData.notes}` : transaction.notes,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', id)
+    .eq('user_id', user!.id);
+  
+  if (error) {
+    console.error('❌ Erro ao pagar transação:', error);
+    throw error;
+  }
+  
+  // Atualizar saldo da conta bancária
+  if (paymentData.bank_account_id) {
+    await updateBankAccountBalance(
+      paymentData.bank_account_id,
+      paymentData.paid_amount || transaction.amount,
+      transaction.type === 'income' ? 'add' : 'subtract'
+    );
+  }
+  
+  console.log('✅ Transação paga com sucesso');
+  await loadFinancialTransactions();
+}, [user, loadFinancialTransactions]);
+
+const getTransactionsByPeriod = useCallback((
+  startDate: string,
+  endDate: string
+): FinancialTransaction[] => {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  
+  return financialTransactions.filter(t => {
+    const transDate = new Date(t.date);
+    return transDate >= start && transDate <= end;
+  });
+}, [financialTransactions]);
+
+const getOverdueTransactions = useCallback((): FinancialTransaction[] => {
+  const today = new Date();
+  
+  return financialTransactions.filter(t => {
+    const dueDate = new Date(t.due_date);
+    return t.status === 'pending' && dueDate < today;
+  });
+}, [financialTransactions]);
+
+// ============================================
+// MÉTODOS CRUD - CONTAS BANCÁRIAS
+// ============================================
+
+const addBankAccount = useCallback(async (
+  data: Omit<BankAccount, 'id' | 'created_at' | 'updated_at' | 'user_id' | 'current_balance'>
+) => {
+  ensureUser();
+  
+  console.log('🏦 Criando conta bancária:', data);
+  
+  const newAccount = {
+    ...cleanUndefined(data),
+    current_balance: data.initial_balance,
+    user_id: user!.id,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  
+  const { error } = await supabase
+    .from('bank_accounts')
+    .insert([newAccount]);
+  
+  if (error) {
+    console.error('❌ Erro ao criar conta:', error);
+    throw error;
+  }
+  
+  console.log('✅ Conta bancária criada');
+  await loadBankAccounts();
+}, [user, loadBankAccounts]);
+
+const updateBankAccount = useCallback(async (
+  id: string,
+  data: Partial<BankAccount>
+) => {
+  ensureUser();
+  
+  console.log('🏦 Atualizando conta bancária:', id, data);
+  
+  const { error } = await supabase
+    .from('bank_accounts')
+    .update({
+      ...cleanUndefined(data),
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', id)
+    .eq('user_id', user!.id);
+  
+  if (error) {
+    console.error('❌ Erro ao atualizar conta:', error);
+    throw error;
+  }
+  
+  console.log('✅ Conta bancária atualizada');
+  await loadBankAccounts();
+}, [user, loadBankAccounts]);
+
+const deleteBankAccount = useCallback(async (id: string) => {
+  ensureUser();
+  
+  console.log('🗑️ Deletando conta bancária:', id);
+  
+  const { error } = await supabase
+    .from('bank_accounts')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', user!.id);
+  
+  if (error) {
+    console.error('❌ Erro ao deletar conta:', error);
+    throw error;
+  }
+  
+  console.log('✅ Conta bancária deletada');
+  await loadBankAccounts();
+}, [user, loadBankAccounts]);
+
+const updateBankAccountBalance = useCallback(async (
+  accountId: string,
+  amount: number,
+  operation: 'add' | 'subtract'
+) => {
+  ensureUser();
+  
+  console.log('💰 Atualizando saldo da conta:', accountId, amount, operation);
+  
+  // Buscar conta atual
+  const { data: account, error: fetchError } = await supabase
+    .from('bank_accounts')
+    .select('current_balance')
+    .eq('id', accountId)
+    .eq('user_id', user!.id)
+    .single();
+  
+  if (fetchError || !account) {
+    console.error('❌ Conta não encontrada');
+    return;
+  }
+  
+  const newBalance = operation === 'add'
+    ? account.current_balance + amount
+    : account.current_balance - amount;
+  
+  const { error } = await supabase
+    .from('bank_accounts')
+    .update({
+      current_balance: newBalance,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', accountId)
+    .eq('user_id', user!.id);
+  
+  if (error) {
+    console.error('❌ Erro ao atualizar saldo:', error);
+    throw error;
+  }
+  
+  console.log('✅ Saldo atualizado:', newBalance);
+  await loadBankAccounts();
+}, [user, loadBankAccounts]);
+
+// ============================================
+// MÉTODOS CRUD - CENTROS DE CUSTO
+// ============================================
+
+const addCostCenter = useCallback(async (
+  data: Omit<CostCenter, 'id' | 'created_at' | 'updated_at' | 'user_id' | 'parent_name'>
+) => {
+  ensureUser();
+  
+  console.log('🎯 Criando centro de custo:', data);
+  
+  const newCostCenter = {
+    ...cleanUndefined(data),
+    user_id: user!.id,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  
+  const { error } = await supabase
+    .from('cost_centers')
+    .insert([newCostCenter]);
+  
+  if (error) {
+    console.error('❌ Erro ao criar centro de custo:', error);
+    throw error;
+  }
+  
+  console.log('✅ Centro de custo criado');
+  await loadCostCenters();
+}, [user, loadCostCenters]);
+
+const updateCostCenter = useCallback(async (
+  id: string,
+  data: Partial<CostCenter>
+) => {
+  ensureUser();
+  
+  console.log('🎯 Atualizando centro de custo:', id, data);
+  
+  const { error } = await supabase
+    .from('cost_centers')
+    .update({
+      ...cleanUndefined(data),
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', id)
+    .eq('user_id', user!.id);
+  
+  if (error) {
+    console.error('❌ Erro ao atualizar centro de custo:', error);
+    throw error;
+  }
+  
+  console.log('✅ Centro de custo atualizado');
+  await loadCostCenters();
+}, [user, loadCostCenters]);
+
+const deleteCostCenter = useCallback(async (id: string) => {
+  ensureUser();
+  
+  console.log('🗑️ Deletando centro de custo:', id);
+  
+  const { error } = await supabase
+    .from('cost_centers')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', user!.id);
+  
+  if (error) {
+    console.error('❌ Erro ao deletar centro de custo:', error);
+    throw error;
+  }
+  
+  console.log('✅ Centro de custo deletado');
+  await loadCostCenters();
+}, [user, loadCostCenters]);
+
+
   const reloadProject = useCallback(async (projectId: string) => {
     if (!user) return null;
     
