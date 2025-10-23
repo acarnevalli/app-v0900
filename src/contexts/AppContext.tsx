@@ -2355,9 +2355,10 @@ const deleteCostCenter = useCallback(async (id: string) => {
         addFinancialTransaction,
         updateFinancialTransaction,
         deleteFinancialTransaction,
+        
         payTransaction,
         getTransactionsByPeriod:,
-        getOverdueTransactions:,
+        getOverdueTransactions,
       
         addBankAccount,
         updateBankAccount,
