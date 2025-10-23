@@ -1028,7 +1028,7 @@ const loadCostCenters = useCallback(async () => {
       safeLoad(loadSales, "Vendas"),
       safeLoad(loadPurchases, "Compras"),
       safeLoad(loadCategories, "Categorias"),
-      safeLoad(loadFinancialTransactions, "Transações Financeiras"),
+      //safeLoad(loadFinancialTransactions, "Transações Financeiras"),
     safeLoad(loadBankAccounts, "Contas Bancárias"),
     safeLoad(loadCostCenters, "Centros de Custo"),
     ]);
@@ -1050,7 +1050,7 @@ const loadCostCenters = useCallback(async () => {
     loadSales,
     loadPurchases,
     loadCategories,
-    loadFinancialTransactions,
+    //loadFinancialTransactions,
     loadBankAccounts,
     loadCostCenters
   ]);
