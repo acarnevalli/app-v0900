@@ -437,7 +437,8 @@ interface AppContextType {
     pendingPayments: number;
     lowStockItems: number;
     recentActivity: any[];
-  };
+  }
+};
 
   refreshData: () => Promise<void>;
 
