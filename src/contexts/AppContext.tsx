@@ -240,7 +240,6 @@ export interface Category {
   created_at: string;
   updated_at: string;
 }
-
 // ============================================
 // INTERFACES FINANCEIRAS
 // ============================================
@@ -437,293 +436,45 @@ interface AppContextType {
     pendingPayments: number;
     lowStockItems: number;
     recentActivity: any[];
-  }
-};
+  };
 
   refreshData: () => Promise<void>;
 
   // ============================================
   // MÉTODOS DE INTEGRAÇÃO AUTOMÁTICA
   // ============================================
-  
-  const createTransactionsFromSale = useCallback(async (
-  saleId: string,
-  saleData: Sale
-) => {
-  ensureUser();
-  
-  console.log('🛒 Criando transações a partir da venda:', saleId);
-  
-  // Buscar dados do cliente
-  const client = clients.find(c => c.id === saleData.client_id);
-  
-  // Se a venda já foi completada, criar transação de entrada
-  if (saleData.status === 'completed') {
-    const transaction: CreateFinancialTransactionData = {
-      type: 'income',
-      category: 'Vendas',
-      description: `Venda #${saleId.substring(0, 8)} - ${client?.name || 'Cliente'}`,
-      amount: saleData.total,
-      date: saleData.date,
-      due_date: saleData.date,
-      payment_date: saleData.date,
-      status: 'paid',
-      payment_method: (saleData.payment_method as any) || 'dinheiro',
-      reference_type: 'sale',
-      reference_id: saleId,
-      client_id: saleData.client_id,
-      notes: saleData.notes,
-    };
-    
-    await addFinancialTransaction(transaction);
-    console.log('✅ Transação de venda criada');
-  }
-}, [user, clients, addFinancialTransaction]);
-
-const createTransactionsFromPurchase = useCallback(async (
-  purchaseId: string,
-  purchaseData: Purchase
-) => {
-  ensureUser();
-  
-  console.log('🛍️ Criando transações a partir da compra:', purchaseId);
-  
-  // Buscar dados do fornecedor
-  const supplier = suppliers.find(s => s.id === purchaseData.supplier_id);
-  
-  // Verificar se há informações de pagamento
-  const paymentInfo = (purchaseData as any).payment_info;
-  
-  if (!paymentInfo) {
-    console.warn('⚠️ Compra sem informações de pagamento');
-    return;
-  }
-  
-  // Criar transações para cada parcela
-  const installments = paymentInfo.installments || 1;
-  const installmentValue = paymentInfo.installment_value || (purchaseData.total / installments);
-  const firstDueDate = new Date(paymentInfo.first_due_date || purchaseData.date);
-  
-  for (let i = 0; i < installments; i++) {
-    // Calcular data de vencimento de cada parcela
-    const dueDate = new Date(firstDueDate);
-    dueDate.setMonth(dueDate.getMonth() + i);
-    
-    const transaction: CreateFinancialTransactionData = {
-      type: 'expense',
-      category: 'Compras',
-      description: `Compra NF ${purchaseData.invoice_number || purchaseId.substring(0, 8)} - ${supplier?.name || 'Fornecedor'} - Parcela ${i + 1}/${installments}`,
-      amount: installmentValue,
-      date: purchaseData.date,
-      due_date: dueDate.toISOString().split('T')[0],
-      status: paymentInfo.paid ? 'paid' : 'pending',
-      payment_date: paymentInfo.paid ? paymentInfo.paid_date : undefined,
-      payment_method: paymentInfo.payment_method,
-      installment_number: i + 1,
-      total_installments: installments,
-      reference_type: 'purchase',
-      reference_id: purchaseId,
-      reference_number: purchaseData.invoice_number,
-      supplier_id: purchaseData.supplier_id,
-      notes: purchaseData.notes,
-    };
-    
-    await addFinancialTransaction(transaction);
-  }
-  
-  // Criar transação separada para frete, se houver
-  if (paymentInfo.has_shipping && paymentInfo.shipping_cost > 0) {
-    const shippingTransaction: CreateFinancialTransactionData = {
-      type: 'expense',
-      category: 'Frete',
-      description: `Frete - Compra NF ${purchaseData.invoice_number || purchaseId.substring(0, 8)} - ${paymentInfo.shipping_type || 'Entrega'}`,
-      amount: paymentInfo.shipping_cost,
-      date: purchaseData.date,
-      due_date: paymentInfo.first_due_date || purchaseData.date,
-      status: paymentInfo.paid ? 'paid' : 'pending',
-      payment_date: paymentInfo.paid ? paymentInfo.paid_date : undefined,
-      payment_method: paymentInfo.payment_method,
-      reference_type: 'purchase',
-      reference_id: purchaseId,
-      supplier_id: purchaseData.supplier_id,
-    };
-    
-    await addFinancialTransaction(shippingTransaction);
-  }
-  
-  console.log(`✅ ${installments} transação(ões) de compra criada(s)`);
-}, [user, suppliers, addFinancialTransaction]);
-
-const createTransactionsFromProject = useCallback(async (
-  projectId: string,
-  projectData: Project
-) => {
-  ensureUser();
-  
-  console.log('📋 Criando transações a partir do projeto:', projectId);
-  
-  // Só criar transações para vendas (não orçamentos)
-  if (projectData.type !== 'venda') {
-    console.log('ℹ️ Projeto é orçamento, pulando criação de transações');
-    return;
-  }
-  
-  // Buscar dados do cliente
-  const client = clients.find(c => c.id === projectData.client_id);
-  
-  // Verificar se há termos de pagamento
-  const paymentTerms = projectData.payment_terms;
-  
-  if (!paymentTerms) {
-    console.warn('⚠️ Projeto sem termos de pagamento');
-    return;
-  }
-  
-  // Calcular valor final com desconto
-  const discount = projectData.budget * (paymentTerms.discount_percentage / 100);
-  const finalValue = projectData.budget - discount;
-  const installmentValue = paymentTerms.installment_value || (finalValue / paymentTerms.installments);
-  
-  // Criar transações para cada parcela
-  for (let i = 0; i < paymentTerms.installments; i++) {
-    // Calcular data de vencimento de cada parcela
-    const dueDate = new Date(projectData.start_date);
-    dueDate.setMonth(dueDate.getMonth() + i);
-    
-    const transaction: CreateFinancialTransactionData = {
-      type: 'income',
-      category: 'Vendas',
-      subcategory: 'Projetos',
-      description: `${projectData.order_number} - ${client?.name || 'Cliente'} - Parcela ${i + 1}/${paymentTerms.installments}`,
-      amount: installmentValue,
-      discount: i === 0 ? discount : 0, // Desconto só na primeira parcela
-      date: projectData.start_date,
-      due_date: dueDate.toISOString().split('T')[0],
-      status: 'pending',
-      payment_method: paymentTerms.payment_method,
-      installment_number: i + 1,
-      total_installments: paymentTerms.installments,
-      reference_type: 'project',
-      reference_id: projectId,
-      reference_number: projectData.order_number,
-      client_id: projectData.client_id,
-      project_id: projectId,
-    };
-    
-    await addFinancialTransaction(transaction);
-  }
-  
-  console.log(`✅ ${paymentTerms.installments} transação(ões) do projeto criada(s)`);
-}, [user, clients, addFinancialTransaction]);
-
+  createTransactionsFromSale: (saleId: string, saleData: Sale) => Promise<void>;
+  createTransactionsFromPurchase: (purchaseId: string, purchaseData: Purchase) => Promise<void>;
+  createTransactionsFromProject: (projectId: string, projectData: Project) => Promise<void>;
 
   // ============================================
   // MÉTODOS DE RELATÓRIOS
   // ============================================
-  
-const getFinancialSummary = useCallback((
-  startDate: string,
-  endDate: string
-) => {
-  const transactions = getTransactionsByPeriod(startDate, endDate);
-  
-  const totalIncome = transactions
-    .filter(t => t.type === 'income' && t.status === 'paid')
-    .reduce((sum, t) => sum + (t.paid_amount || t.amount), 0);
-  
-  const totalExpense = transactions
-    .filter(t => t.type === 'expense' && t.status === 'paid')
-    .reduce((sum, t) => sum + (t.paid_amount || t.amount), 0);
-  
-  const pendingIncome = transactions
-    .filter(t => t.type === 'income' && t.status === 'pending')
-    .reduce((sum, t) => sum + t.amount, 0);
-  
-  const pendingExpense = transactions
-    .filter(t => t.type === 'expense' && t.status === 'pending')
-    .reduce((sum, t) => sum + t.amount, 0);
-  
-  return {
-    totalIncome,
-    totalExpense,
-    balance: totalIncome - totalExpense,
-    pendingIncome,
-    pendingExpense,
+  getFinancialSummary: (startDate: string, endDate: string) => {
+    totalIncome: number;
+    totalExpense: number;
+    balance: number;
+    pendingIncome: number;
+    pendingExpense: number;
   };
-}, [getTransactionsByPeriod]);
-
-const getCashFlow = useCallback((months: number) => {
-  const result: Array<{
+  getCashFlow: (months: number) => Array<{
     month: string;
     income: number;
     expense: number;
     balance: number;
-  }> = [];
+  }>;
+  getExpensesByCategory: (startDate: string, endDate: string) => Array<{
+    category: string;
+    total: number;
+    percentage: number;
+  }>;
   
-  const today = new Date();
-  
-  for (let i = 0; i < months; i++) {
-    const monthDate = new Date(today.getFullYear(), today.getMonth() - i, 1);
-    const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
-    const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
-    
-    const monthTransactions = getTransactionsByPeriod(
-      monthStart.toISOString().split('T')[0],
-      monthEnd.toISOString().split('T')[0]
-    );
-    
-    const income = monthTransactions
-      .filter(t => t.type === 'income' && t.status === 'paid')
-      .reduce((sum, t) => sum + (t.paid_amount || t.amount), 0);
-    
-    const expense = monthTransactions
-      .filter(t => t.type === 'expense' && t.status === 'paid')
-      .reduce((sum, t) => sum + (t.paid_amount || t.amount), 0);
-    
-    result.push({
-      month: monthDate.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }),
-      income,
-      expense,
-      balance: income - expense,
-    });
-  }
-  
-  return result.reverse();
-}, [getTransactionsByPeriod]);
-
-const getExpensesByCategory = useCallback((
-  startDate: string,
-  endDate: string
-) => {
-  const transactions = getTransactionsByPeriod(startDate, endDate);
-  
-  const expenses = transactions.filter(t => 
-    t.type === 'expense' && t.status === 'paid'
-  );
-  
-  const total = expenses.reduce((sum, t) => sum + (t.paid_amount || t.amount), 0);
-  
-  const byCategory: { [key: string]: number } = {};
-  
-  expenses.forEach(t => {
-    const category = t.category || 'Sem categoria';
-    byCategory[category] = (byCategory[category] || 0) + (t.paid_amount || t.amount);
-  });
-  
-  return Object.entries(byCategory)
-    .map(([category, amount]) => ({
-      category,
-      total: amount,
-      percentage: total > 0 ? (amount / total) * 100 : 0,
-    }))
-    .sort((a, b) => b.total - a.total);
-}, [getTransactionsByPeriod]);
-  
-   // ============================================
-  // ✅ NOVOS MÉTODOS PARA DEBUG
- // ============================================
+  // ============================================
+  // MÉTODOS PARA DEBUG
+  // ============================================
   reloadProject: (projectId: string) => Promise<any>;
   debugProject: (projectId: string) => Promise<any>;
+}
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
@@ -732,7 +483,6 @@ export const useApp = () => {
   if (!context) throw new Error("useApp must be used within an AppProvider");
   return context;
 };
-
 // ---------------------------------------------------------------
 // Provider
 // ---------------------------------------------------------------
@@ -770,7 +520,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const ensureUser = () => {
     if (!user) throw new Error('Usuário não autenticado');
   };
-    // ---------------------------------------------------------------
+
+  // ---------------------------------------------------------------
   // FUNÇÕES DE CARREGAMENTO (load*)
   // ---------------------------------------------------------------
 
@@ -871,99 +622,90 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setProducts(merged);
   }, [user]);
 
-  // ============================================
-// FUNÇÕES DE CARREGAMENTO - FINANCEIRO
-// ============================================
+  const loadFinancialTransactions = useCallback(async () => {
+    if (!user) return;
+    
+    console.log('📊 Carregando transações financeiras...');
+    
+    const { data, error } = await supabase
+      .from('financial_transactions')
+      .select(`
+        *,
+        client:clients!client_id(name),
+        supplier:suppliers!supplier_id(name),
+        project:projects!project_id(order_number),
+        bank_account:bank_accounts!bank_account_id(name),
+        cost_center:cost_centers!cost_center_id(name)
+      `)
+      .eq('user_id', user.id)
+      .order('due_date', { ascending: false });
+    
+    if (error) {
+      console.error('❌ Erro ao carregar transações financeiras:', error);
+      throw error;
+    }
+    
+    const merged = validateArray(data).map((t: any) => ({
+      ...t,
+      client_name: t.client?.name,
+      supplier_name: t.supplier?.name,
+      project_number: t.project?.order_number,
+      bank_account_name: t.bank_account?.name,
+      cost_center_name: t.cost_center?.name
+    }));
+    
+    console.log(`✅ ${merged.length} transações financeiras carregadas`);
+    setFinancialTransactions(merged);
+  }, [user]);
 
-const loadFinancialTransactions = useCallback(async () => {
-  if (!user) return;
-  
-  console.log('📊 Carregando transações financeiras...');
-  
-  const { data, error } = await supabase
-    .from('financial_transactions')
-    .select(`
-      *,
-      client:clients!client_id(name),
-      supplier:suppliers!supplier_id(name),
-      project:projects!project_id(order_number),
-      bank_account:bank_accounts!bank_account_id(name),
-      cost_center:cost_centers!cost_center_id(name)
-    `)
-    .eq('user_id', user.id)
-    .order('due_date', { ascending: false });
-  
-  if (error) {
-    console.error('❌ Erro ao carregar transações financeiras:', error);
-    throw error;
-  }
-  
-  // Processar dados com joins
-  const merged = validateArray(data).map((t: any) => ({
-    ...t,
-    client_name: t.client?.name,
-    supplier_name: t.supplier?.name,
-    project_number: t.project?.order_number,
-    bank_account_name: t.bank_account?.name,
-    cost_center_name: t.cost_center?.name
-  }));
-  
-  console.log(`✅ ${merged.length} transações financeiras carregadas`);
-  setFinancialTransactions(merged);
-}, [user]);
+  const loadBankAccounts = useCallback(async () => {
+    if (!user) return;
+    
+    console.log('🏦 Carregando contas bancárias...');
+    
+    const { data, error } = await supabase
+      .from('bank_accounts')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('name');
+    
+    if (error) {
+      console.error('❌ Erro ao carregar contas bancárias:', error);
+      throw error;
+    }
+    
+    console.log(`✅ ${validateArray(data).length} contas bancárias carregadas`);
+    setBankAccounts(validateArray(data));
+  }, [user]);
 
-const loadBankAccounts = useCallback(async () => {
-  if (!user) return;
-  
-  console.log('🏦 Carregando contas bancárias...');
-  
-  const { data, error } = await supabase
-    .from('bank_accounts')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('name');
-  
-  if (error) {
-    console.error('❌ Erro ao carregar contas bancárias:', error);
-    throw error;
-  }
-  
-  console.log(`✅ ${validateArray(data).length} contas bancárias carregadas`);
-  setBankAccounts(validateArray(data));
-}, [user]);
+  const loadCostCenters = useCallback(async () => {
+    if (!user) return;
+    
+    console.log('🎯 Carregando centros de custo...');
+    
+    const { data, error } = await supabase
+      .from('cost_centers')
+      .select(`
+        *,
+        parent:cost_centers!parent_id(name)
+      `)
+      .eq('user_id', user.id)
+      .order('name');
+    
+    if (error) {
+      console.error('❌ Erro ao carregar centros de custo:', error);
+      throw error;
+    }
+    
+    const merged = validateArray(data).map((cc: any) => ({
+      ...cc,
+      parent_name: cc.parent?.name
+    }));
+    
+    console.log(`✅ ${merged.length} centros de custo carregados`);
+    setCostCenters(merged);
+  }, [user]);
 
-const loadCostCenters = useCallback(async () => {
-  if (!user) return;
-  
-  console.log('🎯 Carregando centros de custo...');
-  
-  const { data, error } = await supabase
-    .from('cost_centers')
-    .select(`
-      *,
-      parent:cost_centers!parent_id(name)
-    `)
-    .eq('user_id', user.id)
-    .order('name');
-  
-  if (error) {
-    console.error('❌ Erro ao carregar centros de custo:', error);
-    throw error;
-  }
-  
-  // Processar dados com parent
-  const merged = validateArray(data).map((cc: any) => ({
-    ...cc,
-    parent_name: cc.parent?.name
-  }));
-  
-  console.log(`✅ ${merged.length} centros de custo carregados`);
-  setCostCenters(merged);
-}, [user]);
-
-  // ============================================
-  // ✅ CORREÇÃO CRÍTICA: loadProjects melhorada
-  // ============================================
   const loadProjects = useCallback(async () => {
     if (!user) return;
     
@@ -996,8 +738,6 @@ const loadCostCenters = useCallback(async () => {
       throw error;
     }
 
-    console.log('🔍 [AppContext] Dados brutos do Supabase:', data);
-    
     if (!data || data.length === 0) {
       console.log('⚠️ [AppContext] Nenhum projeto encontrado');
       setProjects([]);
@@ -1005,40 +745,24 @@ const loadCostCenters = useCallback(async () => {
     }
 
     const merged = validateArray(data).map((p: any) => {
-      console.log(`📋 [AppContext] Processando projeto ${p.id}:`, {
-        order_number: p.order_number,
-        description: p.description,
-        raw_products: p.products,
-        products_length: Array.isArray(p.products) ? p.products.length : 'não é array'
-      });
-      
       let processedProducts: ProjectProduct[] = [];
       
       if (p.products && Array.isArray(p.products)) {
         processedProducts = p.products
           .filter((pp: any) => pp && typeof pp === 'object')
-          .map((pp: any) => {
-            const processed = {
-              id: pp.id || `temp-${Date.now()}-${Math.random()}`,
-              product_id: pp.product_id || null,
-              product_name: pp.product_name || pp.name || 'Produto sem nome',
-              quantity: Number(pp.quantity) || 1,
-              unit_price: Number(pp.unit_price) || 0,
-              total_price: Number(pp.total_price) || 0,
-              item_type: (pp.item_type || 'produto') as ItemType,
-              item_description: pp.item_description || pp.description || '',
-              service_hours: pp.item_type === 'servico' ? (Number(pp.service_hours) || undefined) : undefined,
-              hourly_rate: pp.item_type === 'servico' ? (Number(pp.hourly_rate) || undefined) : undefined,
-            };
-            
-            console.log(`  ➡️ Produto processado:`, processed);
-            return processed;
-          });
-      } else {
-        console.log(`  ⚠️ Produtos inválidos ou ausentes para projeto ${p.id}:`, p.products);
+          .map((pp: any) => ({
+            id: pp.id || `temp-${Date.now()}-${Math.random()}`,
+            product_id: pp.product_id || null,
+            product_name: pp.product_name || pp.name || 'Produto sem nome',
+            quantity: Number(pp.quantity) || 1,
+            unit_price: Number(pp.unit_price) || 0,
+            total_price: Number(pp.total_price) || 0,
+            item_type: (pp.item_type || 'produto') as ItemType,
+            item_description: pp.item_description || pp.description || '',
+            service_hours: pp.item_type === 'servico' ? (Number(pp.service_hours) || undefined) : undefined,
+            hourly_rate: pp.item_type === 'servico' ? (Number(pp.hourly_rate) || undefined) : undefined,
+          }));
       }
-      
-      console.log(`✅ [AppContext] Projeto ${p.id} processado com ${processedProducts.length} produtos`);
       
       return {
         id: p.id,
@@ -1065,12 +789,6 @@ const loadCostCenters = useCallback(async () => {
     });
     
     console.log(`✅ [AppContext] Total de projetos carregados: ${merged.length}`);
-    console.log('🔍 [AppContext] Projetos processados:', merged.map(p => ({
-      id: p.id,
-      order_number: p.order_number,
-      products_count: p.products?.length || 0
-    })));
-    
     setProjects(merged);
   }, [user]);
 
@@ -1174,9 +892,7 @@ const loadCostCenters = useCallback(async () => {
     }));
     setPurchases(merged);
   }, [user]);
-
-  // ✅ NOVO: Método para debug de projeto específico
-  const debugProject = useCallback(async (projectId: string) => {
+    const debugProject = useCallback(async (projectId: string) => {
     if (!user) return;
     
     console.log('🐛 [AppContext] DEBUG - Investigando projeto:', projectId);
@@ -1217,372 +933,6 @@ const loadCostCenters = useCallback(async () => {
       errors: { projectError, productsError, joinError }
     };
   }, [user]);
-
-  // ============================================
-// MÉTODOS CRUD - TRANSAÇÕES FINANCEIRAS
-// ============================================
-
-const addFinancialTransaction = useCallback(async (
-  data: CreateFinancialTransactionData
-): Promise<FinancialTransaction> => {
-  ensureUser();
-  
-  console.log('💰 Criando transação financeira:', data);
-  
-  const newTransaction = {
-    ...cleanUndefined(data),
-    user_id: user!.id,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  };
-  
-  const { data: inserted, error } = await supabase
-    .from('financial_transactions')
-    .insert([newTransaction])
-    .select()
-    .single();
-  
-  if (error) {
-    console.error('❌ Erro ao criar transação:', error);
-    throw error;
-  }
-  
-  console.log('✅ Transação criada:', inserted);
-  
-  // ✅ Atualizar saldo da conta bancária se especificado
-  if (data.bank_account_id && data.status === 'paid') {
-    await updateBankAccountBalance(
-      data.bank_account_id,
-      data.paid_amount || data.amount,
-      data.type === 'income' ? 'add' : 'subtract'
-    );
-  }
-  
-  await loadFinancialTransactions();
-  return inserted;
-}, [user, loadFinancialTransactions]);
-
-const updateFinancialTransaction = useCallback(async (
-  id: string,
-  data: UpdateFinancialTransactionData
-) => {
-  ensureUser();
-  
-  console.log('💰 Atualizando transação:', id, data);
-  
-  const { error } = await supabase
-    .from('financial_transactions')
-    .update({
-      ...cleanUndefined(data),
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', id)
-    .eq('user_id', user!.id);
-  
-  if (error) {
-    console.error('❌ Erro ao atualizar transação:', error);
-    throw error;
-  }
-  
-  console.log('✅ Transação atualizada');
-  await loadFinancialTransactions();
-}, [user, loadFinancialTransactions]);
-
-const deleteFinancialTransaction = useCallback(async (id: string) => {
-  ensureUser();
-  
-  console.log('🗑️ Deletando transação:', id);
-  
-  const { error } = await supabase
-    .from('financial_transactions')
-    .delete()
-    .eq('id', id)
-    .eq('user_id', user!.id);
-  
-  if (error) {
-    console.error('❌ Erro ao deletar transação:', error);
-    throw error;
-  }
-  
-  console.log('✅ Transação deletada');
-  await loadFinancialTransactions();
-}, [user, loadFinancialTransactions]);
-
-const payTransaction = useCallback(async (
-  id: string,
-  paymentData: PayTransactionData
-) => {
-  ensureUser();
-  
-  console.log('💳 Marcando transação como paga:', id, paymentData);
-  
-  // Buscar transação atual
-  const { data: transaction, error: fetchError } = await supabase
-    .from('financial_transactions')
-    .select('*')
-    .eq('id', id)
-    .eq('user_id', user!.id)
-    .single();
-  
-  if (fetchError || !transaction) {
-    console.error('❌ Transação não encontrada');
-    throw new Error('Transação não encontrada');
-  }
-  
-  // Atualizar transação
-  const { error } = await supabase
-    .from('financial_transactions')
-    .update({
-      status: 'paid',
-      payment_date: paymentData.payment_date,
-      paid_amount: paymentData.paid_amount || transaction.amount,
-      payment_method: paymentData.payment_method || transaction.payment_method,
-      bank_account_id: paymentData.bank_account_id || transaction.bank_account_id,
-      notes: paymentData.notes ? `${transaction.notes || ''}\n${paymentData.notes}` : transaction.notes,
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', id)
-    .eq('user_id', user!.id);
-  
-  if (error) {
-    console.error('❌ Erro ao pagar transação:', error);
-    throw error;
-  }
-  
-  // Atualizar saldo da conta bancária
-  if (paymentData.bank_account_id) {
-    await updateBankAccountBalance(
-      paymentData.bank_account_id,
-      paymentData.paid_amount || transaction.amount,
-      transaction.type === 'income' ? 'add' : 'subtract'
-    );
-  }
-  
-  console.log('✅ Transação paga com sucesso');
-  await loadFinancialTransactions();
-}, [user, loadFinancialTransactions]);
-
-const getTransactionsByPeriod = useCallback((
-  startDate: string,
-  endDate: string
-): FinancialTransaction[] => {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  
-  return financialTransactions.filter(t => {
-    const transDate = new Date(t.date);
-    return transDate >= start && transDate <= end;
-  });
-}, [financialTransactions]);
-
-const getOverdueTransactions = useCallback((): FinancialTransaction[] => {
-  const today = new Date();
-  
-  return financialTransactions.filter(t => {
-    const dueDate = new Date(t.due_date);
-    return t.status === 'pending' && dueDate < today;
-  });
-}, [financialTransactions]);
-
-// ============================================
-// MÉTODOS CRUD - CONTAS BANCÁRIAS
-// ============================================
-
-const addBankAccount = useCallback(async (
-  data: Omit<BankAccount, 'id' | 'created_at' | 'updated_at' | 'user_id' | 'current_balance'>
-) => {
-  ensureUser();
-  
-  console.log('🏦 Criando conta bancária:', data);
-  
-  const newAccount = {
-    ...cleanUndefined(data),
-    current_balance: data.initial_balance,
-    user_id: user!.id,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  };
-  
-  const { error } = await supabase
-    .from('bank_accounts')
-    .insert([newAccount]);
-  
-  if (error) {
-    console.error('❌ Erro ao criar conta:', error);
-    throw error;
-  }
-  
-  console.log('✅ Conta bancária criada');
-  await loadBankAccounts();
-}, [user, loadBankAccounts]);
-
-const updateBankAccount = useCallback(async (
-  id: string,
-  data: Partial<BankAccount>
-) => {
-  ensureUser();
-  
-  console.log('🏦 Atualizando conta bancária:', id, data);
-  
-  const { error } = await supabase
-    .from('bank_accounts')
-    .update({
-      ...cleanUndefined(data),
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', id)
-    .eq('user_id', user!.id);
-  
-  if (error) {
-    console.error('❌ Erro ao atualizar conta:', error);
-    throw error;
-  }
-  
-  console.log('✅ Conta bancária atualizada');
-  await loadBankAccounts();
-}, [user, loadBankAccounts]);
-
-const deleteBankAccount = useCallback(async (id: string) => {
-  ensureUser();
-  
-  console.log('🗑️ Deletando conta bancária:', id);
-  
-  const { error } = await supabase
-    .from('bank_accounts')
-    .delete()
-    .eq('id', id)
-    .eq('user_id', user!.id);
-  
-  if (error) {
-    console.error('❌ Erro ao deletar conta:', error);
-    throw error;
-  }
-  
-  console.log('✅ Conta bancária deletada');
-  await loadBankAccounts();
-}, [user, loadBankAccounts]);
-
-const updateBankAccountBalance = useCallback(async (
-  accountId: string,
-  amount: number,
-  operation: 'add' | 'subtract'
-) => {
-  ensureUser();
-  
-  console.log('💰 Atualizando saldo da conta:', accountId, amount, operation);
-  
-  // Buscar conta atual
-  const { data: account, error: fetchError } = await supabase
-    .from('bank_accounts')
-    .select('current_balance')
-    .eq('id', accountId)
-    .eq('user_id', user!.id)
-    .single();
-  
-  if (fetchError || !account) {
-    console.error('❌ Conta não encontrada');
-    return;
-  }
-  
-  const newBalance = operation === 'add'
-    ? account.current_balance + amount
-    : account.current_balance - amount;
-  
-  const { error } = await supabase
-    .from('bank_accounts')
-    .update({
-      current_balance: newBalance,
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', accountId)
-    .eq('user_id', user!.id);
-  
-  if (error) {
-    console.error('❌ Erro ao atualizar saldo:', error);
-    throw error;
-  }
-  
-  console.log('✅ Saldo atualizado:', newBalance);
-  await loadBankAccounts();
-}, [user, loadBankAccounts]);
-
-// ============================================
-// MÉTODOS CRUD - CENTROS DE CUSTO
-// ============================================
-
-const addCostCenter = useCallback(async (
-  data: Omit<CostCenter, 'id' | 'created_at' | 'updated_at' | 'user_id' | 'parent_name'>
-) => {
-  ensureUser();
-  
-  console.log('🎯 Criando centro de custo:', data);
-  
-  const newCostCenter = {
-    ...cleanUndefined(data),
-    user_id: user!.id,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  };
-  
-  const { error } = await supabase
-    .from('cost_centers')
-    .insert([newCostCenter]);
-  
-  if (error) {
-    console.error('❌ Erro ao criar centro de custo:', error);
-    throw error;
-  }
-  
-  console.log('✅ Centro de custo criado');
-  await loadCostCenters();
-}, [user, loadCostCenters]);
-
-const updateCostCenter = useCallback(async (
-  id: string,
-  data: Partial<CostCenter>
-) => {
-  ensureUser();
-  
-  console.log('🎯 Atualizando centro de custo:', id, data);
-  
-  const { error } = await supabase
-    .from('cost_centers')
-    .update({
-      ...cleanUndefined(data),
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', id)
-    .eq('user_id', user!.id);
-  
-  if (error) {
-    console.error('❌ Erro ao atualizar centro de custo:', error);
-    throw error;
-  }
-  
-  console.log('✅ Centro de custo atualizado');
-  await loadCostCenters();
-}, [user, loadCostCenters]);
-
-const deleteCostCenter = useCallback(async (id: string) => {
-  ensureUser();
-  
-  console.log('🗑️ Deletando centro de custo:', id);
-  
-  const { error } = await supabase
-    .from('cost_centers')
-    .delete()
-    .eq('id', id)
-    .eq('user_id', user!.id);
-  
-  if (error) {
-    console.error('❌ Erro ao deletar centro de custo:', error);
-    throw error;
-  }
-  
-  console.log('✅ Centro de custo deletado');
-  await loadCostCenters();
-}, [user, loadCostCenters]);
-
 
   const reloadProject = useCallback(async (projectId: string) => {
     if (!user) return null;
@@ -1638,8 +988,8 @@ const deleteCostCenter = useCallback(async (id: string) => {
       safeLoad(loadPurchases, "Compras"),
       safeLoad(loadCategories, "Categorias"),
       //safeLoad(loadFinancialTransactions, "Transações Financeiras"),
-    safeLoad(loadBankAccounts, "Contas Bancárias"),
-    safeLoad(loadCostCenters, "Centros de Custo"),
+      safeLoad(loadBankAccounts, "Contas Bancárias"),
+      safeLoad(loadCostCenters, "Centros de Custo"),
     ]);
 
     const hasErrors = results.some(r => r.status === 'rejected');
@@ -1775,51 +1125,6 @@ const deleteCostCenter = useCallback(async (id: string) => {
     await loadClients();
   }, [user, loadClients]);
 
-  const createFinancialTransactionsFromProject = useCallback(async (
-    projectId: string, 
-    projectData: any
-  ) => {
-    if (projectData.type !== 'venda') {
-      return;
-    }
-
-    const client = clients.find(c => c.id === projectData.client_id);
-    const { payment_terms } = projectData;
-
-    if (!payment_terms) {
-      console.warn('Projeto sem termos de pagamento');
-      return;
-    }
-
-    try {
-      for (let i = 0; i < payment_terms.installments; i++) {
-        const dueDate = new Date(projectData.start_date);
-        dueDate.setMonth(dueDate.getMonth() + i);
-        
-        const transaction = {
-          type: 'entrada' as const,
-          category: 'Vendas',
-          description: `${projectData.order_number || 'Venda'} - ${client?.name || 'Cliente'} - Parcela ${i + 1}/${payment_terms.installments}`,
-          amount: payment_terms.installment_value || 0,
-          date: dueDate.toISOString().split('T')[0],
-          project_id: projectId,
-          project_title: projectData.description || 'Sem descrição',
-          user_id: user!.id,
-          created_at: new Date().toISOString()
-        };
-        
-        await supabase
-          .from('transactions')
-          .insert([transaction]);
-      }
-
-      console.log(`✅ ${payment_terms.installments} transação(ões) criada(s) para o projeto ${projectData.order_number}`);
-    } catch (error) {
-            console.error('❌ Erro ao criar transações financeiras:', error);
-      throw error;
-    }
-  }, [user, clients]);
-  
   const addProduct = useCallback(async (data: Omit<Product, "id" | "created_at" | "updated_at" | "user_id">) => {
     ensureUser();
     
@@ -1925,153 +1230,198 @@ const deleteCostCenter = useCallback(async (id: string) => {
     if (error) throw error;
     await loadProducts();
   }, [user, loadProducts]);
+    // ============================================
+  // MÉTODOS CRUD - PROJETOS
+  // ============================================
 
-  // ✅ FUNÇÃO addProject CORRIGIDA
-  const addProject = useCallback(async (data: Omit<Project, "id" | "created_at" | "updated_at" | "number" | "order_number" | "user_id">) => {
-  ensureUser();
-  
-  console.log('🆕 [AppContext] Criando novo projeto...');
-  console.log('🆕 [AppContext] Dados recebidos:', data);
-  
-  if (!data.description || data.description.trim() === '') {
-    throw new Error('Descrição é obrigatória');
-  }
-  
-  if (!data.client_id) {
-    throw new Error('Cliente é obrigatório');
-  }
-  
-  if (!data.products || data.products.length === 0) {
-    throw new Error('Adicione pelo menos um produto ou serviço');
-  }
-  
-  const deliveryDeadlineDays = data.delivery_deadline_days || 15;
-  const startDate = new Date(data.start_date);
-  const endDate = new Date(startDate);
-  endDate.setDate(endDate.getDate() + deliveryDeadlineDays);
-  
-  const newProject = {
-    client_id: data.client_id,
-    description: data.description.trim(),
-    status: data.status,
-    type: data.type,
-    budget: data.budget,
-    start_date: data.start_date,
-    end_date: data.end_date || endDate.toISOString().split('T')[0],
-    delivery_deadline_days: deliveryDeadlineDays,
-    materials_cost: data.materials_cost,
-    labor_cost: data.labor_cost,
-    profit_margin: data.profit_margin,
-    payment_terms: data.payment_terms,
-    number: 0,
-    user_id: user!.id,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  };
-  
-  console.log('🆕 [AppContext] Criando projeto no banco...');
-  const { data: insertedProject, error } = await supabase
-    .from("projects")
-    .insert([cleanUndefined(newProject)])
-    .select()
-    .single();
-    
-  if (error) {
-    console.error('❌ [AppContext] Erro ao criar projeto:', error);
-    throw error;
-  }
-  
-  console.log('✅ [AppContext] Projeto criado com ID:', insertedProject.id);
-
-  if (data.products && data.products.length > 0) {
-    console.log('🆕 [AppContext] Preparando produtos para inserção...');
-    
-    const projectProducts = data.products.map(p => {
-      if (p.item_type === 'servico') {
-        if (!p.service_hours || p.service_hours <= 0) {
-          throw new Error(`Serviço "${p.product_name}" precisa ter horas definidas`);
-        }
-        if (!p.hourly_rate || p.hourly_rate <= 0) {
-          throw new Error(`Serviço "${p.product_name}" precisa ter valor por hora definido`);
-        }
-      }
-      
-      const processedProduct = {
-        project_id: insertedProject.id,
-        product_id: p.product_id || null,
-        product_name: p.product_name,
-        quantity: p.quantity,
-        unit_price: p.unit_price,
-        total_price: p.total_price,
-        item_type: p.item_type || 'produto',
-        item_description: p.item_description,
-        service_hours: p.item_type === 'servico' ? p.service_hours : null,
-        hourly_rate: p.item_type === 'servico' ? p.hourly_rate : null,
-        user_id: user!.id,
-      };
-      
-      console.log('🆕 [AppContext] Produto processado:', processedProduct);
-      return processedProduct;
-    }).filter(p => p.quantity > 0);
-
-    if (projectProducts.length > 0) {
-      console.log(`🆕 [AppContext] Inserindo ${projectProducts.length} produtos...`);
-
-      const { error: prodError, data: insertedProducts } = await supabase
-        .from("project_products")
-        .insert(projectProducts)
-        .select();
-      
-      if (prodError) {
-        console.error('❌ [AppContext] ERRO DETALHADO ao inserir produtos (addProject):', {
-          error: prodError,
-          code: prodError.code,
-          message: prodError.message,
-          details: prodError.details,
-          hint: prodError.hint,
-          products: projectProducts,
-          projectId: insertedProject.id
-        });
-        
-        alert(`Erro ao salvar produtos no novo projeto: ${prodError.message}`);
-        throw prodError;
-      }
-      
-      console.log('✅ [AppContext] Produtos inseridos no novo projeto:', insertedProducts);
-      console.log(`🎉 [AppContext] ${projectProducts.length} produtos inseridos no banco`);
+  const createFinancialTransactionsFromProject = useCallback(async (
+    projectId: string, 
+    projectData: any
+  ) => {
+    if (projectData.type !== 'venda') {
+      return;
     }
-  }
 
-  // ✅ CRIAR TRANSAÇÕES FINANCEIRAS SE FOR VENDA (APENAS UMA VEZ)
-  if (insertedProject && insertedProject.id && data.type === 'venda') {
+    const client = clients.find(c => c.id === projectData.client_id);
+    const { payment_terms } = projectData;
+
+    if (!payment_terms) {
+      console.warn('Projeto sem termos de pagamento');
+      return;
+    }
+
     try {
-      await createTransactionsFromProject(insertedProject.id, {
-        ...data,
-        id: insertedProject.id,
-        order_number: insertedProject.order_number,
-        client_id: data.client_id,
-        start_date: data.start_date,
-        budget: data.budget,
-        payment_terms: data.payment_terms,
-      } as Project);
-      console.log('✅ Transações financeiras criadas para o projeto');
-    } catch (error) {
-      console.error('❌ Erro ao criar transações financeiras, mas projeto foi salvo:', error);
-    }
-  }
+      for (let i = 0; i < payment_terms.installments; i++) {
+        const dueDate = new Date(projectData.start_date);
+        dueDate.setMonth(dueDate.getMonth() + i);
+        
+        const transaction = {
+          type: 'entrada' as const,
+          category: 'Vendas',
+          description: `${projectData.order_number || 'Venda'} - ${client?.name || 'Cliente'} - Parcela ${i + 1}/${payment_terms.installments}`,
+          amount: payment_terms.installment_value || 0,
+          date: dueDate.toISOString().split('T')[0],
+          project_id: projectId,
+          project_title: projectData.description || 'Sem descrição',
+          user_id: user!.id,
+          created_at: new Date().toISOString()
+        };
+        
+        await supabase
+          .from('transactions')
+          .insert([transaction]);
+      }
 
-  await loadProjects();
-  return insertedProject;
-}, [user, loadProjects, createTransactionsFromProject]); // ✅ adicionar na dependência
+      console.log(`✅ ${payment_terms.installments} transação(ões) criada(s) para o projeto ${projectData.order_number}`);
+    } catch (error) {
+      console.error('❌ Erro ao criar transações financeiras:', error);
+      throw error;
+    }
+  }, [user, clients]);
+
+  const addProject = useCallback(async (data: Omit<Project, "id" | "created_at" | "updated_at" | "number" | "order_number" | "user_id">) => {
+    ensureUser();
     
-  // ✅ FUNÇÃO updateProject CORRIGIDA
+    console.log('🆕 [AppContext] Criando novo projeto...');
+    console.log('🆕 [AppContext] Dados recebidos:', data);
+    
+    if (!data.description || data.description.trim() === '') {
+      throw new Error('Descrição é obrigatória');
+    }
+    
+    if (!data.client_id) {
+      throw new Error('Cliente é obrigatório');
+    }
+    
+    if (!data.products || data.products.length === 0) {
+      throw new Error('Adicione pelo menos um produto ou serviço');
+    }
+    
+    const deliveryDeadlineDays = data.delivery_deadline_days || 15;
+    const startDate = new Date(data.start_date);
+    const endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + deliveryDeadlineDays);
+    
+    const newProject = {
+      client_id: data.client_id,
+      description: data.description.trim(),
+      status: data.status,
+      type: data.type,
+      budget: data.budget,
+      start_date: data.start_date,
+      end_date: data.end_date || endDate.toISOString().split('T')[0],
+      delivery_deadline_days: deliveryDeadlineDays,
+      materials_cost: data.materials_cost,
+      labor_cost: data.labor_cost,
+      profit_margin: data.profit_margin,
+      payment_terms: data.payment_terms,
+      number: 0,
+      user_id: user!.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    
+    console.log('🆕 [AppContext] Criando projeto no banco...');
+    const { data: insertedProject, error } = await supabase
+      .from("projects")
+      .insert([cleanUndefined(newProject)])
+      .select()
+      .single();
+      
+    if (error) {
+      console.error('❌ [AppContext] Erro ao criar projeto:', error);
+      throw error;
+    }
+    
+    console.log('✅ [AppContext] Projeto criado com ID:', insertedProject.id);
+
+    if (data.products && data.products.length > 0) {
+      console.log('🆕 [AppContext] Preparando produtos para inserção...');
+      
+      const projectProducts = data.products.map(p => {
+        if (p.item_type === 'servico') {
+          if (!p.service_hours || p.service_hours <= 0) {
+            throw new Error(`Serviço "${p.product_name}" precisa ter horas definidas`);
+          }
+          if (!p.hourly_rate || p.hourly_rate <= 0) {
+            throw new Error(`Serviço "${p.product_name}" precisa ter valor por hora definido`);
+          }
+        }
+        
+        const processedProduct = {
+          project_id: insertedProject.id,
+          product_id: p.product_id || null,
+          product_name: p.product_name,
+          quantity: p.quantity,
+          unit_price: p.unit_price,
+          total_price: p.total_price,
+          item_type: p.item_type || 'produto',
+          item_description: p.item_description,
+          service_hours: p.item_type === 'servico' ? p.service_hours : null,
+          hourly_rate: p.item_type === 'servico' ? p.hourly_rate : null,
+          user_id: user!.id,
+        };
+        
+        console.log('🆕 [AppContext] Produto processado:', processedProduct);
+        return processedProduct;
+      }).filter(p => p.quantity > 0);
+
+      if (projectProducts.length > 0) {
+        console.log(`🆕 [AppContext] Inserindo ${projectProducts.length} produtos...`);
+
+        const { error: prodError, data: insertedProducts } = await supabase
+          .from("project_products")
+          .insert(projectProducts)
+          .select();
+        
+        if (prodError) {
+          console.error('❌ [AppContext] ERRO DETALHADO ao inserir produtos (addProject):', {
+            error: prodError,
+            code: prodError.code,
+            message: prodError.message,
+            details: prodError.details,
+            hint: prodError.hint,
+            products: projectProducts,
+            projectId: insertedProject.id
+          });
+          
+          alert(`Erro ao salvar produtos no novo projeto: ${prodError.message}`);
+          throw prodError;
+        }
+        
+        console.log('✅ [AppContext] Produtos inseridos no novo projeto:', insertedProducts);
+        console.log(`🎉 [AppContext] ${projectProducts.length} produtos inseridos no banco`);
+      }
+    }
+
+    // Criar transações financeiras se for venda
+    if (insertedProject && insertedProject.id && data.type === 'venda') {
+      try {
+        await createTransactionsFromProject(insertedProject.id, {
+          ...data,
+          id: insertedProject.id,
+          order_number: insertedProject.order_number,
+          client_id: data.client_id,
+          start_date: data.start_date,
+          budget: data.budget,
+          payment_terms: data.payment_terms,
+        } as Project);
+        console.log('✅ Transações financeiras criadas para o projeto');
+      } catch (error) {
+        console.error('❌ Erro ao criar transações financeiras, mas projeto foi salvo:', error);
+      }
+    }
+
+    await loadProjects();
+    return insertedProject;
+  }, [user, loadProjects, createTransactionsFromProject]);
+
   const updateProject = useCallback(async (id: string, data: Partial<Project>) => {
     ensureUser();
     
     console.log('💾 [AppContext] Atualizando projeto:', { id, data });
     console.log('💾 [AppContext] Produtos recebidos:', data.products);
     
-    // ✅ Calcular end_date se necessário
     if (data.delivery_deadline_days && data.start_date) {
       const startDate = new Date(data.start_date);
       const endDate = new Date(startDate);
@@ -2079,7 +1429,6 @@ const deleteCostCenter = useCallback(async (id: string) => {
       data.end_date = endDate.toISOString().split('T')[0];
     }
     
-    // ✅ Atualizar dados básicos do projeto
     console.log('💾 [AppContext] Atualizando dados básicos...');
     const { error } = await supabase
       .from("projects")
@@ -2096,12 +1445,10 @@ const deleteCostCenter = useCallback(async (id: string) => {
     }
     console.log('✅ [AppContext] Dados básicos atualizados');
 
-    // ✅ CORREÇÃO: Melhor gerenciamento dos produtos
     if (data.products !== undefined) {
       console.log('🔄 [AppContext] Atualizando produtos do projeto...');
       console.log('📦 [AppContext] Novos produtos:', data.products);
       
-      // ✅ 1. Remover produtos existentes
       console.log('🗑️ [AppContext] Removendo produtos antigos...');
       const { error: deleteError } = await supabase
         .from("project_products")
@@ -2114,14 +1461,12 @@ const deleteCostCenter = useCallback(async (id: string) => {
       }
       console.log('✅ [AppContext] Produtos antigos removidos');
 
-      // ✅ 2. Inserir novos produtos (se houver)
       if (data.products && data.products.length > 0) {
         console.log('📋 [AppContext] Preparando inserção de produtos...');
         
         const projectProducts = data.products.map(p => {
           console.log('📋 [AppContext] Processando produto para inserção:', p);
           
-          // ✅ Validações para serviços
           if (p.item_type === 'servico') {
             if (!p.service_hours || p.service_hours <= 0) {
               throw new Error(`Serviço "${p.product_name}" precisa ter horas definidas`);
@@ -2154,7 +1499,6 @@ const deleteCostCenter = useCallback(async (id: string) => {
         if (projectProducts.length > 0) {
           console.log(`🔄 [AppContext] Inserindo ${projectProducts.length} produtos...`);
           
-          // ✅ CORREÇÃO APLICADA:
           const { error: prodError, data: insertedProducts } = await supabase
             .from("project_products")
             .insert(projectProducts)
@@ -2187,7 +1531,6 @@ const deleteCostCenter = useCallback(async (id: string) => {
       console.log('ℹ️ [AppContext] products não foi enviado, pulando atualização de produtos');
     }
 
-    // ✅ 3. Recarregar projetos
     console.log('🔄 [AppContext] Recarregando projetos...');
     await loadProjects();
     
@@ -2216,6 +1559,370 @@ const deleteCostCenter = useCallback(async (id: string) => {
     if (error) throw error;
     await loadTransactions();
   }, [user, loadTransactions]);
+
+  // ============================================
+  // MÉTODOS CRUD - TRANSAÇÕES FINANCEIRAS
+  // ============================================
+
+  const addFinancialTransaction = useCallback(async (
+    data: CreateFinancialTransactionData
+  ): Promise<FinancialTransaction> => {
+    ensureUser();
+    
+    console.log('💰 Criando transação financeira:', data);
+    
+    const newTransaction = {
+      ...cleanUndefined(data),
+      user_id: user!.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    
+    const { data: inserted, error } = await supabase
+      .from('financial_transactions')
+      .insert([newTransaction])
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('❌ Erro ao criar transação:', error);
+      throw error;
+    }
+    
+    console.log('✅ Transação criada:', inserted);
+    
+    if (data.bank_account_id && data.status === 'paid') {
+      await updateBankAccountBalance(
+        data.bank_account_id,
+        data.paid_amount || data.amount,
+        data.type === 'income' ? 'add' : 'subtract'
+      );
+    }
+    
+    await loadFinancialTransactions();
+    return inserted;
+  }, [user, loadFinancialTransactions]);
+
+  const updateFinancialTransaction = useCallback(async (
+    id: string,
+    data: UpdateFinancialTransactionData
+  ) => {
+    ensureUser();
+    
+    console.log('💰 Atualizando transação:', id, data);
+    
+    const { error } = await supabase
+      .from('financial_transactions')
+      .update({
+        ...cleanUndefined(data),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .eq('user_id', user!.id);
+    
+    if (error) {
+      console.error('❌ Erro ao atualizar transação:', error);
+      throw error;
+    }
+    
+    console.log('✅ Transação atualizada');
+    await loadFinancialTransactions();
+  }, [user, loadFinancialTransactions]);
+
+  const deleteFinancialTransaction = useCallback(async (id: string) => {
+    ensureUser();
+    
+    console.log('🗑️ Deletando transação:', id);
+    
+    const { error } = await supabase
+      .from('financial_transactions')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user!.id);
+    
+    if (error) {
+      console.error('❌ Erro ao deletar transação:', error);
+      throw error;
+    }
+    
+    console.log('✅ Transação deletada');
+    await loadFinancialTransactions();
+  }, [user, loadFinancialTransactions]);
+
+  const payTransaction = useCallback(async (
+    id: string,
+    paymentData: PayTransactionData
+  ) => {
+    ensureUser();
+    
+    console.log('💳 Marcando transação como paga:', id, paymentData);
+    
+    const { data: transaction, error: fetchError } = await supabase
+      .from('financial_transactions')
+      .select('*')
+      .eq('id', id)
+      .eq('user_id', user!.id)
+      .single();
+    
+    if (fetchError || !transaction) {
+      console.error('❌ Transação não encontrada');
+      throw new Error('Transação não encontrada');
+    }
+    
+    const { error } = await supabase
+      .from('financial_transactions')
+      .update({
+        status: 'paid',
+        payment_date: paymentData.payment_date,
+        paid_amount: paymentData.paid_amount || transaction.amount,
+        payment_method: paymentData.payment_method || transaction.payment_method,
+        bank_account_id: paymentData.bank_account_id || transaction.bank_account_id,
+        notes: paymentData.notes ? `${transaction.notes || ''}\n${paymentData.notes}` : transaction.notes,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .eq('user_id', user!.id);
+    
+    if (error) {
+      console.error('❌ Erro ao pagar transação:', error);
+      throw error;
+    }
+    
+    if (paymentData.bank_account_id) {
+      await updateBankAccountBalance(
+        paymentData.bank_account_id,
+        paymentData.paid_amount || transaction.amount,
+        transaction.type === 'income' ? 'add' : 'subtract'
+      );
+    }
+    
+    console.log('✅ Transação paga com sucesso');
+    await loadFinancialTransactions();
+  }, [user, loadFinancialTransactions]);
+
+  const getTransactionsByPeriod = useCallback((
+    startDate: string,
+    endDate: string
+  ): FinancialTransaction[] => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    return financialTransactions.filter(t => {
+      const transDate = new Date(t.date);
+      return transDate >= start && transDate <= end;
+    });
+  }, [financialTransactions]);
+
+  const getOverdueTransactions = useCallback((): FinancialTransaction[] => {
+    const today = new Date();
+    
+    return financialTransactions.filter(t => {
+      const dueDate = new Date(t.due_date);
+      return t.status === 'pending' && dueDate < today;
+    });
+  }, [financialTransactions]);
+
+  // ============================================
+  // MÉTODOS CRUD - CONTAS BANCÁRIAS
+  // ============================================
+
+  const addBankAccount = useCallback(async (
+    data: Omit<BankAccount, 'id' | 'created_at' | 'updated_at' | 'user_id' | 'current_balance'>
+  ) => {
+    ensureUser();
+    
+    console.log('🏦 Criando conta bancária:', data);
+    
+    const newAccount = {
+      ...cleanUndefined(data),
+      current_balance: data.initial_balance,
+      user_id: user!.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    
+    const { error } = await supabase
+      .from('bank_accounts')
+      .insert([newAccount]);
+    
+    if (error) {
+      console.error('❌ Erro ao criar conta:', error);
+      throw error;
+    }
+    
+    console.log('✅ Conta bancária criada');
+    await loadBankAccounts();
+  }, [user, loadBankAccounts]);
+
+  const updateBankAccount = useCallback(async (
+    id: string,
+    data: Partial<BankAccount>
+  ) => {
+    ensureUser();
+    
+    console.log('🏦 Atualizando conta bancária:', id, data);
+    
+    const { error } = await supabase
+      .from('bank_accounts')
+      .update({
+        ...cleanUndefined(data),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .eq('user_id', user!.id);
+    
+    if (error) {
+      console.error('❌ Erro ao atualizar conta:', error);
+      throw error;
+    }
+    
+    console.log('✅ Conta bancária atualizada');
+    await loadBankAccounts();
+  }, [user, loadBankAccounts]);
+
+  const deleteBankAccount = useCallback(async (id: string) => {
+    ensureUser();
+    
+    console.log('🗑️ Deletando conta bancária:', id);
+    
+    const { error } = await supabase
+      .from('bank_accounts')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user!.id);
+    
+    if (error) {
+      console.error('❌ Erro ao deletar conta:', error);
+      throw error;
+    }
+    
+    console.log('✅ Conta bancária deletada');
+    await loadBankAccounts();
+  }, [user, loadBankAccounts]);
+
+    const updateBankAccountBalance = useCallback(async (
+    accountId: string,
+    amount: number,
+    operation: 'add' | 'subtract'
+  ) => {
+    ensureUser();
+    
+    console.log('💰 Atualizando saldo da conta:', accountId, amount, operation);
+    
+    const { data: account, error: fetchError } = await supabase
+      .from('bank_accounts')
+      .select('current_balance')
+      .eq('id', accountId)
+      .eq('user_id', user!.id)
+      .single();
+    
+    if (fetchError || !account) {
+      console.error('❌ Conta não encontrada');
+      return;
+    }
+    
+    const newBalance = operation === 'add'
+      ? account.current_balance + amount
+      : account.current_balance - amount;
+    
+    const { error } = await supabase
+      .from('bank_accounts')
+      .update({
+        current_balance: newBalance,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', accountId)
+      .eq('user_id', user!.id);
+    
+    if (error) {
+      console.error('❌ Erro ao atualizar saldo:', error);
+      throw error;
+    }
+    
+    console.log('✅ Saldo atualizado:', newBalance);
+    await loadBankAccounts();
+  }, [user, loadBankAccounts]);
+
+  // ============================================
+  // MÉTODOS CRUD - CENTROS DE CUSTO
+  // ============================================
+
+  const addCostCenter = useCallback(async (
+    data: Omit<CostCenter, 'id' | 'created_at' | 'updated_at' | 'user_id' | 'parent_name'>
+  ) => {
+    ensureUser();
+    
+    console.log('🎯 Criando centro de custo:', data);
+    
+    const newCostCenter = {
+      ...cleanUndefined(data),
+      user_id: user!.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    
+    const { error } = await supabase
+      .from('cost_centers')
+      .insert([newCostCenter]);
+    
+    if (error) {
+      console.error('❌ Erro ao criar centro de custo:', error);
+      throw error;
+    }
+    
+    console.log('✅ Centro de custo criado');
+    await loadCostCenters();
+  }, [user, loadCostCenters]);
+
+  const updateCostCenter = useCallback(async (
+    id: string,
+    data: Partial<CostCenter>
+  ) => {
+    ensureUser();
+    
+    console.log('🎯 Atualizando centro de custo:', id, data);
+    
+    const { error } = await supabase
+      .from('cost_centers')
+      .update({
+        ...cleanUndefined(data),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .eq('user_id', user!.id);
+    
+    if (error) {
+      console.error('❌ Erro ao atualizar centro de custo:', error);
+      throw error;
+    }
+    
+    console.log('✅ Centro de custo atualizado');
+    await loadCostCenters();
+  }, [user, loadCostCenters]);
+
+  const deleteCostCenter = useCallback(async (id: string) => {
+    ensureUser();
+    
+    console.log('🗑️ Deletando centro de custo:', id);
+    
+    const { error } = await supabase
+      .from('cost_centers')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user!.id);
+    
+    if (error) {
+      console.error('❌ Erro ao deletar centro de custo:', error);
+      throw error;
+    }
+    
+    console.log('✅ Centro de custo deletado');
+    await loadCostCenters();
+  }, [user, loadCostCenters]);
+
+  // ============================================
+  // MÉTODOS - ESTOQUE
+  // ============================================
 
   const addStockMovement = useCallback(async (data: Omit<StockMovement, "id" | "created_at" | "user_id">) => {
     ensureUser();
@@ -2270,6 +1977,10 @@ const deleteCostCenter = useCallback(async (id: string) => {
 
     await Promise.all(movementPromises);
   }, [addStockMovement]);
+
+  // ============================================
+  // MÉTODOS CRUD - VENDAS
+  // ============================================
 
   const addSale = useCallback(async (sale: Omit<Sale, 'id' | 'created_at' | 'updated_at' | 'user_id'>) => {
     ensureUser();
@@ -2347,76 +2058,79 @@ const deleteCostCenter = useCallback(async (id: string) => {
     await loadSales();
   }, [user, loadSales]);
 
-    const addPurchase = useCallback(async (purchase: Omit<Purchase, 'id' | 'created_at' | 'updated_at' | 'user_id'>) => {
-  ensureUser();
+  // ============================================
+  // MÉTODOS CRUD - COMPRAS
+  // ============================================
 
-  const newPurchase = {
-    date: purchase.date,
-    supplier_id: purchase.supplier_id,
-    total: purchase.total,
-    status: purchase.status,
-    invoice_number: purchase.invoice_number,
-    notes: purchase.notes,
-    user_id: user!.id,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  };
+  const addPurchase = useCallback(async (purchase: Omit<Purchase, 'id' | 'created_at' | 'updated_at' | 'user_id'>) => {
+    ensureUser();
 
-  const { data: insertedPurchase, error: purchaseError } = await supabase
-    .from('purchases')
-    .insert([newPurchase])
-    .select()
-    .single();
+    const newPurchase = {
+      date: purchase.date,
+      supplier_id: purchase.supplier_id,
+      total: purchase.total,
+      status: purchase.status,
+      invoice_number: purchase.invoice_number,
+      notes: purchase.notes,
+      user_id: user!.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
 
-  if (purchaseError) throw purchaseError;
+    const { data: insertedPurchase, error: purchaseError } = await supabase
+      .from('purchases')
+      .insert([newPurchase])
+      .select()
+      .single();
 
-  if (purchase.items && purchase.items.length > 0) {
-    const purchaseItems = purchase.items.map(item => ({
-      purchase_id: insertedPurchase.id,
-      product_id: item.product_id,
-      product_name: item.product_name,
-      quantity: item.quantity,
-      unit_cost: item.unit_cost,
-      total: item.total,
-    })).filter(item => item.quantity > 0);
+    if (purchaseError) throw purchaseError;
 
-    const { error: itemsError } = await supabase.from('purchase_items').insert(purchaseItems);
-    if (itemsError) throw itemsError;
-  }
-
-  if (purchase.status === 'received') {
-    const movements = purchase.items?.map(item => 
-      addStockMovement({
+    if (purchase.items && purchase.items.length > 0) {
+      const purchaseItems = purchase.items.map(item => ({
+        purchase_id: insertedPurchase.id,
         product_id: item.product_id,
         product_name: item.product_name,
-        movement_type: 'entrada',
         quantity: item.quantity,
-        unit_price: item.unit_cost,
-        total_value: item.total,
-        reference_type: 'manual',
+        unit_cost: item.unit_cost,
+        total: item.total,
+      })).filter(item => item.quantity > 0);
+
+      const { error: itemsError } = await supabase.from('purchase_items').insert(purchaseItems);
+      if (itemsError) throw itemsError;
+    }
+
+    if (purchase.status === 'received') {
+      const movements = purchase.items?.map(item => 
+        addStockMovement({
+          product_id: item.product_id,
+          product_name: item.product_name,
+          movement_type: 'entrada',
+          quantity: item.quantity,
+          unit_price: item.unit_cost,
+          total_value: item.total,
+          reference_type: 'manual',
+          date: purchase.date,
+          notes: `Compra #${insertedPurchase.id}`,
+        })
+      ) || [];
+
+      await Promise.all(movements);
+
+      await addTransaction({
+        type: 'saida',
+        category: 'compra',
+        description: `Compra do fornecedor #${purchase.supplier_id}`,
+        amount: purchase.total,
         date: purchase.date,
-        notes: `Compra #${insertedPurchase.id}`,
-      })
-    ) || [];
+      });
+    }
 
-    await Promise.all(movements);
+    if (insertedPurchase && insertedPurchase.id) {
+      await createTransactionsFromPurchase(insertedPurchase.id, purchase);
+    }
 
-    await addTransaction({
-      type: 'saida',
-      category: 'compra',
-      description: `Compra do fornecedor #${purchase.supplier_id}`,
-      amount: purchase.total,
-      date: purchase.date,
-    });
-  }
-
-  if (insertedPurchase && insertedPurchase.id) {
-    await createTransactionsFromPurchase(insertedPurchase.id, purchase);
-  }
-
-  await refreshData();
-}, [user, addStockMovement, addTransaction, refreshData, createTransactionsFromPurchase]);
-  
+    await refreshData();
+  }, [user, addStockMovement, addTransaction, refreshData, createTransactionsFromPurchase]);
 
   const updatePurchase = useCallback(async (id: string, purchase: Partial<Purchase>) => {
     ensureUser();
@@ -2439,6 +2153,10 @@ const deleteCostCenter = useCallback(async (id: string) => {
     if (error) throw error;
     await loadPurchases();
   }, [user, loadPurchases]);
+
+  // ============================================
+  // MÉTODOS CRUD - FORNECEDORES
+  // ============================================
 
   const addSupplier = useCallback(async (supplier: Omit<Supplier, 'id' | 'created_at' | 'updated_at'>) => {
     ensureUser();
@@ -2476,8 +2194,267 @@ const deleteCostCenter = useCallback(async (id: string) => {
   const getAvailableComponents = useCallback(() => {
     return validateArray(products);
   }, [products]);
+    // ============================================
+  // MÉTODOS DE INTEGRAÇÃO AUTOMÁTICA
+  // ============================================
 
-  // ✅ CORREÇÃO: getDashboardStats sem campo 'title'
+  const createTransactionsFromSale = useCallback(async (
+    saleId: string,
+    saleData: Sale
+  ) => {
+    ensureUser();
+    
+    console.log('🛒 Criando transações a partir da venda:', saleId);
+    
+    const client = clients.find(c => c.id === saleData.client_id);
+    
+    if (saleData.status === 'completed') {
+      const transaction: CreateFinancialTransactionData = {
+        type: 'income',
+        category: 'Vendas',
+        description: `Venda #${saleId.substring(0, 8)} - ${client?.name || 'Cliente'}`,
+        amount: saleData.total,
+        date: saleData.date,
+        due_date: saleData.date,
+        payment_date: saleData.date,
+        status: 'paid',
+        payment_method: (saleData.payment_method as any) || 'dinheiro',
+        reference_type: 'sale',
+        reference_id: saleId,
+        client_id: saleData.client_id,
+        notes: saleData.notes,
+      };
+      
+      await addFinancialTransaction(transaction);
+      console.log('✅ Transação de venda criada');
+    }
+  }, [user, clients, addFinancialTransaction]);
+
+  const createTransactionsFromPurchase = useCallback(async (
+    purchaseId: string,
+    purchaseData: Purchase
+  ) => {
+    ensureUser();
+    
+    console.log('🛍️ Criando transações a partir da compra:', purchaseId);
+    
+    const supplier = suppliers.find(s => s.id === purchaseData.supplier_id);
+    const paymentInfo = (purchaseData as any).payment_info;
+    
+    if (!paymentInfo) {
+      console.warn('⚠️ Compra sem informações de pagamento');
+      return;
+    }
+    
+    const installments = paymentInfo.installments || 1;
+    const installmentValue = paymentInfo.installment_value || (purchaseData.total / installments);
+    const firstDueDate = new Date(paymentInfo.first_due_date || purchaseData.date);
+    
+    for (let i = 0; i < installments; i++) {
+      const dueDate = new Date(firstDueDate);
+      dueDate.setMonth(dueDate.getMonth() + i);
+      
+      const transaction: CreateFinancialTransactionData = {
+        type: 'expense',
+        category: 'Compras',
+        description: `Compra NF ${purchaseData.invoice_number || purchaseId.substring(0, 8)} - ${supplier?.name || 'Fornecedor'} - Parcela ${i + 1}/${installments}`,
+        amount: installmentValue,
+        date: purchaseData.date,
+        due_date: dueDate.toISOString().split('T')[0],
+        status: paymentInfo.paid ? 'paid' : 'pending',
+        payment_date: paymentInfo.paid ? paymentInfo.paid_date : undefined,
+        payment_method: paymentInfo.payment_method,
+        installment_number: i + 1,
+        total_installments: installments,
+        reference_type: 'purchase',
+        reference_id: purchaseId,
+        reference_number: purchaseData.invoice_number,
+        supplier_id: purchaseData.supplier_id,
+        notes: purchaseData.notes,
+      };
+      
+      await addFinancialTransaction(transaction);
+    }
+    
+    if (paymentInfo.has_shipping && paymentInfo.shipping_cost > 0) {
+      const shippingTransaction: CreateFinancialTransactionData = {
+        type: 'expense',
+        category: 'Frete',
+        description: `Frete - Compra NF ${purchaseData.invoice_number || purchaseId.substring(0, 8)} - ${paymentInfo.shipping_type || 'Entrega'}`,
+        amount: paymentInfo.shipping_cost,
+        date: purchaseData.date,
+        due_date: paymentInfo.first_due_date || purchaseData.date,
+        status: paymentInfo.paid ? 'paid' : 'pending',
+        payment_date: paymentInfo.paid ? paymentInfo.paid_date : undefined,
+        payment_method: paymentInfo.payment_method,
+        reference_type: 'purchase',
+        reference_id: purchaseId,
+        supplier_id: purchaseData.supplier_id,
+      };
+      
+      await addFinancialTransaction(shippingTransaction);
+    }
+    
+    console.log(`✅ ${installments} transação(ões) de compra criada(s)`);
+  }, [user, suppliers, addFinancialTransaction]);
+
+  const createTransactionsFromProject = useCallback(async (
+    projectId: string,
+    projectData: Project
+  ) => {
+    ensureUser();
+    
+    console.log('📋 Criando transações a partir do projeto:', projectId);
+    
+    if (projectData.type !== 'venda') {
+      console.log('ℹ️ Projeto é orçamento, pulando criação de transações');
+      return;
+    }
+    
+    const client = clients.find(c => c.id === projectData.client_id);
+    const paymentTerms = projectData.payment_terms;
+    
+    if (!paymentTerms) {
+      console.warn('⚠️ Projeto sem termos de pagamento');
+      return;
+    }
+    
+    const discount = projectData.budget * (paymentTerms.discount_percentage / 100);
+    const finalValue = projectData.budget - discount;
+    const installmentValue = paymentTerms.installment_value || (finalValue / paymentTerms.installments);
+    
+    for (let i = 0; i < paymentTerms.installments; i++) {
+      const dueDate = new Date(projectData.start_date);
+      dueDate.setMonth(dueDate.getMonth() + i);
+      
+      const transaction: CreateFinancialTransactionData = {
+        type: 'income',
+        category: 'Vendas',
+        subcategory: 'Projetos',
+        description: `${projectData.order_number} - ${client?.name || 'Cliente'} - Parcela ${i + 1}/${paymentTerms.installments}`,
+        amount: installmentValue,
+        discount: i === 0 ? discount : 0,
+        date: projectData.start_date,
+        due_date: dueDate.toISOString().split('T')[0],
+        status: 'pending',
+        payment_method: paymentTerms.payment_method,
+        installment_number: i + 1,
+        total_installments: paymentTerms.installments,
+        reference_type: 'project',
+        reference_id: projectId,
+        reference_number: projectData.order_number,
+        client_id: projectData.client_id,
+        project_id: projectId,
+      };
+      
+      await addFinancialTransaction(transaction);
+    }
+    
+    console.log(`✅ ${paymentTerms.installments} transação(ões) do projeto criada(s)`);
+  }, [user, clients, addFinancialTransaction]);
+
+  // ============================================
+  // MÉTODOS DE RELATÓRIOS
+  // ============================================
+
+  const getFinancialSummary = useCallback((
+    startDate: string,
+    endDate: string
+  ) => {
+    const transactions = getTransactionsByPeriod(startDate, endDate);
+    
+    const totalIncome = transactions
+      .filter(t => t.type === 'income' && t.status === 'paid')
+      .reduce((sum, t) => sum + (t.paid_amount || t.amount), 0);
+    
+    const totalExpense = transactions
+      .filter(t => t.type === 'expense' && t.status === 'paid')
+      .reduce((sum, t) => sum + (t.paid_amount || t.amount), 0);
+    
+    const pendingIncome = transactions
+      .filter(t => t.type === 'income' && t.status === 'pending')
+      .reduce((sum, t) => sum + t.amount, 0);
+    
+    const pendingExpense = transactions
+      .filter(t => t.type === 'expense' && t.status === 'pending')
+      .reduce((sum, t) => sum + t.amount, 0);
+    
+    return {
+      totalIncome,
+      totalExpense,
+      balance: totalIncome - totalExpense,
+      pendingIncome,
+      pendingExpense,
+    };
+  }, [getTransactionsByPeriod]);
+
+  const getCashFlow = useCallback((months: number) => {
+    const result: Array<{
+      month: string;
+      income: number;
+      expense: number;
+      balance: number;
+    }> = [];
+    
+    const today = new Date();
+    
+    for (let i = 0; i < months; i++) {
+      const monthDate = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+      const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+      
+      const monthTransactions = getTransactionsByPeriod(
+        monthStart.toISOString().split('T')[0],
+        monthEnd.toISOString().split('T')[0]
+      );
+      
+      const income = monthTransactions
+        .filter(t => t.type === 'income' && t.status === 'paid')
+        .reduce((sum, t) => sum + (t.paid_amount || t.amount), 0);
+      
+      const expense = monthTransactions
+        .filter(t => t.type === 'expense' && t.status === 'paid')
+        .reduce((sum, t) => sum + (t.paid_amount || t.amount), 0);
+      
+      result.push({
+        month: monthDate.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }),
+        income,
+        expense,
+        balance: income - expense,
+      });
+    }
+    
+    return result.reverse();
+  }, [getTransactionsByPeriod]);
+
+  const getExpensesByCategory = useCallback((
+    startDate: string,
+    endDate: string
+  ) => {
+    const transactions = getTransactionsByPeriod(startDate, endDate);
+    
+    const expenses = transactions.filter(t => 
+      t.type === 'expense' && t.status === 'paid'
+    );
+    
+    const total = expenses.reduce((sum, t) => sum + (t.paid_amount || t.amount), 0);
+    
+    const byCategory: { [key: string]: number } = {};
+    
+    expenses.forEach(t => {
+      const category = t.category || 'Sem categoria';
+      byCategory[category] = (byCategory[category] || 0) + (t.paid_amount || t.amount);
+    });
+    
+    return Object.entries(byCategory)
+      .map(([category, amount]) => ({
+        category,
+        total: amount,
+        percentage: total > 0 ? (amount / total) * 100 : 0,
+      }))
+      .sort((a, b) => b.total - a.total);
+  }, [getTransactionsByPeriod]);
+
   const getDashboardStats = useCallback(() => {
     const totalClients = clients.length;
     const activeProjects = projects.filter(p => 
@@ -2517,7 +2494,6 @@ const deleteCostCenter = useCallback(async (id: string) => {
       p.current_stock <= p.min_stock
     ).length;
 
-    // ✅ CORREÇÃO: Usando description em vez de title
     const recentActivity = [
       ...(projects || []).slice(-3).map(p => ({
         type: "project",
@@ -2551,8 +2527,7 @@ const deleteCostCenter = useCallback(async (id: string) => {
       recentActivity: Array.isArray(recentActivity) ? recentActivity : [],
     };
   }, [clients, projects, sales, purchases, transactions, products]);
-
-  return (
+    return (
     <AppContext.Provider
       value={{
         clients: validateArray(clients),
@@ -2570,71 +2545,87 @@ const deleteCostCenter = useCallback(async (id: string) => {
         loading,
         error,
 
+        // Métodos CRUD - Clientes
         addClient,
         updateClient,
         deleteClient,
 
+        // Métodos CRUD - Projetos
         addProject,
         updateProject,
         deleteProject,
 
+        // Métodos CRUD - Produtos
         addProduct,
         updateProduct,
         deleteProduct,
 
+        // Métodos CRUD - Transações
         addTransaction,
-        addStockMovement,
-        processProjectStockMovement,
 
-        addSale,
-        updateSale,
-        deleteSale,
-
-        addPurchase,
-        updatePurchase,
-        deletePurchase,
-
-        addSupplier,
-        updateSupplier,
-        deleteSupplier,
-
-        addCategory,
-        loadCategories,
-
-        calculateProductCost,
-        getAvailableComponents,
-        getDashboardStats,
-
+        // Métodos CRUD - Transações Financeiras
         addFinancialTransaction,
         updateFinancialTransaction,
         deleteFinancialTransaction,
-        
         payTransaction,
         getTransactionsByPeriod,
         getOverdueTransactions,
-      
+
+        // Métodos CRUD - Contas Bancárias
         addBankAccount,
         updateBankAccount,
         deleteBankAccount,
         updateBankAccountBalance,
-      
+
+        // Métodos CRUD - Centros de Custo
         addCostCenter,
         updateCostCenter,
         deleteCostCenter,
-      
+
+        // Métodos - Estoque
+        addStockMovement,
+        processProjectStockMovement,
+
+        // Métodos CRUD - Vendas
+        addSale,
+        updateSale,
+        deleteSale,
+
+        // Métodos CRUD - Compras
+        addPurchase,
+        updatePurchase,
+        deletePurchase,
+
+        // Métodos CRUD - Fornecedores
+        addSupplier,
+        updateSupplier,
+        deleteSupplier,
+
+        // Métodos - Categorias
+        addCategory,
+        loadCategories,
+
+        // Métodos - Utilitários
+        calculateProductCost,
+        getAvailableComponents,
+        getDashboardStats,
+
+        // Método de atualização
+        refreshData,
+
+        // Métodos de Integração Automática
         createTransactionsFromSale,
         createTransactionsFromPurchase,
         createTransactionsFromProject,
-      
-        getFinancialSummary: () => ({ totalIncome: 0, totalExpense: 0, balance: 0, pendingIncome: 0, pendingExpense: 0 }),
-        getCashFlow: () => [],
-        getExpensesByCategory: () => [],
-        
-        refreshData,
+
+        // Métodos de Relatórios
+        getFinancialSummary,
+        getCashFlow,
+        getExpensesByCategory,
+
+        // Métodos para Debug
         reloadProject,
         debugProject,
-
-        
       }}
     >
       {loading ? (
