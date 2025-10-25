@@ -361,7 +361,7 @@ export interface PayTransactionData {
 }
 
 // ---------------------------------------------------------------
-// Contexto
+// Interface do Contexto
 // ---------------------------------------------------------------
 
 interface AppContextType {
@@ -388,6 +388,10 @@ interface AppContextType {
   updateProject: (id: string, data: Partial<Project>) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
 
+  addProduct: (data: Omit<Product, "id" | "created_at" | "updated_at" | "user_id">) => Promise<void>;
+  updateProduct: (data: Product) => Promise<void>;
+  deleteProduct: (id: string) => Promise<void>;
+
   addTransaction: (data: Omit<Transaction, "id" | "created_at" | "user_id">) => Promise<void>;
   addFinancialTransaction: (data: CreateFinancialTransactionData) => Promise<FinancialTransaction>;
   updateFinancialTransaction: (id: string, data: UpdateFinancialTransactionData) => Promise<void>;
@@ -404,10 +408,6 @@ interface AppContextType {
   addCostCenter: (data: Omit<CostCenter, 'id' | 'created_at' | 'updated_at' | 'user_id' | 'parent_name'>) => Promise<void>;
   updateCostCenter: (id: string, data: Partial<CostCenter>) => Promise<void>;
   deleteCostCenter: (id: string) => Promise<void>;
-  
-  addProduct: (data: Omit<Product, "id" | "created_at" | "updated_at" | "user_id">) => Promise<void>;
-  updateProduct: (data: Product) => Promise<void>;
-  deleteProduct: (id: string) => Promise<void>;
 
   addStockMovement: (data: Omit<StockMovement, "id" | "created_at" | "user_id">) => Promise<void>;
   processProjectStockMovement: (projectId: string, products: ProjectProduct[]) => Promise<void>;
