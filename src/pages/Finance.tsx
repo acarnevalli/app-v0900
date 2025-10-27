@@ -277,7 +277,6 @@ const AccountsTabContent: React.FC<{
   getAccountTypeColor?: (type: string) => string;
 }> = (props) => {
   // Como será usado dentro do escopo do Finance, vamos acessar as props
-  const context = React.useContext(require('../contexts/AppContext').AppContext) || {};
   
   return (
     <div className="space-y-6">
