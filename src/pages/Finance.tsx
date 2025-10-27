@@ -1135,7 +1135,7 @@ const handleSaveTransaction = async () => {
                 </div>
               </div>
             </div>
-
+          )
           <div className="mt-8">
         <TransactionsView
           title="Transações Recentes"
