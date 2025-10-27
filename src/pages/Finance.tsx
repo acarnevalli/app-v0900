@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { formatCurrency, formatDate } from '../lib/utils';
+import { TransactionModal } from '../components/TransactionModal';
 
 // ====== MODAL DE CONTA BANCÁRIA (FORA DO COMPONENTE) ======
 interface AccountModalProps {
@@ -458,6 +459,24 @@ const Finance: React.FC = () => {
     active: true,
   });
 
+  // ====== ESTADOS PARA TRANSAÇÕES ======
+  const [showTransactionModal, setShowTransactionModal] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<any>(null);
+  const [transactionForm, setTransactionForm] = useState({
+    type: 'expense' as 'income' | 'expense',
+    description: '',
+    amount: 0,
+    date: new Date().toISOString().split('T')[0],
+    due_date: new Date().toISOString().split('T')[0],
+    status: 'pending' as 'pending' | 'paid' | 'cancelled',
+    payment_date: '',
+    client_id: null,
+    supplier_id: null,
+    bank_account_id: null,
+    cost_center_id: null,
+  });
+
+  
   // ====== CÁLCULOS ======
   const today = new Date();
   const currentMonth = today.getMonth();
@@ -719,6 +738,81 @@ const totalBankBalance = useMemo(() =>
     };
     return colors[type] || colors.checking;
   };
+
+  // ====== FUNÇÕES DE TRANSAÇÕES ======
+const { addFinancialTransaction, updateFinancialTransaction, clients = [], suppliers = [] } = useApp();
+
+const handleOpenTransactionModal = (transaction?: any) => {
+  const today = new Date().toISOString().split('T')[0];
+  if (transaction) {
+    setEditingTransaction(transaction);
+    setTransactionForm({
+      ...transaction,
+      date: transaction.date ? new Date(transaction.date).toISOString().split('T')[0] : today,
+      due_date: transaction.due_date ? new Date(transaction.due_date).toISOString().split('T')[0] : today,
+      payment_date: transaction.payment_date ? new Date(transaction.payment_date).toISOString().split('T')[0] : '',
+    });
+  } else {
+    setEditingTransaction(null);
+    setTransactionForm({
+      type: 'expense',
+      description: '',
+      amount: 0,
+      date: today,
+      due_date: today,
+      status: 'pending',
+      payment_date: '',
+      client_id: null,
+      supplier_id: null,
+      bank_account_id: null,
+      cost_center_id: null,
+    });
+  }
+  setShowTransactionModal(true);
+};
+
+const handleCloseTransactionModal = () => {
+  setShowTransactionModal(false);
+  setEditingTransaction(null);
+};
+
+const handleSaveTransaction = async () => {
+  // Validações básicas
+  if (!transactionForm.description.trim()) {
+    alert('A descrição é obrigatória.');
+    return;
+  }
+  if (transactionForm.amount <= 0) {
+    alert('O valor deve ser maior que zero.');
+    return;
+  }
+  if (transactionForm.status === 'paid' && !transactionForm.bank_account_id) {
+    alert('Para transações pagas, é obrigatório selecionar uma conta bancária.');
+    return;
+  }
+
+  try {
+    const dataToSave = { ...transactionForm };
+    // Limpar IDs nulos para não enviar para o Supabase
+    if (!dataToSave.client_id) delete dataToSave.client_id;
+    if (!dataToSave.supplier_id) delete dataToSave.supplier_id;
+    if (!dataToSave.bank_account_id) delete dataToSave.bank_account_id;
+    if (!dataToSave.cost_center_id) delete dataToSave.cost_center_id;
+    if (!dataToSave.payment_date) delete dataToSave.payment_date;
+
+
+    if (editingTransaction) {
+      await updateFinancialTransaction(editingTransaction.id, dataToSave);
+    } else {
+      await addFinancialTransaction(dataToSave);
+    }
+    handleCloseTransactionModal();
+  } catch (error) {
+    console.error("Erro ao salvar transação:", error);
+    alert('Ocorreu um erro ao salvar a transação.');
+  }
+};
+  
     // ====== COMPONENTES UI ======
 
   const StatCard: React.FC<{
@@ -791,7 +885,7 @@ const totalBankBalance = useMemo(() =>
           <p className="text-gray-600 mt-1">Controle completo das suas finanças</p>
         </div>
         <button
-          onClick={() => {/* TODO: Abrir modal de nova transação */}}
+          onClick={() => handleOpenTransactionModal()}
           className="bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-lg font-medium flex items-center space-x-2 hover:from-green-700 hover:to-green-800 transition-all duration-200 shadow-lg hover:shadow-xl"
         >
           <Plus className="h-5 w-5" />
@@ -1016,6 +1110,21 @@ const totalBankBalance = useMemo(() =>
         setAccountForm={setAccountForm}
         editingAccount={editingAccount}
       />
+
+      {/* NOVO: Modal de Transação */}
+      <TransactionModal
+        isOpen={showTransactionModal}
+        onClose={handleCloseTransactionModal}
+        onSave={handleSaveTransaction}
+        formState={transactionForm}
+        setFormState={setTransactionForm}
+        editingTransaction={editingTransaction}
+        clients={clients}
+        suppliers={suppliers}
+        bankAccounts={bankAccounts}
+        costCenters={costCenters}
+      />
+      
     </div>
   );
 };
