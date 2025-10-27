@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { formatCurrency, formatDate } from '../lib/utils';
-import { TransactionModal } from '../components/TransactionModal';
+import TransactionModal from '../components/TransactionModal';
 
 // ====== MODAL DE CONTA BANCÁRIA (FORA DO COMPONENTE) ======
 interface AccountModalProps {
