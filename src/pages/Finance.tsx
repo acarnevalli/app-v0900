@@ -31,6 +31,7 @@ import {
 import { useApp } from '../contexts/AppContext';
 import { formatCurrency, formatDate } from '../lib/utils';
 import TransactionModal from '../components/TransactionModal';
+import TransactionsTable from '../components/TransactionsTable';
 
 // ====== MODAL DE CONTA BANCÁRIA (FORA DO COMPONENTE) ======
 interface AccountModalProps {
@@ -426,6 +427,68 @@ const AccountsTabContent: React.FC<{
   );
 };
 
+// Componente para a Barra de Ferramentas de Filtro
+const TransactionFilters: React.FC<{
+  searchTerm: string;
+  setSearchTerm: (value: string) => void;
+  statusFilter: string;
+  setStatusFilter: (value: string) => void;
+}> = ({ searchTerm, setSearchTerm, statusFilter, setStatusFilter }) => (
+  <div className="flex flex-col md:flex-row items-center justify-between gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+    <div className="flex-grow w-full">
+      <input
+        type="text"
+        placeholder="Buscar por descrição, cliente, fornecedor..."
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+      />
+    </div>
+    <div className="w-full md:w-auto">
+      <select
+        value={statusFilter}
+        onChange={(e) => setStatusFilter(e.target.value)}
+        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+      >
+        <option value="all">Todos os Status</option>
+        <option value="pending">Pendente</option>
+        <option value="paid">Pago</option>
+        <option value="overdue">Vencido</option>
+        <option value="cancelled">Cancelado</option>
+      </select>
+    </div>
+  </div>
+);
+
+// Componente para a Visualização da Tabela com Filtros
+const TransactionsView: React.FC<{
+  title: string;
+  transactions: any[];
+  searchTerm: string;
+  setSearchTerm: (value: string) => void;
+  statusFilter: string;
+  setStatusFilter: (value: string) => void;
+  onEdit: (transaction: any) => void;
+  onDelete: (transactionId: string) => void;
+  onPay: (transaction: any) => void;
+}> = ({ title, transactions, searchTerm, setSearchTerm, statusFilter, setStatusFilter, onEdit, onDelete, onPay }) => (
+  <div className="space-y-4">
+    <h3 className="text-xl font-bold text-gray-800">{title}</h3>
+    <TransactionFilters
+      searchTerm={searchTerm}
+      setSearchTerm={setSearchTerm}
+      statusFilter={statusFilter}
+      setStatusFilter={setStatusFilter}
+    />
+    <TransactionsTable
+      transactions={transactions}
+      onEdit={onEdit}
+      onDelete={onDelete}
+      onPay={onPay}
+    />
+  </div>
+);
+
 const Finance: React.FC = () => {
   const { 
     financialTransactions = [],
@@ -598,27 +661,33 @@ const totalBankBalance = useMemo(() =>
   const projectedBalance = totalBankBalance + projectedIncome - projectedExpense;
 
   // Filtrar transações
-  const filteredTransactions = useMemo(() => {
-    let filtered = financialTransactions;
+const filteredTransactions = useMemo(() => {
+  let items = financialTransactions;
 
-    // Filtro de busca
-    if (searchTerm.trim()) {
-      const search = searchTerm.toLowerCase();
-      filtered = filtered.filter(t =>
-        t.description.toLowerCase().includes(search) ||
-        t.client_name?.toLowerCase().includes(search) ||
-        t.supplier_name?.toLowerCase().includes(search) ||
-        t.category.toLowerCase().includes(search)
-      );
-    }
+  // 1. Filtro por Aba Ativa
+  if (activeTab === 'receivables') {
+    items = items.filter(t => t.type === 'income');
+  } else if (activeTab === 'payables') {
+    items = items.filter(t => t.type === 'expense');
+  }
 
-    // Filtro de status
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(t => t.status === statusFilter);
-    }
+  // 2. Filtro de Busca
+  if (searchTerm.trim()) {
+    const search = searchTerm.toLowerCase();
+    items = items.filter(t =>
+      t.description.toLowerCase().includes(search) ||
+      t.client_name?.toLowerCase().includes(search) ||
+      t.supplier_name?.toLowerCase().includes(search)
+    );
+  }
 
-    return filtered;
-  }, [financialTransactions, searchTerm, statusFilter]);
+  // 3. Filtro de Status
+  if (statusFilter !== 'all') {
+    items = items.filter(t => t.status === statusFilter);
+  }
+
+  return items;
+}, [financialTransactions, activeTab, searchTerm, statusFilter]);
 
   // ====== FUNÇÕES DE CONTAS BANCÁRIAS ======
   const handleOpenAccountModal = (account?: any) => {
@@ -740,7 +809,7 @@ const totalBankBalance = useMemo(() =>
   };
 
   // ====== FUNÇÕES DE TRANSAÇÕES ======
-const { addFinancialTransaction, updateFinancialTransaction, clients = [], suppliers = [] } = useApp();
+const { addFinancialTransaction, updateFinancialTransaction, deleteFinancialTransaction, clients = [], suppliers = [] } = useApp();
 
 const handleOpenTransactionModal = (transaction?: any) => {
   const today = new Date().toISOString().split('T')[0];
@@ -810,6 +879,17 @@ const handleSaveTransaction = async () => {
   } catch (error) {
     console.error("Erro ao salvar transação:", error);
     alert('Ocorreu um erro ao salvar a transação.');
+  }
+};
+
+  const handleDeleteTransaction = async (transactionId: string) => {
+  if (window.confirm('Tem certeza que deseja excluir esta transação? Essa ação não pode ser desfeita.')) {
+    try {
+      await deleteFinancialTransaction(transactionId);
+    } catch (error) {
+      console.error('Erro ao excluir transação:', error);
+      alert('Não foi possível excluir a transação.');
+    }
   }
 };
   
@@ -926,9 +1006,11 @@ const handleSaveTransaction = async () => {
         </div>
 
         <div className="p-6">
+          
           {/* Conteúdo da Aba Ativa */}
           {activeTab === 'overview' && (
             <div className="space-y-6">
+              
               {/* Cards de Resumo */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <StatCard
@@ -1053,6 +1135,20 @@ const handleSaveTransaction = async () => {
                 </div>
               </div>
             </div>
+
+          <div className="mt-8">
+        <TransactionsView
+          title="Transações Recentes"
+           transactions={filteredTransactions}
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          statusFilter={statusFilter}
+          setStatusFilter={setStatusFilter}
+          onEdit={handleOpenTransactionModal}
+          onDelete={handleDeleteTransaction}
+          onPay={(t) => alert(`Pagar ${t.description}`)}
+      />
+  </div>
           )}
 
           {/* Aba de Contas Bancárias */}
