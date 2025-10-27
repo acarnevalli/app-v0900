@@ -266,6 +266,166 @@ const AccountModal: React.FC<AccountModalProps> = ({
   );
 };
 
+// ====== CONTEÚDO DA ABA DE CONTAS BANCÁRIAS ======
+const AccountsTabContent: React.FC<{
+  bankAccounts?: any[];
+  handleOpenAccountModal?: (account?: any) => void;
+  handleDeleteAccount?: (id: string) => void;
+  handleToggleAccountActive?: (account: any) => void;
+  totalBankBalance?: number;
+  getAccountTypeLabel?: (type: string) => any;
+  getAccountTypeColor?: (type: string) => string;
+}> = (props) => {
+  // Como será usado dentro do escopo do Finance, vamos acessar as props
+  const context = React.useContext(require('../contexts/AppContext').AppContext) || {};
+  
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-xl font-bold text-gray-800">Contas Bancárias</h3>
+          <p className="text-sm text-gray-600 mt-1">
+            Gerencie suas contas correntes, poupança, dinheiro e investimentos
+          </p>
+        </div>
+        <button
+          onClick={() => props.handleOpenAccountModal?.()}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium flex items-center space-x-2 hover:bg-blue-700 transition-colors"
+        >
+          <Plus className="h-5 w-5" />
+          <span>Nova Conta</span>
+        </button>
+      </div>
+
+      {/* Resumo Total */}
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl shadow-lg p-6 text-white">
+        <p className="text-sm opacity-90 mb-2">Saldo Total em Contas Ativas</p>
+        <p className="text-4xl font-bold">{formatCurrency(props.totalBankBalance || 0)}</p>
+        <p className="text-sm opacity-75 mt-2">
+          {(props.bankAccounts || []).filter((acc: any) => acc.active).length} conta(s) ativa(s)
+        </p>
+      </div>
+
+      {/* Lista de Contas */}
+      {(!props.bankAccounts || props.bankAccounts.length === 0) ? (
+        <div className="bg-white rounded-xl shadow-lg p-12 text-center">
+          <Wallet className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-gray-700 mb-2">
+            Nenhuma conta cadastrada
+          </h3>
+          <p className="text-gray-500 mb-6">
+            Comece cadastrando sua primeira conta bancária
+          </p>
+          <button
+            onClick={() => props.handleOpenAccountModal?.()}
+            className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors inline-flex items-center space-x-2"
+          >
+            <Plus className="h-5 w-5" />
+            <span>Cadastrar Primeira Conta</span>
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {(props.bankAccounts || []).map((account: any) => {
+            const typeInfo = props.getAccountTypeLabel?.(account.type) || { label: 'Conta', icon: null };
+            const typeColor = props.getAccountTypeColor?.(account.type) || '';
+
+            return (
+              <div
+                key={account.id}
+                className={`bg-white rounded-xl shadow-lg border-2 hover:shadow-xl transition-all ${
+                  account.active ? 'border-gray-200' : 'border-gray-300 opacity-60'
+                }`}
+              >
+                {/* Header do Card */}
+                <div className={`p-4 rounded-t-xl ${typeColor}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      {typeInfo.icon}
+                      <span className="text-sm font-semibold">
+                        {typeInfo.label}
+                      </span>
+                    </div>
+                    {!account.active && (
+                      <span className="text-xs bg-white bg-opacity-50 px-2 py-1 rounded">
+                        Inativa
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Conteúdo */}
+                <div className="p-4">
+                  <h4 className="font-semibold text-gray-800 mb-1">
+                    {account.name}
+                  </h4>
+                  
+                  {account.bank_name && (
+                    <p className="text-sm text-gray-600 mb-3">
+                      {account.bank_name}
+                      {account.agency && ` • Ag: ${account.agency}`}
+                      {account.account_number && ` • CC: ${account.account_number}`}
+                    </p>
+                  )}
+
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <p className="text-xs text-gray-500 mb-1">Saldo Atual</p>
+                    <p className={`text-2xl font-bold ${
+                      account.current_balance >= 0 ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {formatCurrency(account.current_balance)}
+                    </p>
+                  </div>
+
+                  {/* Ações */}
+                  <div className="flex items-center space-x-2 mt-4">
+                    <button
+                      onClick={() => props.handleOpenAccountModal?.(account)}
+                      className="flex-1 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium flex items-center justify-center space-x-1"
+                    >
+                      <Edit className="h-4 w-4" />
+                      <span>Editar</span>
+                    </button>
+
+                    <button
+                      onClick={() => props.handleToggleAccountActive?.(account)}
+                      className={`flex-1 px-3 py-2 rounded-lg transition-colors text-sm font-medium flex items-center justify-center space-x-1 ${
+                        account.active
+                          ? 'bg-yellow-50 text-yellow-600 hover:bg-yellow-100'
+                          : 'bg-green-50 text-green-600 hover:bg-green-100'
+                      }`}
+                    >
+                      {account.active ? (
+                        <>
+                          <XCircle className="h-4 w-4" />
+                          <span>Desativar</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="h-4 w-4" />
+                          <span>Ativar</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={() => props.handleDeleteAccount?.(account.id)}
+                      className="px-3 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const Finance: React.FC = () => {
   const { 
     financialTransactions = [],
@@ -389,12 +549,12 @@ const Finance: React.FC = () => {
   );
 
   // Saldo total das contas bancárias
-  const totalBankBalance = useMemo(() =>
-    bankAccounts
-      .filter(acc => acc.active)
-      .reduce((sum, acc) => sum + acc.current_balance, 0),
-    [bankAccounts]
-  );
+const totalBankBalance = useMemo(() =>
+  (bankAccounts || [])
+    .filter(acc => acc.active)
+    .reduce((sum, acc) => sum + acc.current_balance, 0),
+  [bankAccounts]
+);
 
   // Projeção para próximos 30 dias
   const next30Days = useMemo(() => {
@@ -803,8 +963,18 @@ const Finance: React.FC = () => {
           )}
 
           {/* Aba de Contas Bancárias */}
-          {activeTab === 'accounts' && <AccountsTabContent />}
-
+            {activeTab === 'accounts' && (
+              <AccountsTabContent 
+               bankAccounts={bankAccounts}
+               handleOpenAccountModal={handleOpenAccountModal}
+               handleDeleteAccount={handleDeleteAccount}
+               handleToggleAccountActive={handleToggleAccountActive}
+               totalBankBalance={totalBankBalance}
+               getAccountTypeLabel={getAccountTypeLabel}
+               getAccountTypeColor={getAccountTypeColor}
+              />
+            )}
+          
           {/* Placeholder para outras abas */}
           {activeTab === 'receivables' && (
             <div className="text-center py-12">
