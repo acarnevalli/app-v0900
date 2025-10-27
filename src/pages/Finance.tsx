@@ -31,6 +31,241 @@ import {
 import { useApp } from '../contexts/AppContext';
 import { formatCurrency, formatDate } from '../lib/utils';
 
+// ====== MODAL DE CONTA BANCÁRIA (FORA DO COMPONENTE) ======
+interface AccountModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: () => void;
+  accountForm: {
+    name: string;
+    type: 'checking' | 'savings' | 'cash' | 'investment';
+    bank_name: string;
+    agency: string;
+    account_number: string;
+    initial_balance: number;
+    current_balance: number;
+    active: boolean;
+  };
+  setAccountForm: React.Dispatch<React.SetStateAction<any>>;
+  editingAccount: any;
+}
+
+const AccountModal: React.FC<AccountModalProps> = ({
+  isOpen,
+  onClose,
+  onSave,
+  accountForm,
+  setAccountForm,
+  editingAccount,
+}) => {
+  if (!isOpen) return null;
+
+  const getAccountTypeLabel = (type: string) => {
+    const types: { [key: string]: { label: string; icon: React.ReactNode } } = {
+      checking: { label: 'Conta Corrente', icon: <Building2 className="h-5 w-5" /> },
+      savings: { label: 'Poupança', icon: <PiggyBank className="h-5 w-5" /> },
+      cash: { label: 'Dinheiro', icon: <Banknote className="h-5 w-5" /> },
+      investment: { label: 'Investimento', icon: <TrendingUpIcon className="h-5 w-5" /> },
+    };
+    return types[type] || types.checking;
+  };
+
+  const getAccountTypeColor = (type: string) => {
+    const colors: { [key: string]: string } = {
+      checking: 'bg-blue-100 text-blue-800 border-blue-200',
+      savings: 'bg-green-100 text-green-800 border-green-200',
+      cash: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+      investment: 'bg-purple-100 text-purple-800 border-purple-200',
+    };
+    return colors[type] || colors.checking;
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <h2 className="text-2xl font-bold text-gray-800">
+            {editingAccount ? 'Editar Conta Bancária' : 'Nova Conta Bancária'}
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <X className="h-6 w-6" />
+          </button>
+        </div>
+
+        {/* Form */}
+        <div className="p-6 space-y-6">
+          {/* Nome da Conta */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Nome da Conta *
+            </label>
+            <input
+              type="text"
+              value={accountForm.name}
+              onChange={(e) => setAccountForm({ ...accountForm, name: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Ex: Banco do Brasil - Conta Corrente"
+            />
+          </div>
+
+          {/* Tipo de Conta */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Tipo de Conta *
+            </label>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {(['checking', 'savings', 'cash', 'investment'] as const).map((type) => {
+                const typeInfo = getAccountTypeLabel(type);
+                const isSelected = accountForm.type === type;
+                return (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => setAccountForm({ ...accountForm, type })}
+                    className={`p-4 rounded-lg border-2 transition-all ${
+                      isSelected
+                        ? getAccountTypeColor(type) + ' border-current'
+                        : 'border-gray-200 hover:border-gray-300 bg-white'
+                    }`}
+                  >
+                    <div className="flex flex-col items-center space-y-2">
+                      {typeInfo.icon}
+                      <span className="text-xs font-medium text-center">
+                        {typeInfo.label}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Banco (opcional para dinheiro) */}
+          {accountForm.type !== 'cash' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Nome do Banco
+              </label>
+              <input
+                type="text"
+                value={accountForm.bank_name}
+                onChange={(e) => setAccountForm({ ...accountForm, bank_name: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Ex: Banco do Brasil, Nubank, Inter..."
+              />
+            </div>
+          )}
+
+          {/* Agência e Conta (apenas para contas bancárias) */}
+          {(accountForm.type === 'checking' || accountForm.type === 'savings') && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Agência
+                </label>
+                <input
+                  type="text"
+                  value={accountForm.agency}
+                  onChange={(e) => setAccountForm({ ...accountForm, agency: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Ex: 1234-5"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Número da Conta
+                </label>
+                <input
+                  type="text"
+                  value={accountForm.account_number}
+                  onChange={(e) => setAccountForm({ ...accountForm, account_number: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Ex: 12345-6"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Saldo Inicial (apenas ao criar) */}
+          {!editingAccount && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Saldo Inicial
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={accountForm.initial_balance}
+                onChange={(e) => setAccountForm({ 
+                  ...accountForm, 
+                  initial_balance: parseFloat(e.target.value) || 0 
+                })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="0,00"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Informe o saldo atual desta conta
+              </p>
+            </div>
+          )}
+
+          {/* Saldo Atual (apenas ao editar) */}
+          {editingAccount && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Saldo Atual
+              </label>
+              <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg">
+                <p className="text-2xl font-bold text-gray-800">
+                  {formatCurrency(accountForm.current_balance)}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  O saldo é atualizado automaticamente pelas transações
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Status */}
+          <div className="flex items-center space-x-3">
+            <input
+              type="checkbox"
+              id="account-active"
+              checked={accountForm.active}
+              onChange={(e) => setAccountForm({ ...accountForm, active: e.target.checked })}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            />
+            <label htmlFor="account-active" className="text-sm font-medium text-gray-700">
+              Conta ativa
+            </label>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end space-x-3 p-6 border-t border-gray-200 bg-gray-50">
+          <button
+            onClick={onClose}
+            className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={onSave}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+          >
+            {editingAccount ? 'Salvar Alterações' : 'Criar Conta'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const Finance: React.FC = () => {
   const { 
     financialTransactions = [],
@@ -253,28 +488,37 @@ const Finance: React.FC = () => {
   };
 
   const handleSaveAccount = async () => {
-    try {
-      // Validações
-      if (!accountForm.name.trim()) {
-        alert('Nome da conta é obrigatório');
-        return;
-      }
-
-      if (editingAccount) {
-        await updateBankAccount(editingAccount.id, accountForm);
-      } else {
-        // Ao criar, current_balance começa igual ao initial_balance
-        await addBankAccount({
-          ...accountForm,
-          current_balance: accountForm.initial_balance,
-        });
-      }
-      handleCloseAccountModal();
-    } catch (error) {
-      console.error('Erro ao salvar conta:', error);
-      alert('Erro ao salvar conta bancária');
+  try {
+    // Validações
+    if (!accountForm.name.trim()) {
+      alert('Nome da conta é obrigatório');
+      return;
     }
-  };
+
+    console.log('💾 Salvando conta:', accountForm);
+    console.log('📝 Editando?', editingAccount ? 'SIM' : 'NÃO');
+
+    if (editingAccount) {
+      console.log('🔄 Atualizando conta ID:', editingAccount.id);
+      await updateBankAccount(editingAccount.id, accountForm);
+      console.log('✅ Conta atualizada com sucesso!');
+    } else {
+      console.log('➕ Criando nova conta');
+      const newAccount = {
+        ...accountForm,
+        current_balance: accountForm.initial_balance,
+      };
+      console.log('📦 Dados da nova conta:', newAccount);
+      await addBankAccount(newAccount);
+      console.log('✅ Conta criada com sucesso!');
+    }
+    
+    handleCloseAccountModal();
+  } catch (error) {
+    console.error('❌ Erro ao salvar conta:', error);
+    alert('Erro ao salvar conta bancária: ' + (error as Error).message);
+  }
+};
 
   const handleDeleteAccount = async (accountId: string) => {
     if (window.confirm('Tem certeza que deseja excluir esta conta? Esta ação não pode ser desfeita.')) {
@@ -377,342 +621,6 @@ const Finance: React.FC = () => {
     return methods[method || ''] || method || '-';
   };
 
-  // ====== MODAL DE CONTA BANCÁRIA ======
-  const AccountModal = () => {
-    if (!showAccountModal) return null;
-
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-          {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200">
-            <h2 className="text-2xl font-bold text-gray-800">
-              {editingAccount ? 'Editar Conta Bancária' : 'Nova Conta Bancária'}
-            </h2>
-            <button
-              onClick={handleCloseAccountModal}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <X className="h-6 w-6" />
-            </button>
-          </div>
-
-          {/* Form */}
-          <div className="p-6 space-y-6">
-            {/* Nome da Conta */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Nome da Conta *
-              </label>
-              <input
-                type="text"
-                value={accountForm.name}
-                onChange={(e) => setAccountForm({ ...accountForm, name: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Ex: Banco do Brasil - Conta Corrente"
-              />
-            </div>
-
-            {/* Tipo de Conta */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Tipo de Conta *
-              </label>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {(['checking', 'savings', 'cash', 'investment'] as const).map((type) => {
-                  const typeInfo = getAccountTypeLabel(type);
-                  const isSelected = accountForm.type === type;
-                  return (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => setAccountForm({ ...accountForm, type })}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        isSelected
-                          ? getAccountTypeColor(type) + ' border-current'
-                          : 'border-gray-200 hover:border-gray-300 bg-white'
-                      }`}
-                    >
-                      <div className="flex flex-col items-center space-y-2">
-                        {typeInfo.icon}
-                        <span className="text-xs font-medium text-center">
-                          {typeInfo.label}
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Banco (opcional para dinheiro) */}
-            {accountForm.type !== 'cash' && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nome do Banco
-                </label>
-                <input
-                  type="text"
-                  value={accountForm.bank_name}
-                  onChange={(e) => setAccountForm({ ...accountForm, bank_name: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Ex: Banco do Brasil, Nubank, Inter..."
-                />
-              </div>
-            )}
-
-            {/* Agência e Conta (apenas para contas bancárias) */}
-            {(accountForm.type === 'checking' || accountForm.type === 'savings') && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Agência
-                  </label>
-                  <input
-                    type="text"
-                    value={accountForm.agency}
-                    onChange={(e) => setAccountForm({ ...accountForm, agency: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Ex: 1234-5"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Número da Conta
-                  </label>
-                  <input
-                    type="text"
-                    value={accountForm.account_number}
-                    onChange={(e) => setAccountForm({ ...accountForm, account_number: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Ex: 12345-6"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Saldo Inicial (apenas ao criar) */}
-            {!editingAccount && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Saldo Inicial
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={accountForm.initial_balance}
-                  onChange={(e) => setAccountForm({ 
-                    ...accountForm, 
-                    initial_balance: parseFloat(e.target.value) || 0 
-                  })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="0,00"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Informe o saldo atual desta conta
-                </p>
-              </div>
-            )}
-
-            {/* Saldo Atual (apenas ao editar) */}
-            {editingAccount && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Saldo Atual
-                </label>
-                <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg">
-                  <p className="text-2xl font-bold text-gray-800">
-                    {formatCurrency(accountForm.current_balance)}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    O saldo é atualizado automaticamente pelas transações
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Status */}
-            <div className="flex items-center space-x-3">
-              <input
-                type="checkbox"
-                id="account-active"
-                checked={accountForm.active}
-                onChange={(e) => setAccountForm({ ...accountForm, active: e.target.checked })}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <label htmlFor="account-active" className="text-sm font-medium text-gray-700">
-                Conta ativa
-              </label>
-            </div>
-          </div>
-
-          {/* Footer */}
-          <div className="flex items-center justify-end space-x-3 p-6 border-t border-gray-200 bg-gray-50">
-            <button
-              onClick={handleCloseAccountModal}
-              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={handleSaveAccount}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              {editingAccount ? 'Salvar Alterações' : 'Criar Conta'}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // ====== CONTEÚDO DA ABA DE CONTAS BANCÁRIAS ======
-  const AccountsTabContent = () => (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-xl font-bold text-gray-800">Contas Bancárias</h3>
-          <p className="text-sm text-gray-600 mt-1">
-            Gerencie suas contas correntes, poupança, dinheiro e investimentos
-          </p>
-        </div>
-        <button
-          onClick={() => handleOpenAccountModal()}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium flex items-center space-x-2 hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="h-5 w-5" />
-          <span>Nova Conta</span>
-        </button>
-      </div>
-
-      {/* Resumo Total */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl shadow-lg p-6 text-white">
-        <p className="text-sm opacity-90 mb-2">Saldo Total em Contas Ativas</p>
-        <p className="text-4xl font-bold">{formatCurrency(totalBankBalance)}</p>
-        <p className="text-sm opacity-75 mt-2">
-          {bankAccounts.filter(acc => acc.active).length} conta(s) ativa(s)
-        </p>
-      </div>
-
-      {/* Lista de Contas */}
-      {bankAccounts.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-lg p-12 text-center">
-          <Wallet className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-700 mb-2">
-            Nenhuma conta cadastrada
-          </h3>
-          <p className="text-gray-500 mb-6">
-            Comece cadastrando sua primeira conta bancária
-          </p>
-          <button
-            onClick={() => handleOpenAccountModal()}
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors inline-flex items-center space-x-2"
-          >
-            <Plus className="h-5 w-5" />
-            <span>Cadastrar Primeira Conta</span>
-          </button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {bankAccounts.map((account) => {
-            const typeInfo = getAccountTypeLabel(account.type);
-            const typeColor = getAccountTypeColor(account.type);
-
-            return (
-              <div
-                key={account.id}
-                className={`bg-white rounded-xl shadow-lg border-2 hover:shadow-xl transition-all ${
-                  account.active ? 'border-gray-200' : 'border-gray-300 opacity-60'
-                }`}
-              >
-                {/* Header do Card */}
-                <div className={`p-4 rounded-t-xl ${typeColor}`}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      {typeInfo.icon}
-                      <span className="text-sm font-semibold">
-                        {typeInfo.label}
-                      </span>
-                    </div>
-                    {!account.active && (
-                      <span className="text-xs bg-white bg-opacity-50 px-2 py-1 rounded">
-                        Inativa
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Conteúdo */}
-                <div className="p-4">
-                  <h4 className="font-semibold text-gray-800 mb-1">
-                    {account.name}
-                  </h4>
-                  
-                  {account.bank_name && (
-                    <p className="text-sm text-gray-600 mb-3">
-                      {account.bank_name}
-                      {account.agency && ` • Ag: ${account.agency}`}
-                      {account.account_number && ` • CC: ${account.account_number}`}
-                    </p>
-                  )}
-
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <p className="text-xs text-gray-500 mb-1">Saldo Atual</p>
-                    <p className={`text-2xl font-bold ${
-                      account.current_balance >= 0 ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      {formatCurrency(account.current_balance)}
-                    </p>
-                  </div>
-
-                  {/* Ações */}
-                  <div className="flex items-center space-x-2 mt-4">
-                    <button
-                      onClick={() => handleOpenAccountModal(account)}
-                      className="flex-1 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium flex items-center justify-center space-x-1"
-                    >
-                      <Edit className="h-4 w-4" />
-                      <span>Editar</span>
-                    </button>
-
-                    <button
-                      onClick={() => handleToggleAccountActive(account)}
-                      className={`flex-1 px-3 py-2 rounded-lg transition-colors text-sm font-medium flex items-center justify-center space-x-1 ${
-                        account.active
-                          ? 'bg-yellow-50 text-yellow-600 hover:bg-yellow-100'
-                          : 'bg-green-50 text-green-600 hover:bg-green-100'
-                      }`}
-                    >
-                      {account.active ? (
-                        <>
-                          <XCircle className="h-4 w-4" />
-                          <span>Desativar</span>
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle className="h-4 w-4" />
-                          <span>Ativar</span>
-                        </>
-                      )}
-                    </button>
-
-                    <button
-                      onClick={() => handleDeleteAccount(account.id)}
-                      className="px-3 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
     // ====== RENDER ======
 
   return (
@@ -931,7 +839,14 @@ const Finance: React.FC = () => {
       </div>
 
       {/* Modal de Conta Bancária */}
-      <AccountModal />
+       <AccountModal
+        isOpen={showAccountModal}
+        onClose={handleCloseAccountModal}
+        onSave={handleSaveAccount}
+        accountForm={accountForm}
+        setAccountForm={setAccountForm}
+        editingAccount={editingAccount}
+      />
     </div>
   );
 };
