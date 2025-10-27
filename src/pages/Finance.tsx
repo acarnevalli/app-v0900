@@ -1147,9 +1147,11 @@ const handleSaveTransaction = async () => {
           onEdit={handleOpenTransactionModal}
           onDelete={handleDeleteTransaction}
           onPay={(t) => alert(`Pagar ${t.description}`)}
-      />
-  </div>
-          )}
+        />
+      </div>
+
+    </div>
+  )}
 
           {/* Aba de Contas Bancárias */}
             {activeTab === 'accounts' && (
