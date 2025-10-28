@@ -628,69 +628,51 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const loadFinancialTransactions = useCallback(async () => {
   if (!user) return;
-  
+
   try {
     console.log('📊 Carregando transações financeiras...');
-    
     const { data, error } = await supabase
       .from('financial_transactions')
       .select(`
         *,
-        client:clients!financial_transactions_client_id_fkey(name),
-        supplier:suppliers!financial_transactions_supplier_id_fkey(name),
-        project:projects!financial_transactions_project_id_fkey(order_number),
-        account:bank_accounts!financial_transactions_account_id_fkey(name),
-        cost_center:cost_centers!financial_transactions_cost_center_id_fkey(name)
+        client:clients!client_id(name),
+        supplier:suppliers!supplier_id(name),
+        account:bank_accounts!account_id(name),
+        cost_center:cost_centers!cost_center_id(name)
       `)
       .eq('user_id', user.id)
       .order('due_date', { ascending: false });
-    
-    if (error) {
-      console.error('❌ Erro ao buscar transações:', error);
-      
-      const ignorableErrors = ['PGRST116', 'PGRST301', 'join', 'foreign key', 'violates foreign key constraint', 'no rows'];
-      const isIgnorableError = ignorableErrors.some(errType => {
-        const message = error.message?.toLowerCase() || '';
-        const code = error.code?.toLowerCase() || '';
-        const details = typeof error.details === 'string' ? error.details.toLowerCase() : '';
-        return message.includes(errType.toLowerCase()) || code.includes(errType.toLowerCase()) || details.includes(errType.toLowerCase());
-      });
 
-      if (isIgnorableError) {
-        console.warn('⚠️ Tabela de transações vazia ou sem relacionamentos. Iniciando com array vazio.');
-        setFinancialTransactions([]);
-        return;
-      }
+    if (error?.code === 'PGRST200') {
+      // Fallback se relações não existirem
+      const { data: fallbackData } = await supabase
+        .from('financial_transactions')
+        .select('*')
+        .eq('user_id', user.id);
+      setFinancialTransactions(validateArray(fallbackData));
+      return;
+    } else if (error) {
       throw error;
     }
-    
-    if (!data) {
-      console.warn('⚠️ Nenhuma transação encontrada no banco.');
+
+    if (!data || data.length === 0) {
+      console.log('ℹ️ Nenhuma transação cadastrada');
       setFinancialTransactions([]);
       return;
     }
 
-    if (Array.isArray(data) && data.length === 0) {
-      console.log('ℹ️ Nenhuma transação cadastrada ainda.');
-      setFinancialTransactions([]);
-      return;
-    }
-    
     const merged = validateArray(data).map((t: any) => ({
       ...t,
-      client_name: t.client?.name,
-      supplier_name: t.supplier?.name,
-      project_number: t.project?.order_number,
-      account_name: t.account?.name, // 🆕 ADICIONADO
-      cost_center_name: t.cost_center?.name
+      client_name: t.client?.name || null,
+      supplier_name: t.supplier?.name || null,
+      account_name: t.account?.name || 'Conta não definida',
+      cost_center_name: t.cost_center?.name || null
     }));
-    
-    console.log(`✅ ${merged.length} transações financeiras carregadas com sucesso`);
-    setFinancialTransactions(merged);
 
+    setFinancialTransactions(merged);
   } catch (error: any) {
-    console.error('🔴 Erro crítico ao carregar transações financeiras:', error);
-    setFinancialTransactions([]);
+    console.error('Erro ao carregar transações:', error);
+    setError('Falha no carregamento de dados financeiros');
   }
 }, [user]);
     
