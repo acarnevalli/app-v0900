@@ -1,9 +1,9 @@
-// src/components/finance/ReceivablesTab.tsx
+// src/components/ReceivablesTab.tsx
 import React, { useMemo, useState } from 'react';
 import { TrendingUp, DollarSign, AlertCircle, CheckCircle, Users } from 'lucide-react';
-import { useApp } from '../../context/AppContext';
+import { useApp } from '../contexts/AppContext';
 import TransactionsTable from './TransactionsTable';
-import { formatCurrency } from '../../lib/utils';
+import { formatCurrency } from '../lib/utils';
 
 const ReceivablesTab: React.FC = () => {
   const { financialTransactions, clients } = useApp();
