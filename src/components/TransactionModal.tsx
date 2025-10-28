@@ -279,8 +279,10 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
           >
             Cancelar
           </button>
+          
+          {/* ⭐ MUDANÇA AQUI: era onClick={onSave} */}
           <button
-            onClick={handleSave} {/* ⭐ MUDANÇA AQUI: era onClick={onSave} */}
+            onClick={handleSave}
             className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors"
           >
             {editingTransaction ? 'Salvar Alterações' : 'Criar Transação'}
