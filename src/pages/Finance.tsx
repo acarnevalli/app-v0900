@@ -1198,8 +1198,6 @@ const handleSaveTransaction = async () => {
       />
       
     </div>
-  </div>
   );
-};
 
 export default Finance;
