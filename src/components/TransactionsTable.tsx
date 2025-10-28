@@ -14,20 +14,6 @@ import { useApp } from '../contexts/AppContext';
 import type { FinancialTransaction } from '../../types';
 import PaymentModal from './PaymentModal';
 
-if (transactions.length === 0) {
-  return (
-    <div className="p-12 text-center">
-      <DollarSign className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-      <h3 className="text-lg font-medium text-gray-900 mb-2">
-        Nenhuma transação encontrada
-      </h3>
-      <p className="text-gray-500 mb-4">
-        Comece criando sua primeira transação financeira
-      </p>
-    </div>
-  );
-}
-
 interface TransactionsTableProps {
   transactions: FinancialTransaction[];
   onEdit: (transaction: FinancialTransaction) => void;
@@ -42,6 +28,21 @@ export default function TransactionsTable({
   showTypeColumn = true 
 }: TransactionsTableProps) {
   const { deleteFinancialTransaction, clients, suppliers, projects } = useApp();
+
+  if (transactions.length === 0) {
+  return (
+    <div className="p-12 text-center">
+      <DollarSign className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+      <h3 className="text-lg font-medium text-gray-900 mb-2">
+        Nenhuma transação encontrada
+      </h3>
+      <p className="text-gray-500 mb-4">
+        Comece criando sua primeira transação financeira
+      </p>
+    </div>
+  );
+}
+
   
   // Estados
   const [searchTerm, setSearchTerm] = useState('');
