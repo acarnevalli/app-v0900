@@ -5,6 +5,7 @@ import PDFSettingsModal from '../components/PDFSettingsModal';
 import CompanySettingsModal from '../components/CompanySettingsModal';
 import ImportExportModal from '../components/ImportExportModal';
 import ProductSettingsModal from '../components/ProductSettingsModal';
+import { defaultCostCenters } from '../utils/defaultCostCenters';
 
 const Settings: React.FC = () => {
   const { user, logout } = useAuth();
@@ -18,6 +19,18 @@ const Settings: React.FC = () => {
       logout();
     }
   };
+
+  const handleCreateDefaultCostCenters = async () => {
+  try {
+    for (const cc of defaultCostCenters) {
+      await addCostCenter(cc);
+    }
+    alert('Centros de custo padrão criados com sucesso!');
+  } catch (error) {
+    console.error('Erro ao criar centros de custo:', error);
+    alert('Erro ao criar centros de custo');
+  }
+};
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -44,6 +57,14 @@ const Settings: React.FC = () => {
               onClick={handleLogout}
               className="flex items-center space-x-2 px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
             >
+
+            <button
+              onClick={handleCreateDefaultCostCenters}
+              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+            >
+              Criar Centros de Custo Padrão
+              </button>
+              
               <LogOut className="h-4 w-4" />
               <span>Sair do Sistema</span>
             </button>
