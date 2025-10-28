@@ -1,5 +1,4 @@
 // src/components/TransactionModal.tsx
-
 import React from 'react';
 import { X, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
@@ -41,6 +40,54 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
     const value = parseFloat(e.target.value) || 0;
     setFormState(prev => ({ ...prev, amount: value }));
   };
+
+  // ⭐⭐⭐ ADICIONE ESTA FUNÇÃO AQUI ⭐⭐⭐
+  const handleSave = async () => {
+    // Validação 1: Descrição obrigatória
+    if (!formState.description || formState.description.trim() === '') {
+      alert('A descrição é obrigatória');
+      return;
+    }
+
+    // Validação 2: Valor deve ser maior que zero
+    if (!formState.amount || formState.amount <= 0) {
+      alert('O valor deve ser maior que zero');
+      return;
+    }
+
+    // Validação 3: Número de parcelas (se houver)
+    if (formState.installments && formState.installments < 1) {
+      alert('O número de parcelas deve ser maior que zero');
+      return;
+    }
+
+    // Validação 4: Se status for 'paid', deve ter conta bancária
+    if (formState.status === 'paid' && !formState.bank_account_id) {
+      alert('Selecione uma conta bancária para transações pagas');
+      return;
+    }
+
+    // Validação 5: Se status for 'paid', deve ter data de pagamento
+    if (formState.status === 'paid' && !formState.payment_date) {
+      alert('Informe a data do pagamento');
+      return;
+    }
+
+    // Validação 6: Data de vencimento não pode ser anterior à data da transação
+    if (formState.due_date && formState.date && formState.due_date < formState.date) {
+      const confirm = window.confirm('A data de vencimento é anterior à data da transação. Deseja continuar?');
+      if (!confirm) return;
+    }
+
+    // Se passou em todas as validações, chama o onSave original
+    try {
+      await onSave();
+    } catch (error) {
+      console.error('Erro ao salvar transação:', error);
+      alert('Erro ao salvar transação. Verifique os dados e tente novamente.');
+    }
+  };
+  // ⭐⭐⭐ FIM DA ADIÇÃO ⭐⭐⭐
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
@@ -93,6 +140,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
               onChange={handleInputChange}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               placeholder={formState.type === 'income' ? 'Ex: Venda de produto X' : 'Ex: Compra de matéria-prima'}
+              required
             />
           </div>
 
@@ -107,6 +155,9 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                 onChange={handleAmountChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 placeholder="0,00"
+                min="0.01"
+                step="0.01"
+                required
               />
             </div>
 
@@ -137,6 +188,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                   value={formState.payment_date}
                   onChange={handleInputChange}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                  required
                 />
               </div>
               <div>
@@ -146,6 +198,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                   value={formState.bank_account_id || ''}
                   onChange={handleInputChange}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 bg-white"
+                  required
                 >
                   <option value="">Selecione uma conta</option>
                   {bankAccounts.filter(acc => acc.active).map(acc => (
@@ -227,7 +280,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
             Cancelar
           </button>
           <button
-            onClick={onSave}
+            onClick={handleSave} {/* ⭐ MUDANÇA AQUI: era onClick={onSave} */}
             className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors"
           >
             {editingTransaction ? 'Salvar Alterações' : 'Criar Transação'}
