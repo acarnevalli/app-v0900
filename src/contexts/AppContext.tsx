@@ -656,12 +656,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       ];
 
       // Verifica se é um erro ignorável
-      const isIgnorableError = ignorableErrors.some(errType => 
-        error.message?.toLowerCase().includes(errType.toLowerCase()) ||
-        error.code?.toLowerCase().includes(errType.toLowerCase()) ||
-        error.details?.toLowerCase().includes(errType.toLowerCase())
-      );
-
+      const isIgnorableError = ignorableErrors.some(errType => {
+        const message = error.message?.toLowerCase() || '';
+        const code = error.code?.toLowerCase() || '';
+        // ⭐ CORREÇÃO AQUI: Verifica se 'details' é uma string antes de usar
+        const details = typeof error.details === 'string' ? error.details.toLowerCase() : '';
+  
+       return message.includes(errType.toLowerCase()) ||
+         code.includes(errType.toLowerCase()) ||
+         details.includes(errType.toLowerCase());
+      });
       if (isIgnorableError) {
         console.warn('⚠️ Tabela de transações vazia ou sem relacionamentos. Iniciando com array vazio.');
         setFinancialTransactions([]);
