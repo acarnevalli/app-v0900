@@ -1023,7 +1023,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     loadSales,
     loadPurchases,
     loadCategories,
-    //loadFinancialTransactions,
+    loadFinancialTransactions,
     loadBankAccounts,
     loadCostCenters
   ]);
