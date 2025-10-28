@@ -33,6 +33,7 @@ import { formatCurrency, formatDate } from '../lib/utils';
 import TransactionModal from '../components/TransactionModal';
 import TransactionsTable from '../components/TransactionsTable';
 import ReceivablesTab from '../components/ReceivablesTab';
+import PayablesTab from '../components/PayablesTab';
 
 // ====== MODAL DE CONTA BANCÁRIA (FORA DO COMPONENTE) ======
 interface AccountModalProps {
