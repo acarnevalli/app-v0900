@@ -15,6 +15,8 @@ import { AppProvider } from './contexts/AppContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { DebugAuth } from './components/DebugAuth';
+import { ToastProvider } from './contexts/ToastContext';
+
 
 // Componente AppContent separado - FORA do return
 const AppContent: React.FC = () => {
@@ -107,11 +109,13 @@ const AppContent: React.FC = () => {
 function App() {
   return (
     <AuthProvider>
-      <SettingsProvider>
-        <AppProvider>
-          <AppContent />
-        </AppProvider>
-      </SettingsProvider>
+      <ToastProvider>
+        <SettingsProvider>
+          <AppProvider>
+            <AppContent />
+          </AppProvider>
+        </SettingsProvider>
+      </ToastProvider>
     </AuthProvider>
   );
 }
