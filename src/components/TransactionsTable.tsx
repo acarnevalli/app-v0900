@@ -10,7 +10,7 @@ import {
   AlertCircle,
   Calendar
 } from 'lucide-react';
-import { useApp } from '../context/AppContext';
+import { useApp } from '../contexts/AppContext';
 import type { FinancialTransaction } from '../../types';
 import PaymentModal from './PaymentModal';
 
