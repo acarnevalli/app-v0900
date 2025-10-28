@@ -1173,6 +1173,9 @@ const handleSaveTransaction = async () => {
 
           {activeTab === 'cashflow' && <CashFlowTab />}
 
+          </div> {/* CORREÇÃO: Fechamento do <div className="p-6"> */}
+      </div> {/* CORREÇÃO: Fechamento do <div className="bg-white rounded-xl shadow-lg"> */}
+
       {/* Modal de Conta Bancária */}
        <AccountModal
         isOpen={showAccountModal}
@@ -1196,8 +1199,8 @@ const handleSaveTransaction = async () => {
         bankAccounts={bankAccounts}
         costCenters={costCenters}
       />
-      
     </div>
   );
+};
 
 export default Finance;
