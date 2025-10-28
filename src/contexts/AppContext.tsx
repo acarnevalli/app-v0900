@@ -631,32 +631,96 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   try {
     console.log('📊 Carregando transações financeiras...');
+
+    // Tentativa 1: Com relacionamentos usando sintaxe simplificada
     const { data, error } = await supabase
       .from('financial_transactions')
       .select(`
         *,
-        client:clients!client_id(name),
-        supplier:suppliers!supplier_id(name),
-        account:bank_accounts!account_id(name),
-        cost_center:cost_centers!cost_center_id(name)
+        client:clients(name),
+        supplier:suppliers(name),
+        project:projects(order_number),
+        account:bank_accounts(name),
+        cost_center:cost_centers(name)
       `)
       .eq('user_id', user.id)
       .order('due_date', { ascending: false });
 
-    if (error?.code === 'PGRST200') {
-      // Fallback se relações não existirem
-      const { data: fallbackData } = await supabase
-        .from('financial_transactions')
-        .select('*')
-        .eq('user_id', user.id);
-      setFinancialTransactions(validateArray(fallbackData));
-      return;
-    } else if (error) {
+    // Se houver erro de relacionamento, tenta consulta simples
+    if (error) {
+      console.error('❌ Erro ao buscar transações com relacionamentos:', error);
+
+      const errorCode = error.code?.toUpperCase() || '';
+      const errorMessage = error.message?.toLowerCase() || '';
+      const errorDetails = typeof error.details === 'string' ? error.details.toLowerCase() : '';
+
+      // Lista de erros relacionados a foreign keys/relacionamentos
+      const relationshipErrors = [
+        'PGRST116', // Nenhuma linha encontrada
+        'PGRST200', // Relacionamento não encontrado
+        'PGRST301', // Erro de query
+        'relationship',
+        'foreign key',
+        'no matches were found',
+        'could not find'
+      ];
+
+      const isRelationshipError = relationshipErrors.some(errType => 
+        errorCode.includes(errType.toUpperCase()) || 
+        errorMessage.includes(errType.toLowerCase()) ||
+        errorDetails.includes(errType.toLowerCase())
+      );
+
+      if (isRelationshipError) {
+        console.warn('⚠️ Erro de relacionamento detectado. Carregando sem JOINs...');
+        
+        // Fallback: Consulta simples sem relacionamentos
+        const { data: simpleData, error: simpleError } = await supabase
+          .from('financial_transactions')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('due_date', { ascending: false });
+
+        if (simpleError) {
+          console.error('❌ Erro na consulta simples:', simpleError);
+          
+          // Se a tabela não existir
+          if (simpleError.code === '42P01') {
+            console.warn('⚠️ Tabela financial_transactions não existe. Inicializando vazia.');
+            setFinancialTransactions([]);
+            return;
+          }
+          
+          throw simpleError;
+        }
+
+        if (!simpleData || simpleData.length === 0) {
+          console.log('ℹ️ Nenhuma transação cadastrada ainda.');
+          setFinancialTransactions([]);
+          return;
+        }
+
+        // Buscar nomes dos relacionamentos separadamente
+        const enrichedData = await enrichTransactionsWithNames(simpleData);
+        
+        console.log(`✅ ${enrichedData.length} transações financeiras carregadas (modo fallback)`);
+        setFinancialTransactions(enrichedData);
+        return;
+      }
+
+      // Se não for erro de relacionamento, propaga
       throw error;
     }
 
-    if (!data || data.length === 0) {
-      console.log('ℹ️ Nenhuma transação cadastrada');
+    // Sucesso na consulta com relacionamentos
+    if (!data) {
+      console.warn('⚠️ Nenhuma transação encontrada no banco.');
+      setFinancialTransactions([]);
+      return;
+    }
+
+    if (Array.isArray(data) && data.length === 0) {
+      console.log('ℹ️ Nenhuma transação cadastrada ainda.');
       setFinancialTransactions([]);
       return;
     }
@@ -665,16 +729,89 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       ...t,
       client_name: t.client?.name || null,
       supplier_name: t.supplier?.name || null,
-      account_name: t.account?.name || 'Conta não definida',
+      project_number: t.project?.order_number || null,
+      account_name: t.account?.name || null,
       cost_center_name: t.cost_center?.name || null
     }));
 
+    console.log(`✅ ${merged.length} transações financeiras carregadas com sucesso`);
     setFinancialTransactions(merged);
+    
   } catch (error: any) {
-    console.error('Erro ao carregar transações:', error);
-    setError('Falha no carregamento de dados financeiros');
+    console.error('🔴 Erro crítico ao carregar transações financeiras:', error);
+    setFinancialTransactions([]);
   }
 }, [user]);
+
+// Função auxiliar para enriquecer dados sem JOINs
+const enrichTransactionsWithNames = async (transactions: any[]) => {
+  try {
+    // Coletar IDs únicos
+    const clientIds = [...new Set(transactions.map(t => t.client_id).filter(Boolean))];
+    const supplierIds = [...new Set(transactions.map(t => t.supplier_id).filter(Boolean))];
+    const projectIds = [...new Set(transactions.map(t => t.project_id).filter(Boolean))];
+    const accountIds = [...new Set(transactions.map(t => t.account_id).filter(Boolean))];
+    const costCenterIds = [...new Set(transactions.map(t => t.cost_center_id).filter(Boolean))];
+
+    // Buscar dados em paralelo
+    const [clientsRes, suppliersRes, projectsRes, accountsRes, costCentersRes] = await Promise.allSettled([
+      clientIds.length > 0 
+        ? supabase.from('clients').select('id, name').in('id', clientIds)
+        : Promise.resolve({ data: [] }),
+      supplierIds.length > 0
+        ? supabase.from('suppliers').select('id, name').in('id', supplierIds)
+        : Promise.resolve({ data: [] }),
+      projectIds.length > 0
+        ? supabase.from('projects').select('id, order_number').in('id', projectIds)
+        : Promise.resolve({ data: [] }),
+      accountIds.length > 0
+        ? supabase.from('bank_accounts').select('id, name').in('id', accountIds)
+        : Promise.resolve({ data: [] }),
+      costCenterIds.length > 0
+        ? supabase.from('cost_centers').select('id, name').in('id', costCenterIds)
+        : Promise.resolve({ data: [] })
+    ]);
+
+    // Criar mapas
+    const clientsMap = new Map(
+      (clientsRes.status === 'fulfilled' && clientsRes.value.data || []).map((c: any) => [c.id, c.name])
+    );
+    const suppliersMap = new Map(
+      (suppliersRes.status === 'fulfilled' && suppliersRes.value.data || []).map((s: any) => [s.id, s.name])
+    );
+    const projectsMap = new Map(
+      (projectsRes.status === 'fulfilled' && projectsRes.value.data || []).map((p: any) => [p.id, p.order_number])
+    );
+    const accountsMap = new Map(
+      (accountsRes.status === 'fulfilled' && accountsRes.value.data || []).map((a: any) => [a.id, a.name])
+    );
+    const costCentersMap = new Map(
+      (costCentersRes.status === 'fulfilled' && costCentersRes.value.data || []).map((cc: any) => [cc.id, cc.name])
+    );
+
+    // Enriquecer transações
+    return transactions.map(t => ({
+      ...t,
+      client_name: t.client_id ? clientsMap.get(t.client_id) : null,
+      supplier_name: t.supplier_id ? suppliersMap.get(t.supplier_id) : null,
+      project_number: t.project_id ? projectsMap.get(t.project_id) : null,
+      account_name: t.account_id ? accountsMap.get(t.account_id) : null,
+      cost_center_name: t.cost_center_id ? costCentersMap.get(t.cost_center_id) : null
+    }));
+
+  } catch (error) {
+    console.error('Erro ao enriquecer transações:', error);
+    // Retorna dados sem enriquecimento
+    return transactions.map(t => ({
+      ...t,
+      client_name: null,
+      supplier_name: null,
+      project_number: null,
+      account_name: null,
+      cost_center_name: null
+    }));
+  }
+};
     
   const loadBankAccounts = useCallback(async () => {
     if (!user) return;
