@@ -1198,6 +1198,7 @@ const handleSaveTransaction = async () => {
       />
       
     </div>
+  </div>
   );
 };
 
