@@ -278,6 +278,10 @@ export interface FinancialTransaction {
   reference_id?: string;
   reference_number?: string;
   
+  // 🆕 CONTA BANCÁRIA (OBRIGATÓRIO)
+  account_id?: string;           // ← ADICIONADO
+  account_name?: string;          // ← JÁ EXISTIA
+  
   // Relacionamentos (IDs e nomes)
   client_id?: string;
   client_name?: string;
@@ -285,8 +289,8 @@ export interface FinancialTransaction {
   supplier_name?: string;
   project_id?: string;
   project_number?: string;
-  bank_account_id?: string;
-  bank_account_name?: string;
+  bank_account_id?: string;       // ← DEPRECATED (usar account_id)
+  bank_account_name?: string;     // ← DEPRECATED (usar account_name)
   cost_center_id?: string;
   cost_center_name?: string;
   
@@ -635,78 +639,60 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         client:clients!financial_transactions_client_id_fkey(name),
         supplier:suppliers!financial_transactions_supplier_id_fkey(name),
         project:projects!financial_transactions_project_id_fkey(order_number),
-        bank_account:bank_accounts!financial_transactions_bank_account_id_fkey(name),
+        account:bank_accounts!financial_transactions_account_id_fkey(name),
         cost_center:cost_centers!financial_transactions_cost_center_id_fkey(name)
       `)
       .eq('user_id', user.id)
       .order('due_date', { ascending: false });
     
-    // 🔍 VERIFICAÇÃO 1: Se houver erro do Supabase
     if (error) {
       console.error('❌ Erro ao buscar transações:', error);
-
-      // 🛡️ PROTEÇÃO: Erros conhecidos que podem ser ignorados
-      const ignorableErrors = [
-        'PGRST116',     // Nenhum registro encontrado (tabela vazia)
-        'PGRST301',     // Erro de JOIN com tabela vazia
-        'join',         // Palavra que aparece em erros de JOIN
-        'foreign key',  // Erros de chave estrangeira em tabelas vazias
-        'violates foreign key constraint', // Variação do erro de FK
-        'no rows',      // Sem linhas
-      ];
-
-      // Verifica se é um erro ignorável
+      
+      const ignorableErrors = ['PGRST116', 'PGRST301', 'join', 'foreign key', 'violates foreign key constraint', 'no rows'];
       const isIgnorableError = ignorableErrors.some(errType => {
         const message = error.message?.toLowerCase() || '';
         const code = error.code?.toLowerCase() || '';
-        // ⭐ CORREÇÃO AQUI: Verifica se 'details' é uma string antes de usar
         const details = typeof error.details === 'string' ? error.details.toLowerCase() : '';
-  
-       return message.includes(errType.toLowerCase()) ||
-         code.includes(errType.toLowerCase()) ||
-         details.includes(errType.toLowerCase());
+        return message.includes(errType.toLowerCase()) || code.includes(errType.toLowerCase()) || details.includes(errType.toLowerCase());
       });
+
       if (isIgnorableError) {
         console.warn('⚠️ Tabela de transações vazia ou sem relacionamentos. Iniciando com array vazio.');
         setFinancialTransactions([]);
-        return; // Sai da função sem lançar erro
+        return;
       }
-
-      // Se for um erro REAL (não ignorável), lança o erro
       throw error;
     }
     
-    // 🔍 VERIFICAÇÃO 2: Se data vier null ou undefined
     if (!data) {
       console.warn('⚠️ Nenhuma transação encontrada no banco.');
       setFinancialTransactions([]);
       return;
     }
 
-    // 🔍 VERIFICAÇÃO 3: Se data for um array vazio
     if (Array.isArray(data) && data.length === 0) {
       console.log('ℹ️ Nenhuma transação cadastrada ainda.');
       setFinancialTransactions([]);
       return;
     }
     
-    // ✅ PROCESSAMENTO: Mescla os dados relacionados
     const merged = validateArray(data).map((t: any) => ({
       ...t,
       client_name: t.client?.name,
       supplier_name: t.supplier?.name,
       project_number: t.project?.order_number,
-      bank_account_name: t.bank_account?.name,
+      account_name: t.account?.name, // 🆕 ADICIONADO
       cost_center_name: t.cost_center?.name
     }));
     
-    // ✅ SUCESSO: Define as transações
     console.log(`✅ ${merged.length} transações financeiras carregadas com sucesso`);
     setFinancialTransactions(merged);
 
   } catch (error: any) {
-    // 🚨 ÚLTIMO NÍVEL DE PROTEÇÃO: Qualquer erro não tratado
     console.error('🔴 Erro crítico ao carregar transações financeiras:', error);
+    setFinancialTransactions([]);
+  }
+}, [user]);
     
     // Exibe detalhes do erro para debug
     if (error.message) {
@@ -1362,7 +1348,7 @@ const addFinancialTransaction = useCallback(async (
 
   console.log('💰 [ANTES] Dados recebidos:', data);
 
-  // 🔍 VALIDAÇÃO: Campos obrigatórios para a tabela real
+  // 🔍 VALIDAÇÃO: Campos obrigatórios
   if (!data.type || !['income', 'expense'].includes(data.type)) {
     throw new Error('Tipo deve ser "income" ou "expense"');
   }
@@ -1374,31 +1360,45 @@ const addFinancialTransaction = useCallback(async (
   if (!data.amount || data.amount <= 0) {
     throw new Error('Valor deve ser maior que zero');
   }
+
+  // 🆕 VALIDAÇÃO: Conta bancária obrigatória
+  if (!data.account_id) {
+    throw new Error('Conta bancária é obrigatória para a transação');
+  }
+
+  // 🆕 Valida se a conta existe
+  const accountExists = bankAccounts.find(acc => acc.id === data.account_id);
+  if (!accountExists) {
+    throw new Error('Conta bancária não encontrada');
+  }
   
-  // 🆕 CAMPO OBRIGATÓRIO: date
+  // 🆕 Data da transação
   const transactionDate = data.payment_date || data.due_date || new Date().toISOString().split('T')[0];
 
   // 🧹 Mapeamento CORRETO para a estrutura real da tabela
   const newTransaction = {
     // Campos OBRIGATÓRIOS
-    type: data.type,                                    // TEXT NOT NULL
-    category: data.category.trim(),                     // TEXT NOT NULL
-    amount: Number(data.amount),                        // NUMERIC NOT NULL
-    date: transactionDate,                              // DATE NOT NULL
+    type: data.type,
+    category: data.category.trim(),
+    amount: Number(data.amount),
+    date: transactionDate,
+    
+    // 🆕 CONTA BANCÁRIA (OBRIGATÓRIO)
+    account_id: data.account_id,
     
     // Campos OPCIONAIS
-    description: data.description?.trim() || null,      // TEXT NULLABLE
-    due_date: data.due_date || null,                    // DATE NULLABLE
-    status: data.status || 'pending',                   // TEXT NULLABLE
-    payment_method: data.payment_method || null,        // TEXT NULLABLE
-    reference_id: data.reference_id || null,            // UUID NULLABLE
-    reference_type: data.reference_type || null,        // TEXT NULLABLE
-    client_id: data.client_id || null,                  // UUID NULLABLE
-    client_name: data.client_name || null,              // TEXT NULLABLE
-    supplier_id: data.supplier_id || null,              // UUID NULLABLE
-    supplier_name: data.supplier_name || null,          // TEXT NULLABLE
-    installment_number: data.installment_number || null, // INTEGER NULLABLE
-    total_installments: data.total_installments || null, // INTEGER NULLABLE
+    description: data.description?.trim() || null,
+    due_date: data.due_date || null,
+    status: data.status || 'pending',
+    payment_method: data.payment_method || null,
+    reference_id: data.reference_id || null,
+    reference_type: data.reference_type || null,
+    client_id: data.client_id || null,
+    client_name: data.client_name || null,
+    supplier_id: data.supplier_id || null,
+    supplier_name: data.supplier_name || null,
+    installment_number: data.installment_number || null,
+    total_installments: data.total_installments || null,
   };
 
   console.log('💰 [DEPOIS] Dados preparados para envio:', newTransaction);
@@ -1421,10 +1421,18 @@ const addFinancialTransaction = useCallback(async (
 
   console.log('✅ Transação criada com sucesso:', inserted);
 
+  // 🆕 ATUALIZA O SALDO DA CONTA AUTOMATICAMENTE
+  if (data.status === 'paid' || !data.due_date || data.payment_date) {
+    const operation = data.type === 'income' ? 'add' : 'subtract';
+    await updateBankAccountBalance(data.account_id, Number(data.amount), operation);
+    console.log(`✅ Saldo da conta ${data.account_id} atualizado (${operation})`);
+  }
+
   await loadFinancialTransactions();
   return inserted;
-}, [user, loadFinancialTransactions]);
+}, [user, loadFinancialTransactions, bankAccounts, updateBankAccountBalance]);
 
+  
 const updateFinancialTransaction = useCallback(async (
   id: string,
   data: UpdateFinancialTransactionData
@@ -1627,104 +1635,120 @@ const payTransaction = useCallback(async (
   // ============================================
   
   const createTransactionsFromSale = useCallback(async (
-    saleId: string,
-    saleData: Sale
-  ) => {
-    ensureUser();
+  saleId: string,
+  saleData: Sale
+) => {
+  ensureUser();
+  
+  console.log('🛒 Criando transações a partir da venda:', saleId);
+  
+  // 🆕 BUSCA A CONTA PADRÃO (você pode melhorar isso pedindo ao usuário)
+  const defaultAccount = bankAccounts.find(acc => acc.active) || bankAccounts[0];
+  if (!defaultAccount) {
+    console.error('❌ Nenhuma conta bancária disponível');
+    throw new Error('Configure uma conta bancária antes de registrar transações');
+  }
+  
+  const client = clients.find(c => c.id === saleData.client_id);
+  
+  if (saleData.status === 'completed') {
+    const transaction: CreateFinancialTransactionData = {
+      type: 'income',
+      category: 'Vendas',
+      description: `Venda #${saleId.substring(0, 8)} - ${client?.name || 'Cliente'}`,
+      amount: saleData.total,
+      date: saleData.date,
+      due_date: saleData.date,
+      payment_date: saleData.date,
+      status: 'paid',
+      payment_method: (saleData.payment_method as any) || 'dinheiro',
+      reference_type: 'sale',
+      reference_id: saleId,
+      client_id: saleData.client_id,
+      notes: saleData.notes,
+      account_id: defaultAccount.id, // 🆕 ADICIONADO
+    };
     
-    console.log('🛒 Criando transações a partir da venda:', saleId);
-    
-    const client = clients.find(c => c.id === saleData.client_id);
-    
-    if (saleData.status === 'completed') {
-      const transaction: CreateFinancialTransactionData = {
-        type: 'income',
-        category: 'Vendas',
-        description: `Venda #${saleId.substring(0, 8)} - ${client?.name || 'Cliente'}`,
-        amount: saleData.total,
-        date: saleData.date,
-        due_date: saleData.date,
-        payment_date: saleData.date,
-        status: 'paid',
-        payment_method: (saleData.payment_method as any) || 'dinheiro',
-        reference_type: 'sale',
-        reference_id: saleId,
-        client_id: saleData.client_id,
-        notes: saleData.notes,
-      };
-      
-      await addFinancialTransaction(transaction);
-      console.log('✅ Transação de venda criada');
-    }
-  }, [user, clients, addFinancialTransaction]);
+    await addFinancialTransaction(transaction);
+    console.log('✅ Transação de venda criada');
+  }
+}, [user, clients, addFinancialTransaction, bankAccounts]);
 
   const createTransactionsFromPurchase = useCallback(async (
-    purchaseId: string,
-    purchaseData: Purchase
-  ) => {
-    ensureUser();
+  purchaseId: string,
+  purchaseData: Purchase
+) => {
+  ensureUser();
+  
+  console.log('🛍️ Criando transações a partir da compra:', purchaseId);
+  
+  // 🆕 BUSCA A CONTA PADRÃO
+  const defaultAccount = bankAccounts.find(acc => acc.active) || bankAccounts[0];
+  if (!defaultAccount) {
+    throw new Error('Configure uma conta bancária antes de registrar transações');
+  }
+  
+  const supplier = suppliers.find(s => s.id === purchaseData.supplier_id);
+  const paymentInfo = (purchaseData as any).payment_info;
+  
+  if (!paymentInfo) {
+    console.warn('⚠️ Compra sem informações de pagamento');
+    return;
+  }
+  
+  const installments = paymentInfo.installments || 1;
+  const installmentValue = paymentInfo.installment_value || (purchaseData.total / installments);
+  const firstDueDate = new Date(paymentInfo.first_due_date || purchaseData.date);
+  
+  for (let i = 0; i < installments; i++) {
+    const dueDate = new Date(firstDueDate);
+    dueDate.setMonth(dueDate.getMonth() + i);
     
-    console.log('🛍️ Criando transações a partir da compra:', purchaseId);
+    const transaction: CreateFinancialTransactionData = {
+      type: 'expense',
+      category: 'Compras',
+      description: `Compra NF ${purchaseData.invoice_number || purchaseId.substring(0, 8)} - ${supplier?.name || 'Fornecedor'} - Parcela ${i + 1}/${installments}`,
+      amount: installmentValue,
+      date: purchaseData.date,
+      due_date: dueDate.toISOString().split('T')[0],
+      status: paymentInfo.paid ? 'paid' : 'pending',
+      payment_date: paymentInfo.paid ? paymentInfo.paid_date : undefined,
+      payment_method: paymentInfo.payment_method,
+      installment_number: i + 1,
+      total_installments: installments,
+      reference_type: 'purchase',
+      reference_id: purchaseId,
+      reference_number: purchaseData.invoice_number,
+      supplier_id: purchaseData.supplier_id,
+      notes: purchaseData.notes,
+      account_id: defaultAccount.id, // 🆕 ADICIONADO
+    };
     
-    const supplier = suppliers.find(s => s.id === purchaseData.supplier_id);
-    const paymentInfo = (purchaseData as any).payment_info;
+    await addFinancialTransaction(transaction);
+  }
+  
+  if (paymentInfo.has_shipping && paymentInfo.shipping_cost > 0) {
+    const shippingTransaction: CreateFinancialTransactionData = {
+      type: 'expense',
+      category: 'Frete',
+      description: `Frete - Compra NF ${purchaseData.invoice_number || purchaseId.substring(0, 8)} - ${paymentInfo.shipping_type || 'Entrega'}`,
+      amount: paymentInfo.shipping_cost,
+      date: purchaseData.date,
+      due_date: paymentInfo.first_due_date || purchaseData.date,
+      status: paymentInfo.paid ? 'paid' : 'pending',
+      payment_date: paymentInfo.paid ? paymentInfo.paid_date : undefined,
+      payment_method: paymentInfo.payment_method,
+      reference_type: 'purchase',
+      reference_id: purchaseId,
+      supplier_id: purchaseData.supplier_id,
+      account_id: defaultAccount.id, // 🆕 ADICIONADO
+    };
     
-    if (!paymentInfo) {
-      console.warn('⚠️ Compra sem informações de pagamento');
-      return;
-    }
-    
-    const installments = paymentInfo.installments || 1;
-    const installmentValue = paymentInfo.installment_value || (purchaseData.total / installments);
-    const firstDueDate = new Date(paymentInfo.first_due_date || purchaseData.date);
-    
-    for (let i = 0; i < installments; i++) {
-      const dueDate = new Date(firstDueDate);
-      dueDate.setMonth(dueDate.getMonth() + i);
-      
-      const transaction: CreateFinancialTransactionData = {
-        type: 'expense',
-        category: 'Compras',
-        description: `Compra NF ${purchaseData.invoice_number || purchaseId.substring(0, 8)} - ${supplier?.name || 'Fornecedor'} - Parcela ${i + 1}/${installments}`,
-        amount: installmentValue,
-        date: purchaseData.date,
-        due_date: dueDate.toISOString().split('T')[0],
-        status: paymentInfo.paid ? 'paid' : 'pending',
-        payment_date: paymentInfo.paid ? paymentInfo.paid_date : undefined,
-        payment_method: paymentInfo.payment_method,
-        installment_number: i + 1,
-        total_installments: installments,
-        reference_type: 'purchase',
-        reference_id: purchaseId,
-        reference_number: purchaseData.invoice_number,
-        supplier_id: purchaseData.supplier_id,
-        notes: purchaseData.notes,
-      };
-      
-      await addFinancialTransaction(transaction);
-    }
-    
-    if (paymentInfo.has_shipping && paymentInfo.shipping_cost > 0) {
-      const shippingTransaction: CreateFinancialTransactionData = {
-        type: 'expense',
-        category: 'Frete',
-        description: `Frete - Compra NF ${purchaseData.invoice_number || purchaseId.substring(0, 8)} - ${paymentInfo.shipping_type || 'Entrega'}`,
-        amount: paymentInfo.shipping_cost,
-        date: purchaseData.date,
-        due_date: paymentInfo.first_due_date || purchaseData.date,
-        status: paymentInfo.paid ? 'paid' : 'pending',
-        payment_date: paymentInfo.paid ? paymentInfo.paid_date : undefined,
-        payment_method: paymentInfo.payment_method,
-        reference_type: 'purchase',
-        reference_id: purchaseId,
-        supplier_id: purchaseData.supplier_id,
-      };
-      
-      await addFinancialTransaction(shippingTransaction);
-    }
-    
-    console.log(`✅ ${installments} transação(ões) de compra criada(s)`);
-  }, [user, suppliers, addFinancialTransaction]);
+    await addFinancialTransaction(shippingTransaction);
+  }
+  
+  console.log(`✅ ${installments} transação(ões) de compra criada(s)`);
+}, [user, suppliers, addFinancialTransaction, bankAccounts]);
   
   const createTransactionsFromProject = useCallback(async (
     projectId: string, 
