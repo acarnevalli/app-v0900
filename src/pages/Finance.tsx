@@ -539,20 +539,22 @@ const Finance: React.FC = () => {
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<any>(null);
   const [transactionForm, setTransactionForm] = useState({
-    type: 'expense' as 'income' | 'expense',
-    description: '',
-    amount: 0,
-    date: new Date().toISOString().split('T')[0],
-    due_date: new Date().toISOString().split('T')[0],
-    status: 'pending' as 'pending' | 'paid' | 'cancelled',
-    payment_date: '',
-    client_id: null,
-    supplier_id: null,
-    bank_account_id: null,
-    cost_center_id: null,
+   type: 'expense' as 'income' | 'expense',
+  category: '', // 🆕 ADICIONADO
+  description: '',
+  amount: 0,
+  date: new Date().toISOString().split('T')[0],
+  due_date: new Date().toISOString().split('T')[0],
+  status: 'pending' as 'pending' | 'paid' | 'cancelled',
+  payment_date: '',
+  payment_method: undefined, // 🆕 ADICIONADO
+  account_id: '', // 🆕 CAMPO OBRIGATÓRIO (substitui bank_account_id)
+  client_id: null,
+  supplier_id: null,
+  cost_center_id: null,
+  notes: '', // 🆕 ADICIONADO
   });
 
-  
   // ====== CÁLCULOS ======
   const today = new Date();
   const currentMonth = today.getMonth();
@@ -831,33 +833,46 @@ const Finance: React.FC = () => {
     // ====== FUNÇÕES DE TRANSAÇÕES (COM TOASTS) ======
   
   const handleOpenTransactionModal = (transaction?: any) => {
-    const today = new Date().toISOString().split('T')[0];
-    if (transaction) {
-      setEditingTransaction(transaction);
-      setTransactionForm({
-        ...transaction,
-        date: transaction.date ? new Date(transaction.date).toISOString().split('T')[0] : today,
-        due_date: transaction.due_date ? new Date(transaction.due_date).toISOString().split('T')[0] : today,
-        payment_date: transaction.payment_date ? new Date(transaction.payment_date).toISOString().split('T')[0] : '',
-      });
-    } else {
-      setEditingTransaction(null);
-      setTransactionForm({
-        type: 'expense',
-        description: '',
-        amount: 0,
-        date: today,
-        due_date: today,
-        status: 'pending',
-        payment_date: '',
-        client_id: null,
-        supplier_id: null,
-        bank_account_id: null,
-        cost_center_id: null,
-      });
-    }
-    setShowTransactionModal(true);
-  };
+  const today = new Date().toISOString().split('T')[0];
+  if (transaction) {
+    setEditingTransaction(transaction);
+    setTransactionForm({
+      type: transaction.type || 'expense',
+      category: transaction.category || '', // 🆕 ADICIONADO
+      description: transaction.description || '',
+      amount: transaction.amount || 0,
+      date: transaction.date ? new Date(transaction.date).toISOString().split('T')[0] : today,
+      due_date: transaction.due_date ? new Date(transaction.due_date).toISOString().split('T')[0] : today,
+      status: transaction.status || 'pending',
+      payment_date: transaction.payment_date ? new Date(transaction.payment_date).toISOString().split('T')[0] : '',
+      payment_method: transaction.payment_method || undefined, // 🆕 ADICIONADO
+      account_id: transaction.account_id || '', // 🆕 CAMPO OBRIGATÓRIO
+      client_id: transaction.client_id || null,
+      supplier_id: transaction.supplier_id || null,
+      cost_center_id: transaction.cost_center_id || null,
+      notes: transaction.notes || '', // 🆕 ADICIONADO
+    });
+  } else {
+    setEditingTransaction(null);
+    setTransactionForm({
+      type: 'expense',
+      category: '', // 🆕 ADICIONADO
+      description: '',
+      amount: 0,
+      date: today,
+      due_date: today,
+      status: 'pending',
+      payment_date: '',
+      payment_method: undefined, // 🆕 ADICIONADO
+      account_id: '', // 🆕 CAMPO OBRIGATÓRIO
+      client_id: null,
+      supplier_id: null,
+      cost_center_id: null,
+      notes: '', // 🆕 ADICIONADO
+    });
+  }
+  setShowTransactionModal(true);
+};
 
   const handleCloseTransactionModal = () => {
     setShowTransactionModal(false);
@@ -866,42 +881,59 @@ const Finance: React.FC = () => {
 
   // ⭐ MODIFICADO: Substituído alert() por toasts
   const handleSaveTransaction = async () => {
-    // Validações básicas
-    if (!transactionForm.description.trim()) {
-      error('A descrição é obrigatória'); // ⭐ Toast de erro
-      return;
-    }
-    if (transactionForm.amount <= 0) {
-      error('O valor deve ser maior que zero'); // ⭐ Toast de erro
-      return;
-    }
-    if (transactionForm.status === 'paid' && !transactionForm.bank_account_id) {
-      error('Para transações pagas, é obrigatório selecionar uma conta bancária'); // ⭐ Toast de erro
-      return;
-    }
+  // Validações básicas
+  if (!transactionForm.description.trim()) {
+    error('A descrição é obrigatória');
+    return;
+  }
+  
+  if (!transactionForm.category?.trim()) {
+    error('A categoria é obrigatória'); // 🆕 VALIDAÇÃO ADICIONADA
+    return;
+  }
+  
+  if (!transactionForm.account_id) {
+    error('Selecione uma conta bancária para a transação'); // 🆕 VALIDAÇÃO OBRIGATÓRIA
+    return;
+  }
+  
+  if (transactionForm.amount <= 0) {
+    error('O valor deve ser maior que zero');
+    return;
+  }
+  
+  if (transactionForm.status === 'paid' && !transactionForm.payment_date) {
+    error('Para transações pagas, informe a data do pagamento'); // 🆕 VALIDAÇÃO MELHORADA
+    return;
+  }
 
-    try {
-      const dataToSave = { ...transactionForm };
-      // Limpar IDs nulos para não enviar para o Supabase
-      if (!dataToSave.client_id) delete dataToSave.client_id;
-      if (!dataToSave.supplier_id) delete dataToSave.supplier_id;
-      if (!dataToSave.bank_account_id) delete dataToSave.bank_account_id;
-      if (!dataToSave.cost_center_id) delete dataToSave.cost_center_id;
-      if (!dataToSave.payment_date) delete dataToSave.payment_date;
+  try {
+    const dataToSave = { ...transactionForm };
+    
+    // Limpar campos nulos/vazios
+    if (!dataToSave.client_id) delete dataToSave.client_id;
+    if (!dataToSave.supplier_id) delete dataToSave.supplier_id;
+    if (!dataToSave.cost_center_id) delete dataToSave.cost_center_id;
+    if (!dataToSave.payment_date) delete dataToSave.payment_date;
+    if (!dataToSave.payment_method) delete dataToSave.payment_method;
+    if (!dataToSave.notes) delete dataToSave.notes;
 
-      if (editingTransaction) {
-        await updateFinancialTransaction(editingTransaction.id, dataToSave);
-        success('Transação atualizada com sucesso!'); // ⭐ Toast de sucesso
-      } else {
-        await addFinancialTransaction(dataToSave);
-        success('Transação criada com sucesso!'); // ⭐ Toast de sucesso
-      }
-      handleCloseTransactionModal();
-    } catch (err) {
-      console.error("Erro ao salvar transação:", err);
-      error('Ocorreu um erro ao salvar a transação'); // ⭐ Toast de erro
+    console.log('💾 Salvando transação:', dataToSave); // 🆕 LOG PARA DEBUG
+
+    if (editingTransaction) {
+      await updateFinancialTransaction(editingTransaction.id, dataToSave);
+      success('Transação atualizada com sucesso!');
+    } else {
+      await addFinancialTransaction(dataToSave);
+      success('Transação criada com sucesso!');
     }
-  };
+    
+    handleCloseTransactionModal();
+  } catch (err) {
+    console.error("❌ Erro ao salvar transação:", err);
+    error(`Erro ao salvar transação: ${(err as Error).message}`);
+  }
+};
 
   // ⭐ MODIFICADO: Adicionado toast de sucesso
   const handleDeleteTransaction = async (transactionId: string) => {
