@@ -1168,15 +1168,7 @@ const handleSaveTransaction = async () => {
           {/* Placeholder para outras abas */}
           {activeTab === 'receivables' && <ReceivablesTab />}
 
-          {activeTab === 'payables' && (
-            <div className="text-center py-12">
-              <ArrowDownCircle className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-700 mb-2">
-                Contas a Pagar
-              </h3>
-              <p className="text-gray-500">Em desenvolvimento - PARTE 11</p>
-            </div>
-          )}
+          {activeTab === 'payables' && <PayablesTab />}
 
           {activeTab === 'cashflow' && (
             <div className="text-center py-12">
