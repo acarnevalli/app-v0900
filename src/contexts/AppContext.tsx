@@ -1347,142 +1347,225 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   // MÉTODOS CRUD - TRANSAÇÕES FINANCEIRAS
   // ============================================
 
-  const addFinancialTransaction = useCallback(async (
-    data: CreateFinancialTransactionData
-  ): Promise<FinancialTransaction> => {
-    ensureUser();
-    
-    console.log('💰 Criando transação financeira:', data);
-    
-    const newTransaction = {
-      ...cleanUndefined(data),
-      user_id: user!.id,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    
-    const { data: inserted, error } = await supabase
-      .from('financial_transactions')
-      .insert([newTransaction])
-      .select()
-      .single();
-    
-    if (error) {
-      console.error('❌ Erro ao criar transação:', error);
-      throw error;
-    }
-    
-    console.log('✅ Transação criada:', inserted);
-    
-    if (data.bank_account_id && data.status === 'paid') {
-      await updateBankAccountBalance(
-        data.bank_account_id,
-        data.paid_amount || data.amount,
-        data.type === 'income' ? 'add' : 'subtract'
-      );
-    }
-    
-    await loadFinancialTransactions();
-    return inserted;
-  }, [user, loadFinancialTransactions, updateBankAccountBalance]);
+ // ============================================
+// 💰 FINANCIAL TRANSACTIONS - VERSÃO CORRIGIDA
+// ============================================
 
-  const updateFinancialTransaction = useCallback(async (
-    id: string,
-    data: UpdateFinancialTransactionData
-  ) => {
-    ensureUser();
-    
-    console.log('💰 Atualizando transação:', id, data);
-    
-    const { error } = await supabase
-      .from('financial_transactions')
-      .update({
-        ...cleanUndefined(data),
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', id)
-      .eq('user_id', user!.id);
-    
-    if (error) {
-      console.error('❌ Erro ao atualizar transação:', error);
-      throw error;
-    }
-    
-    console.log('✅ Transação atualizada');
-    await loadFinancialTransactions();
-  }, [user, loadFinancialTransactions]);
+const addFinancialTransaction = useCallback(async (
+  data: CreateFinancialTransactionData
+): Promise<FinancialTransaction> => {
+  ensureUser();
 
-  const deleteFinancialTransaction = useCallback(async (id: string) => {
-    ensureUser();
-    
-    console.log('🗑️ Deletando transação:', id);
-    
-    const { error } = await supabase
-      .from('financial_transactions')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', user!.id);
-    
-    if (error) {
-      console.error('❌ Erro ao deletar transação:', error);
-      throw error;
-    }
-    
-    console.log('✅ Transação deletada');
-    await loadFinancialTransactions();
-  }, [user, loadFinancialTransactions]);
+  console.log('💰 [ANTES] Dados recebidos:', data);
 
-  const payTransaction = useCallback(async (
-    id: string,
-    paymentData: PayTransactionData
-  ) => {
-    ensureUser();
-    
-    console.log('💳 Marcando transação como paga:', id, paymentData);
-    
-    const { data: transaction, error: fetchError } = await supabase
-      .from('financial_transactions')
-      .select('*')
-      .eq('id', id)
-      .eq('user_id', user!.id)
-      .single();
-    
-    if (fetchError || !transaction) {
-      console.error('❌ Transação não encontrada');
-      throw new Error('Transação não encontrada');
-    }
-    
-    const { error } = await supabase
-      .from('financial_transactions')
-      .update({
-        status: 'paid',
-        payment_date: paymentData.payment_date,
-        paid_amount: paymentData.paid_amount || transaction.amount,
-        payment_method: paymentData.payment_method || transaction.payment_method,
-        bank_account_id: paymentData.bank_account_id || transaction.bank_account_id,
-        notes: paymentData.notes ? `${transaction.notes || ''}\n${paymentData.notes}` : transaction.notes,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', id)
-      .eq('user_id', user!.id);
-    
-    if (error) {
-      console.error('❌ Erro ao pagar transação:', error);
-      throw error;
-    }
-    
-    if (paymentData.bank_account_id) {
-      await updateBankAccountBalance(
-        paymentData.bank_account_id,
-        paymentData.paid_amount || transaction.amount,
-        transaction.type === 'income' ? 'add' : 'subtract'
-      );
-    }
-    
-    console.log('✅ Transação paga com sucesso');
-    await loadFinancialTransactions();
-  }, [user, loadFinancialTransactions, updateBankAccountBalance]);
+  // 🔍 VALIDAÇÃO: Campos obrigatórios
+  if (!data.description?.trim()) {
+    throw new Error('Descrição é obrigatória');
+  }
+  
+  if (!data.amount || data.amount <= 0) {
+    throw new Error('Valor deve ser maior que zero');
+  }
+  
+  if (!data.type || !['income', 'expense'].includes(data.type)) {
+    throw new Error('Tipo deve ser "income" ou "expense"');
+  }
+  
+  if (!data.due_date) {
+    throw new Error('Data de vencimento é obrigatória');
+  }
 
+  // 🧹 Limpa e prepara os dados
+  const newTransaction = {
+    user_id: user!.id,
+    description: data.description.trim(),
+    amount: Number(data.amount), // Garante que é número
+    type: data.type,
+    category_id: data.category_id || null,
+    due_date: data.due_date,
+    status: data.status || 'pending',
+    payment_date: data.payment_date || null,
+    paid_amount: data.paid_amount ? Number(data.paid_amount) : null,
+    payment_method: data.payment_method || null,
+    bank_account_id: data.bank_account_id || null,
+    is_recurring: data.is_recurring || false,
+    recurrence_type: data.recurrence_type || null,
+    recurrence_day: data.recurrence_day || null,
+    notes: data.notes?.trim() || null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  console.log('💰 [DEPOIS] Dados preparados para envio:', newTransaction);
+
+  const { data: inserted, error } = await supabase
+    .from('financial_transactions')
+    .insert([newTransaction])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('❌ Erro ao criar transação:', error);
+    console.error('❌ Mensagem:', error.message);
+    console.error('❌ Detalhes:', error.details);
+    console.error('❌ Hint:', error.hint);
+    throw error;
+  }
+
+  console.log('✅ Transação criada com sucesso:', inserted);
+
+  // Atualiza saldo se estiver paga
+  if (data.bank_account_id && data.status === 'paid') {
+    await updateBankAccountBalance(
+      data.bank_account_id,
+      data.paid_amount || data.amount,
+      data.type === 'income' ? 'add' : 'subtract'
+    );
+  }
+
+  await loadFinancialTransactions();
+  return inserted;
+}, [user, loadFinancialTransactions, updateBankAccountBalance]);
+
+const updateFinancialTransaction = useCallback(async (
+  id: string,
+  data: UpdateFinancialTransactionData
+) => {
+  ensureUser();
+
+  console.log('💰 [ANTES] Atualizando transação:', id, data);
+
+  // 🧹 Limpa e prepara os dados (apenas campos fornecidos)
+  const updateData: any = {
+    updated_at: new Date().toISOString()
+  };
+
+  if (data.description !== undefined) {
+    if (!data.description?.trim()) {
+      throw new Error('Descrição não pode ser vazia');
+    }
+    updateData.description = data.description.trim();
+  }
+
+  if (data.amount !== undefined) {
+    if (data.amount <= 0) {
+      throw new Error('Valor deve ser maior que zero');
+    }
+    updateData.amount = Number(data.amount);
+  }
+
+  if (data.type !== undefined) updateData.type = data.type;
+  if (data.category_id !== undefined) updateData.category_id = data.category_id;
+  if (data.due_date !== undefined) updateData.due_date = data.due_date;
+  if (data.status !== undefined) updateData.status = data.status;
+  if (data.payment_date !== undefined) updateData.payment_date = data.payment_date;
+  if (data.paid_amount !== undefined) updateData.paid_amount = data.paid_amount ? Number(data.paid_amount) : null;
+  if (data.payment_method !== undefined) updateData.payment_method = data.payment_method;
+  if (data.bank_account_id !== undefined) updateData.bank_account_id = data.bank_account_id;
+  if (data.is_recurring !== undefined) updateData.is_recurring = data.is_recurring;
+  if (data.recurrence_type !== undefined) updateData.recurrence_type = data.recurrence_type;
+  if (data.recurrence_day !== undefined) updateData.recurrence_day = data.recurrence_day;
+  if (data.notes !== undefined) updateData.notes = data.notes?.trim() || null;
+
+  console.log('💰 [DEPOIS] Dados preparados:', updateData);
+
+  const { error } = await supabase
+    .from('financial_transactions')
+    .update(updateData)
+    .eq('id', id)
+    .eq('user_id', user!.id);
+
+  if (error) {
+    console.error('❌ Erro ao atualizar transação:', error);
+    console.error('❌ Mensagem:', error.message);
+    throw error;
+  }
+
+  console.log('✅ Transação atualizada com sucesso');
+  await loadFinancialTransactions();
+}, [user, loadFinancialTransactions]);
+
+const deleteFinancialTransaction = useCallback(async (id: string) => {
+  ensureUser();
+
+  console.log('🗑️ Deletando transação:', id);
+
+  const { error } = await supabase
+    .from('financial_transactions')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', user!.id);
+
+  if (error) {
+    console.error('❌ Erro ao deletar transação:', error);
+    throw error;
+  }
+
+  console.log('✅ Transação deletada com sucesso');
+  await loadFinancialTransactions();
+}, [user, loadFinancialTransactions]);
+
+const payTransaction = useCallback(async (
+  id: string,
+  paymentData: PayTransactionData
+) => {
+  ensureUser();
+
+  console.log('💳 Marcando transação como paga:', id, paymentData);
+
+  // 🔍 Busca a transação primeiro
+  const { data: transaction, error: fetchError } = await supabase
+    .from('financial_transactions')
+    .select('*')
+    .eq('id', id)
+    .eq('user_id', user!.id)
+    .single();
+
+  if (fetchError || !transaction) {
+    console.error('❌ Transação não encontrada');
+    throw new Error('Transação não encontrada');
+  }
+
+  // 🧹 Prepara dados de pagamento
+  const updateData = {
+    status: 'paid' as const,
+    payment_date: paymentData.payment_date,
+    paid_amount: paymentData.paid_amount ? Number(paymentData.paid_amount) : Number(transaction.amount),
+    payment_method: paymentData.payment_method || transaction.payment_method,
+    bank_account_id: paymentData.bank_account_id || transaction.bank_account_id,
+    notes: paymentData.notes 
+      ? `${transaction.notes || ''}\n${paymentData.notes}`.trim()
+      : transaction.notes,
+    updated_at: new Date().toISOString()
+  };
+
+  console.log('💳 Dados de pagamento preparados:', updateData);
+
+  const { error } = await supabase
+    .from('financial_transactions')
+    .update(updateData)
+    .eq('id', id)
+    .eq('user_id', user!.id);
+
+  if (error) {
+    console.error('❌ Erro ao pagar transação:', error);
+    console.error('❌ Mensagem:', error.message);
+    throw error;
+  }
+
+  // Atualiza saldo da conta
+  if (updateData.bank_account_id) {
+    await updateBankAccountBalance(
+      updateData.bank_account_id,
+      updateData.paid_amount,
+      transaction.type === 'income' ? 'add' : 'subtract'
+    );
+  }
+
+  console.log('✅ Transação paga com sucesso');
+  await loadFinancialTransactions();
+}, [user, loadFinancialTransactions, updateBankAccountBalance]);
+  
   // ============================================
   // MÉTODOS CRUD - CENTROS DE CUSTO
   // ============================================
