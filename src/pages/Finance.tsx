@@ -34,6 +34,7 @@ import TransactionModal from '../components/TransactionModal';
 import TransactionsTable from '../components/TransactionsTable';
 import ReceivablesTab from '../components/ReceivablesTab';
 import PayablesTab from '../components/PayablesTab';
+import CashFlowTab from '../components/CashFlowTab';
 
 // ====== MODAL DE CONTA BANCÁRIA (FORA DO COMPONENTE) ======
 interface AccountModalProps {
@@ -1170,17 +1171,7 @@ const handleSaveTransaction = async () => {
 
           {activeTab === 'payables' && <PayablesTab />}
 
-          {activeTab === 'cashflow' && (
-            <div className="text-center py-12">
-              <TrendingUp className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-700 mb-2">
-                Fluxo de Caixa
-              </h3>
-              <p className="text-gray-500">Em desenvolvimento - PARTE 12</p>
-            </div>
-          )}
-        </div>
-      </div>
+          {activeTab === 'cashflow' && <CashFlowTab />}
 
       {/* Modal de Conta Bancária */}
        <AccountModal
