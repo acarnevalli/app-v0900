@@ -694,29 +694,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }
 }, [user]);
     
-    // Exibe detalhes do erro para debug
-    if (error.message) {
-      console.error('📝 Mensagem:', error.message);
-    }
-    if (error.code) {
-      console.error('🔢 Código:', error.code);
-    }
-    if (error.details) {
-      console.error('📋 Detalhes:', error.details);
-    }
-    if (error.hint) {
-      console.error('💡 Dica:', error.hint);
-    }
-
-    // Define array vazio para não quebrar a aplicação
-    console.warn('⚠️ Definindo array vazio de transações para evitar quebra da aplicação.');
-    setFinancialTransactions([]);
-    
-    // Opcional: Você pode adicionar um toast/notificação aqui se tiver implementado
-    // showToast('error', 'Erro ao carregar transações. Verifique o console.');
-  }
-}, [user]);
-  
   const loadBankAccounts = useCallback(async () => {
     if (!user) return;
     
