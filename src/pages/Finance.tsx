@@ -30,11 +30,13 @@ import {
 } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { formatCurrency, formatDate } from '../lib/utils';
+import { useToast } from '../contexts/ToastContext';
 import TransactionModal from '../components/TransactionModal';
 import TransactionsTable from '../components/TransactionsTable';
 import ReceivablesTab from '../components/ReceivablesTab';
 import PayablesTab from '../components/PayablesTab';
 import CashFlowTab from '../components/CashFlowTab';
+
 
 // ====== MODAL DE CONTA BANCÁRIA (FORA DO COMPONENTE) ======
 interface AccountModalProps {
@@ -53,6 +55,7 @@ interface AccountModalProps {
   };
   setAccountForm: React.Dispatch<React.SetStateAction<any>>;
   editingAccount: any;
+  toast: any; // ⭐ ADICIONADO: recebe o toast como prop
 }
 
 const AccountModal: React.FC<AccountModalProps> = ({
@@ -62,6 +65,7 @@ const AccountModal: React.FC<AccountModalProps> = ({
   accountForm,
   setAccountForm,
   editingAccount,
+  toast, // ⭐ ADICIONADO
 }) => {
   if (!isOpen) return null;
 
@@ -281,8 +285,6 @@ const AccountsTabContent: React.FC<{
   getAccountTypeLabel?: (type: string) => any;
   getAccountTypeColor?: (type: string) => string;
 }> = (props) => {
-  // Como será usado dentro do escopo do Finance, vamos acessar as props
-  
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -497,13 +499,21 @@ const Finance: React.FC = () => {
     financialTransactions = [],
     bankAccounts = [],
     costCenters = [],
+    clients = [],
+    suppliers = [],
     getFinancialSummary,
     getCashFlow,
     getOverdueTransactions,
     addBankAccount,
     updateBankAccount,
     deleteBankAccount,
+    addFinancialTransaction,
+    updateFinancialTransaction,
+    deleteFinancialTransaction,
   } = useApp();
+
+  // ⭐ ADICIONADO: Hook do Toast
+  const { success, error, warning } = useToast();
 
   // ====== ESTADOS ======
   const [activeTab, setActiveTab] = useState<'overview' | 'receivables' | 'payables' | 'cashflow' | 'accounts'>('overview');
@@ -633,12 +643,12 @@ const Finance: React.FC = () => {
   );
 
   // Saldo total das contas bancárias
-const totalBankBalance = useMemo(() =>
-  (bankAccounts || [])
-    .filter(acc => acc.active)
-    .reduce((sum, acc) => sum + acc.current_balance, 0),
-  [bankAccounts]
-);
+  const totalBankBalance = useMemo(() =>
+    (bankAccounts || [])
+      .filter(acc => acc.active)
+      .reduce((sum, acc) => sum + acc.current_balance, 0),
+    [bankAccounts]
+  );
 
   // Projeção para próximos 30 dias
   const next30Days = useMemo(() => {
@@ -664,35 +674,35 @@ const totalBankBalance = useMemo(() =>
   const projectedBalance = totalBankBalance + projectedIncome - projectedExpense;
 
   // Filtrar transações
-const filteredTransactions = useMemo(() => {
-  let items = financialTransactions;
+  const filteredTransactions = useMemo(() => {
+    let items = financialTransactions;
 
-  // 1. Filtro por Aba Ativa
-  if (activeTab === 'receivables') {
-    items = items.filter(t => t.type === 'income');
-  } else if (activeTab === 'payables') {
-    items = items.filter(t => t.type === 'expense');
-  }
+    // 1. Filtro por Aba Ativa
+    if (activeTab === 'receivables') {
+      items = items.filter(t => t.type === 'income');
+    } else if (activeTab === 'payables') {
+      items = items.filter(t => t.type === 'expense');
+    }
 
-  // 2. Filtro de Busca
-  if (searchTerm.trim()) {
-    const search = searchTerm.toLowerCase();
-    items = items.filter(t =>
-      t.description.toLowerCase().includes(search) ||
-      t.client_name?.toLowerCase().includes(search) ||
-      t.supplier_name?.toLowerCase().includes(search)
-    );
-  }
+    // 2. Filtro de Busca
+    if (searchTerm.trim()) {
+      const search = searchTerm.toLowerCase();
+      items = items.filter(t =>
+        t.description.toLowerCase().includes(search) ||
+        t.client_name?.toLowerCase().includes(search) ||
+        t.supplier_name?.toLowerCase().includes(search)
+      );
+    }
 
-  // 3. Filtro de Status
-  if (statusFilter !== 'all') {
-    items = items.filter(t => t.status === statusFilter);
-  }
+    // 3. Filtro de Status
+    if (statusFilter !== 'all') {
+      items = items.filter(t => t.status === statusFilter);
+    }
 
-  return items;
-}, [financialTransactions, activeTab, searchTerm, statusFilter]);
+    return items;
+  }, [financialTransactions, activeTab, searchTerm, statusFilter]);
 
-  // ====== FUNÇÕES DE CONTAS BANCÁRIAS ======
+  // ====== FUNÇÕES DE CONTAS BANCÁRIAS (COM TOASTS) ======
   const handleOpenAccountModal = (account?: any) => {
     if (account) {
       setEditingAccount(account);
@@ -737,57 +747,65 @@ const filteredTransactions = useMemo(() => {
     });
   };
 
+  // ⭐ MODIFICADO: Substituído alert() por toasts
   const handleSaveAccount = async () => {
-  try {
-    // Validações
-    if (!accountForm.name.trim()) {
-      alert('Nome da conta é obrigatório');
-      return;
+    try {
+      // Validações
+      if (!accountForm.name.trim()) {
+        error('Nome da conta é obrigatório'); // ⭐ Toast em vez de alert
+        return;
+      }
+
+      console.log('💾 Salvando conta:', accountForm);
+      console.log('📝 Editando?', editingAccount ? 'SIM' : 'NÃO');
+
+      if (editingAccount) {
+        console.log('🔄 Atualizando conta ID:', editingAccount.id);
+        await updateBankAccount(editingAccount.id, accountForm);
+        console.log('✅ Conta atualizada com sucesso!');
+        success('Conta bancária atualizada com sucesso!'); // ⭐ Toast de sucesso
+      } else {
+        console.log('➕ Criando nova conta');
+        const newAccount = {
+          ...accountForm,
+          current_balance: accountForm.initial_balance,
+        };
+        console.log('📦 Dados da nova conta:', newAccount);
+        await addBankAccount(newAccount);
+        console.log('✅ Conta criada com sucesso!');
+        success('Conta bancária criada com sucesso!'); // ⭐ Toast de sucesso
+      }
+      
+      handleCloseAccountModal();
+    } catch (err) {
+      console.error('❌ Erro ao salvar conta:', err);
+      error('Erro ao salvar conta bancária: ' + (err as Error).message); // ⭐ Toast de erro
     }
+  };
 
-    console.log('💾 Salvando conta:', accountForm);
-    console.log('📝 Editando?', editingAccount ? 'SIM' : 'NÃO');
-
-    if (editingAccount) {
-      console.log('🔄 Atualizando conta ID:', editingAccount.id);
-      await updateBankAccount(editingAccount.id, accountForm);
-      console.log('✅ Conta atualizada com sucesso!');
-    } else {
-      console.log('➕ Criando nova conta');
-      const newAccount = {
-        ...accountForm,
-        current_balance: accountForm.initial_balance,
-      };
-      console.log('📦 Dados da nova conta:', newAccount);
-      await addBankAccount(newAccount);
-      console.log('✅ Conta criada com sucesso!');
-    }
-    
-    handleCloseAccountModal();
-  } catch (error) {
-    console.error('❌ Erro ao salvar conta:', error);
-    alert('Erro ao salvar conta bancária: ' + (error as Error).message);
-  }
-};
-
+  // ⭐ MODIFICADO: Substituído alert() por toasts
   const handleDeleteAccount = async (accountId: string) => {
     if (window.confirm('Tem certeza que deseja excluir esta conta? Esta ação não pode ser desfeita.')) {
       try {
         await deleteBankAccount(accountId);
-      } catch (error) {
-        console.error('Erro ao excluir conta:', error);
-        alert('Erro ao excluir conta bancária');
+        success('Conta bancária excluída com sucesso!'); // ⭐ Toast de sucesso
+      } catch (err) {
+        console.error('Erro ao excluir conta:', err);
+        error('Erro ao excluir conta bancária'); // ⭐ Toast de erro
       }
     }
   };
 
+  // ⭐ MODIFICADO: Adicionado toast de sucesso
   const handleToggleAccountActive = async (account: any) => {
     try {
       await updateBankAccount(account.id, {
         active: !account.active,
       });
-    } catch (error) {
-      console.error('Erro ao atualizar status da conta:', error);
+      success(`Conta ${account.active ? 'desativada' : 'ativada'} com sucesso!`); // ⭐ Toast de sucesso
+    } catch (err) {
+      console.error('Erro ao atualizar status da conta:', err);
+      error('Erro ao atualizar status da conta'); // ⭐ Toast de erro
     }
   };
 
@@ -810,93 +828,95 @@ const filteredTransactions = useMemo(() => {
     };
     return colors[type] || colors.checking;
   };
-
-  // ====== FUNÇÕES DE TRANSAÇÕES ======
-const { addFinancialTransaction, updateFinancialTransaction, deleteFinancialTransaction, clients = [], suppliers = [] } = useApp();
-
-const handleOpenTransactionModal = (transaction?: any) => {
-  const today = new Date().toISOString().split('T')[0];
-  if (transaction) {
-    setEditingTransaction(transaction);
-    setTransactionForm({
-      ...transaction,
-      date: transaction.date ? new Date(transaction.date).toISOString().split('T')[0] : today,
-      due_date: transaction.due_date ? new Date(transaction.due_date).toISOString().split('T')[0] : today,
-      payment_date: transaction.payment_date ? new Date(transaction.payment_date).toISOString().split('T')[0] : '',
-    });
-  } else {
-    setEditingTransaction(null);
-    setTransactionForm({
-      type: 'expense',
-      description: '',
-      amount: 0,
-      date: today,
-      due_date: today,
-      status: 'pending',
-      payment_date: '',
-      client_id: null,
-      supplier_id: null,
-      bank_account_id: null,
-      cost_center_id: null,
-    });
-  }
-  setShowTransactionModal(true);
-};
-
-const handleCloseTransactionModal = () => {
-  setShowTransactionModal(false);
-  setEditingTransaction(null);
-};
-
-const handleSaveTransaction = async () => {
-  // Validações básicas
-  if (!transactionForm.description.trim()) {
-    alert('A descrição é obrigatória.');
-    return;
-  }
-  if (transactionForm.amount <= 0) {
-    alert('O valor deve ser maior que zero.');
-    return;
-  }
-  if (transactionForm.status === 'paid' && !transactionForm.bank_account_id) {
-    alert('Para transações pagas, é obrigatório selecionar uma conta bancária.');
-    return;
-  }
-
-  try {
-    const dataToSave = { ...transactionForm };
-    // Limpar IDs nulos para não enviar para o Supabase
-    if (!dataToSave.client_id) delete dataToSave.client_id;
-    if (!dataToSave.supplier_id) delete dataToSave.supplier_id;
-    if (!dataToSave.bank_account_id) delete dataToSave.bank_account_id;
-    if (!dataToSave.cost_center_id) delete dataToSave.cost_center_id;
-    if (!dataToSave.payment_date) delete dataToSave.payment_date;
-
-
-    if (editingTransaction) {
-      await updateFinancialTransaction(editingTransaction.id, dataToSave);
-    } else {
-      await addFinancialTransaction(dataToSave);
-    }
-    handleCloseTransactionModal();
-  } catch (error) {
-    console.error("Erro ao salvar transação:", error);
-    alert('Ocorreu um erro ao salvar a transação.');
-  }
-};
-
-  const handleDeleteTransaction = async (transactionId: string) => {
-  if (window.confirm('Tem certeza que deseja excluir esta transação? Essa ação não pode ser desfeita.')) {
-    try {
-      await deleteFinancialTransaction(transactionId);
-    } catch (error) {
-      console.error('Erro ao excluir transação:', error);
-      alert('Não foi possível excluir a transação.');
-    }
-  }
-};
+    // ====== FUNÇÕES DE TRANSAÇÕES (COM TOASTS) ======
   
-    // ====== COMPONENTES UI ======
+  const handleOpenTransactionModal = (transaction?: any) => {
+    const today = new Date().toISOString().split('T')[0];
+    if (transaction) {
+      setEditingTransaction(transaction);
+      setTransactionForm({
+        ...transaction,
+        date: transaction.date ? new Date(transaction.date).toISOString().split('T')[0] : today,
+        due_date: transaction.due_date ? new Date(transaction.due_date).toISOString().split('T')[0] : today,
+        payment_date: transaction.payment_date ? new Date(transaction.payment_date).toISOString().split('T')[0] : '',
+      });
+    } else {
+      setEditingTransaction(null);
+      setTransactionForm({
+        type: 'expense',
+        description: '',
+        amount: 0,
+        date: today,
+        due_date: today,
+        status: 'pending',
+        payment_date: '',
+        client_id: null,
+        supplier_id: null,
+        bank_account_id: null,
+        cost_center_id: null,
+      });
+    }
+    setShowTransactionModal(true);
+  };
+
+  const handleCloseTransactionModal = () => {
+    setShowTransactionModal(false);
+    setEditingTransaction(null);
+  };
+
+  // ⭐ MODIFICADO: Substituído alert() por toasts
+  const handleSaveTransaction = async () => {
+    // Validações básicas
+    if (!transactionForm.description.trim()) {
+      error('A descrição é obrigatória'); // ⭐ Toast de erro
+      return;
+    }
+    if (transactionForm.amount <= 0) {
+      error('O valor deve ser maior que zero'); // ⭐ Toast de erro
+      return;
+    }
+    if (transactionForm.status === 'paid' && !transactionForm.bank_account_id) {
+      error('Para transações pagas, é obrigatório selecionar uma conta bancária'); // ⭐ Toast de erro
+      return;
+    }
+
+    try {
+      const dataToSave = { ...transactionForm };
+      // Limpar IDs nulos para não enviar para o Supabase
+      if (!dataToSave.client_id) delete dataToSave.client_id;
+      if (!dataToSave.supplier_id) delete dataToSave.supplier_id;
+      if (!dataToSave.bank_account_id) delete dataToSave.bank_account_id;
+      if (!dataToSave.cost_center_id) delete dataToSave.cost_center_id;
+      if (!dataToSave.payment_date) delete dataToSave.payment_date;
+
+      if (editingTransaction) {
+        await updateFinancialTransaction(editingTransaction.id, dataToSave);
+        success('Transação atualizada com sucesso!'); // ⭐ Toast de sucesso
+      } else {
+        await addFinancialTransaction(dataToSave);
+        success('Transação criada com sucesso!'); // ⭐ Toast de sucesso
+      }
+      handleCloseTransactionModal();
+    } catch (err) {
+      console.error("Erro ao salvar transação:", err);
+      error('Ocorreu um erro ao salvar a transação'); // ⭐ Toast de erro
+    }
+  };
+
+  // ⭐ MODIFICADO: Adicionado toast de sucesso
+  const handleDeleteTransaction = async (transactionId: string) => {
+    if (window.confirm('Tem certeza que deseja excluir esta transação? Essa ação não pode ser desfeita.')) {
+      try {
+        await deleteFinancialTransaction(transactionId);
+        success('Transação excluída com sucesso!'); // ⭐ Toast de sucesso
+      } catch (err) {
+        console.error('Erro ao excluir transação:', err);
+        error('Não foi possível excluir a transação'); // ⭐ Toast de erro
+      }
+    }
+  };
+  
+  // ====== COMPONENTES UI ======
 
   const StatCard: React.FC<{
     title: string;
@@ -957,7 +977,7 @@ const handleSaveTransaction = async () => {
     return methods[method || ''] || method || '-';
   };
 
-    // ====== RENDER ======
+  // ====== RENDER ======
 
   return (
     <div className="space-y-6">
@@ -1011,182 +1031,181 @@ const handleSaveTransaction = async () => {
         <div className="p-6">
           
           {activeTab === 'overview' && (
-  <div className="space-y-6">
-    {/* Cards de Resumo */}
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      <StatCard
-        title="Saldo em Contas"
-        value={formatCurrency(totalBankBalance)}
-        icon={Wallet}
-        color="#3B82F6"
-        bgColor="bg-blue-50"
-        subtitle="Disponível agora"
-      />
+            <div className="space-y-6">
+              {/* Cards de Resumo */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <StatCard
+                  title="Saldo em Contas"
+                  value={formatCurrency(totalBankBalance)}
+                  icon={Wallet}
+                  color="#3B82F6"
+                  bgColor="bg-blue-50"
+                  subtitle="Disponível agora"
+                />
 
-      <StatCard
-        title="A Receber"
-        value={formatCurrency(totalReceivablesPending)}
-        icon={ArrowUpCircle}
-        color="#10B981"
-        bgColor="bg-green-50"
-        subtitle={`${receivablesPending.length} pendente(s)`}
-      />
+                <StatCard
+                  title="A Receber"
+                  value={formatCurrency(totalReceivablesPending)}
+                  icon={ArrowUpCircle}
+                  color="#10B981"
+                  bgColor="bg-green-50"
+                  subtitle={`${receivablesPending.length} pendente(s)`}
+                />
 
-      <StatCard
-        title="A Pagar"
-        value={formatCurrency(totalPayablesPending)}
-        icon={ArrowDownCircle}
-        color="#EF4444"
-        bgColor="bg-red-50"
-        subtitle={`${payablesPending.length} pendente(s)`}
-      />
+                <StatCard
+                  title="A Pagar"
+                  value={formatCurrency(totalPayablesPending)}
+                  icon={ArrowDownCircle}
+                  color="#EF4444"
+                  bgColor="bg-red-50"
+                  subtitle={`${payablesPending.length} pendente(s)`}
+                />
 
-      <StatCard
-        title="Projeção 30 Dias"
-        value={formatCurrency(projectedBalance)}
-        icon={TrendingUp}
-        color={projectedBalance >= 0 ? "#10B981" : "#EF4444"}
-        bgColor={projectedBalance >= 0 ? "bg-green-50" : "bg-red-50"}
-        subtitle="Saldo projetado"
-      />
-    </div>
+                <StatCard
+                  title="Projeção 30 Dias"
+                  value={formatCurrency(projectedBalance)}
+                  icon={TrendingUp}
+                  color={projectedBalance >= 0 ? "#10B981" : "#EF4444"}
+                  bgColor={projectedBalance >= 0 ? "bg-green-50" : "bg-red-50"}
+                  subtitle="Saldo projetado"
+                />
+              </div>
 
-    {/* Alertas de Vencidos */}
-    {(receivablesOverdue.length > 0 || payablesOverdue.length > 0) && (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {receivablesOverdue.length > 0 && (
-          <div className="bg-orange-50 border border-orange-200 rounded-xl p-6">
-            <div className="flex items-center mb-3">
-              <AlertCircle className="h-5 w-5 text-orange-600 mr-2" />
-              <h3 className="text-lg font-semibold text-orange-800">
-                Recebimentos Vencidos
-              </h3>
+              {/* Alertas de Vencidos */}
+              {(receivablesOverdue.length > 0 || payablesOverdue.length > 0) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {receivablesOverdue.length > 0 && (
+                    <div className="bg-orange-50 border border-orange-200 rounded-xl p-6">
+                      <div className="flex items-center mb-3">
+                        <AlertCircle className="h-5 w-5 text-orange-600 mr-2" />
+                        <h3 className="text-lg font-semibold text-orange-800">
+                          Recebimentos Vencidos
+                        </h3>
+                      </div>
+                      <p className="text-3xl font-bold text-orange-700 mb-2">
+                        {formatCurrency(totalReceivablesOverdue)}
+                      </p>
+                      <p className="text-sm text-orange-600">
+                        {receivablesOverdue.length} conta(s) vencida(s)
+                      </p>
+                    </div>
+                  )}
+
+                  {payablesOverdue.length > 0 && (
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-6">
+                      <div className="flex items-center mb-3">
+                        <AlertCircle className="h-5 w-5 text-red-600 mr-2" />
+                        <h3 className="text-lg font-semibold text-red-800">
+                          Pagamentos Vencidos
+                        </h3>
+                      </div>
+                      <p className="text-3xl font-bold text-red-700 mb-2">
+                        {formatCurrency(totalPayablesOverdue)}
+                      </p>
+                      <p className="text-sm text-red-600">
+                        {payablesOverdue.length} conta(s) vencida(s)
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Resultado do Período */}
+              <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-bold text-gray-800">
+                    Resultado do Período
+                  </h3>
+                  <select
+                    value={dateFilter}
+                    onChange={(e) => setDateFilter(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="week">Última Semana</option>
+                    <option value="month">Este Mês</option>
+                    <option value="year">Este Ano</option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="bg-green-50 rounded-lg p-4">
+                    <p className="text-sm text-green-600 mb-1">Receitas</p>
+                    <p className="text-2xl font-bold text-green-700">
+                      {formatCurrency(summary.totalIncome)}
+                    </p>
+                  </div>
+
+                  <div className="bg-red-50 rounded-lg p-4">
+                    <p className="text-sm text-red-600 mb-1">Despesas</p>
+                    <p className="text-2xl font-bold text-red-700">
+                      {formatCurrency(summary.totalExpense)}
+                    </p>
+                  </div>
+
+                  <div className={`${summary.balance >= 0 ? 'bg-blue-50' : 'bg-orange-50'} rounded-lg p-4`}>
+                    <p className={`text-sm ${summary.balance >= 0 ? 'text-blue-600' : 'text-orange-600'} mb-1`}>
+                      Resultado
+                    </p>
+                    <p className={`text-2xl font-bold ${summary.balance >= 0 ? 'text-blue-700' : 'text-orange-700'}`}>
+                      {formatCurrency(Math.abs(summary.balance))}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {summary.balance >= 0 ? 'Superávit' : 'Déficit'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* TransactionsView */}
+                <div className="mt-8">
+                  <TransactionsView
+                    title="Transações Recentes"
+                    transactions={filteredTransactions}
+                    searchTerm={searchTerm}
+                    setSearchTerm={setSearchTerm}
+                    statusFilter={statusFilter}
+                    setStatusFilter={setStatusFilter}
+                    onEdit={handleOpenTransactionModal}
+                    onDelete={handleDeleteTransaction}
+                    onPay={(t) => warning(`Função de pagamento em desenvolvimento para: ${t.description}`)} // ⭐ Toast de aviso
+                  />
+                </div>
+              </div>
             </div>
-            <p className="text-3xl font-bold text-orange-700 mb-2">
-              {formatCurrency(totalReceivablesOverdue)}
-            </p>
-            <p className="text-sm text-orange-600">
-              {receivablesOverdue.length} conta(s) vencida(s)
-            </p>
-          </div>
-        )}
-
-        {payablesOverdue.length > 0 && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-6">
-            <div className="flex items-center mb-3">
-              <AlertCircle className="h-5 w-5 text-red-600 mr-2" />
-              <h3 className="text-lg font-semibold text-red-800">
-                Pagamentos Vencidos
-              </h3>
-            </div>
-            <p className="text-3xl font-bold text-red-700 mb-2">
-              {formatCurrency(totalPayablesOverdue)}
-            </p>
-            <p className="text-sm text-red-600">
-              {payablesOverdue.length} conta(s) vencida(s)
-            </p>
-          </div>
-        )}
-      </div>
-    )}
-
-    {/* Resultado do Período */}
-    <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-xl font-bold text-gray-800">
-          Resultado do Período
-        </h3>
-        <select
-          value={dateFilter}
-          onChange={(e) => setDateFilter(e.target.value)}
-          className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-        >
-          <option value="week">Última Semana</option>
-          <option value="month">Este Mês</option>
-          <option value="year">Este Ano</option>
-        </select>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-green-50 rounded-lg p-4">
-          <p className="text-sm text-green-600 mb-1">Receitas</p>
-          <p className="text-2xl font-bold text-green-700">
-            {formatCurrency(summary.totalIncome)}
-          </p>
-        </div>
-
-        <div className="bg-red-50 rounded-lg p-4">
-          <p className="text-sm text-red-600 mb-1">Despesas</p>
-          <p className="text-2xl font-bold text-red-700">
-            {formatCurrency(summary.totalExpense)}
-          </p>
-        </div>
-
-        <div className={`${summary.balance >= 0 ? 'bg-blue-50' : 'bg-orange-50'} rounded-lg p-4`}>
-          <p className={`text-sm ${summary.balance >= 0 ? 'text-blue-600' : 'text-orange-600'} mb-1`}>
-            Resultado
-          </p>
-          <p className={`text-2xl font-bold ${summary.balance >= 0 ? 'text-blue-700' : 'text-orange-700'}`}>
-            {formatCurrency(Math.abs(summary.balance))}
-          </p>
-          <p className="text-xs text-gray-500 mt-1">
-            {summary.balance >= 0 ? 'Superávit' : 'Déficit'}
-          </p>
-        </div>
-      </div>
-
-      {/* TransactionsView fora da grid */}
-      <div className="mt-8">
-        <TransactionsView
-          title="Transações Recentes"
-          transactions={filteredTransactions}
-          searchTerm={searchTerm}
-          setSearchTerm={setSearchTerm}
-          statusFilter={statusFilter}
-          setStatusFilter={setStatusFilter}
-          onEdit={handleOpenTransactionModal}
-          onDelete={handleDeleteTransaction}
-          onPay={(t) => alert(`Pagar ${t.description}`)}
-        />
-      </div>
-    </div>
-  </div>
-)}
+          )}
 
           {/* Aba de Contas Bancárias */}
-            {activeTab === 'accounts' && (
-              <AccountsTabContent 
-               bankAccounts={bankAccounts}
-               handleOpenAccountModal={handleOpenAccountModal}
-               handleDeleteAccount={handleDeleteAccount}
-               handleToggleAccountActive={handleToggleAccountActive}
-               totalBankBalance={totalBankBalance}
-               getAccountTypeLabel={getAccountTypeLabel}
-               getAccountTypeColor={getAccountTypeColor}
-              />
-            )}
+          {activeTab === 'accounts' && (
+            <AccountsTabContent 
+              bankAccounts={bankAccounts}
+              handleOpenAccountModal={handleOpenAccountModal}
+              handleDeleteAccount={handleDeleteAccount}
+              handleToggleAccountActive={handleToggleAccountActive}
+              totalBankBalance={totalBankBalance}
+              getAccountTypeLabel={getAccountTypeLabel}
+              getAccountTypeColor={getAccountTypeColor}
+            />
+          )}
           
-          {/* Placeholder para outras abas */}
+          {/* Outras abas */}
           {activeTab === 'receivables' && <ReceivablesTab />}
-
           {activeTab === 'payables' && <PayablesTab />}
-
           {activeTab === 'cashflow' && <CashFlowTab />}
 
-          </div> {/* CORREÇÃO: Fechamento do <div className="p-6"> */}
-      </div> {/* CORREÇÃO: Fechamento do <div className="bg-white rounded-xl shadow-lg"> */}
+        </div>
+      </div>
 
-      {/* Modal de Conta Bancária */}
-       <AccountModal
+      {/* Modal de Conta Bancária (COM TOAST) */}
+      <AccountModal
         isOpen={showAccountModal}
         onClose={handleCloseAccountModal}
         onSave={handleSaveAccount}
         accountForm={accountForm}
         setAccountForm={setAccountForm}
         editingAccount={editingAccount}
+        toast={{ success, error, warning }} // ⭐ PASSANDO TOAST COMO PROP
       />
 
-      {/* NOVO: Modal de Transação */}
+      {/* Modal de Transação */}
       <TransactionModal
         isOpen={showTransactionModal}
         onClose={handleCloseTransactionModal}
