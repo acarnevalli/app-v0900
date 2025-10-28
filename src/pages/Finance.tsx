@@ -32,6 +32,7 @@ import { useApp } from '../contexts/AppContext';
 import { formatCurrency, formatDate } from '../lib/utils';
 import TransactionModal from '../components/TransactionModal';
 import TransactionsTable from '../components/TransactionsTable';
+import ReceivablesTab from '../components/ReceivablesTab';
 
 // ====== MODAL DE CONTA BANCÁRIA (FORA DO COMPONENTE) ======
 interface AccountModalProps {
@@ -1164,15 +1165,7 @@ const handleSaveTransaction = async () => {
             )}
           
           {/* Placeholder para outras abas */}
-          {activeTab === 'receivables' && (
-            <div className="text-center py-12">
-              <ArrowUpCircle className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-700 mb-2">
-                Contas a Receber
-              </h3>
-              <p className="text-gray-500">Em desenvolvimento - PARTE 10</p>
-            </div>
-          )}
+          {activeTab === 'receivables' && <ReceivablesTab />}
 
           {activeTab === 'payables' && (
             <div className="text-center py-12">
