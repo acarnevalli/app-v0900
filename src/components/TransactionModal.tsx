@@ -41,11 +41,16 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
     setFormState(prev => ({ ...prev, amount: value }));
   };
 
-  // ⭐⭐⭐ ADICIONE ESTA FUNÇÃO AQUI ⭐⭐⭐
   const handleSave = async () => {
     // Validação 1: Descrição obrigatória
     if (!formState.description || formState.description.trim() === '') {
       alert('A descrição é obrigatória');
+      return;
+    }
+
+    // ⭐ VALIDAÇÃO NOVA: Categoria obrigatória ⭐
+    if (!formState.category || formState.category.trim() === '') {
+      alert('A categoria é obrigatória');
       return;
     }
 
@@ -87,7 +92,6 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
       alert('Erro ao salvar transação. Verifique os dados e tente novamente.');
     }
   };
-  // ⭐⭐⭐ FIM DA ADIÇÃO ⭐⭐⭐
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
@@ -143,6 +147,21 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
               required
             />
           </div>
+
+          {/* ⭐⭐⭐ CAMPO CATEGORIA - NOVO ⭐⭐⭐ */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Categoria *</label>
+            <input
+              type="text"
+              name="category"
+              value={formState.category || ''}
+              onChange={handleInputChange}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              placeholder={formState.type === 'income' ? 'Ex: Venda de Produto, Serviço' : 'Ex: Fornecedores, Salários, Impostos'}
+              required
+            />
+          </div>
+          {/* ⭐⭐⭐ FIM DO CAMPO CATEGORIA ⭐⭐⭐ */}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Valor */}
@@ -280,7 +299,6 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
             Cancelar
           </button>
           
-          {/* ⭐ MUDANÇA AQUI: era onClick={onSave} */}
           <button
             onClick={handleSave}
             className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors"
