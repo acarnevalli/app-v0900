@@ -743,114 +743,90 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }, [user]);
 
   const loadProjects = useCallback(async () => {
-    if (!user) return;
-    
-    console.log('🔄 [AppContext] Carregando projetos...');
-    
-    const { data, error } = await supabase
-      .from("projects")
-      .select(`
-        *,
-        client:clients(name),
-        products:project_products(
-          id,
-          project_id,
-          product_id,
-          product_name,
-          quantity,
-          unit_price,
-          total_price,
-          item_type,
-          item_description,
-          service_hours,
-          hourly_rate
-        )
-      `)
-      .eq("user_id", user.id)
-      .order('created_at', { ascending: false });
-      
-    if (error) {
-      console.error('❌ [AppContext] Erro ao carregar projetos:', error);
-      throw error;
-    }
+  if (!user) return;
 
-    console.log('🔍 [AppContext] Dados brutos do Supabase:', data);
-    
-    if (!data || data.length === 0) {
-      console.log('⚠️ [AppContext] Nenhum projeto encontrado');
-      setProjects([]);
-      return;
-    }
+  console.log('🔄 [AppContext] Carregando projetos...');
 
-    const merged = validateArray(data).map((p: any) => {
-      console.log(`📋 [AppContext] Processando projeto ${p.id}:`, {
-        order_number: p.order_number,
-        description: p.description,
-        raw_products: p.products,
-        products_length: Array.isArray(p.products) ? p.products.length : 'não é array'
-      });
-      
-      let processedProducts: ProjectProduct[] = [];
-      
-      if (p.products && Array.isArray(p.products)) {
-        processedProducts = p.products
-          .filter((pp: any) => pp && typeof pp === 'object')
-          .map((pp: any) => {
-            const processed = {
-              id: pp.id || `temp-${Date.now()}-${Math.random()}`,
-              product_id: pp.product_id || null,
-              product_name: pp.product_name || pp.name || 'Produto sem nome',
-              quantity: Number(pp.quantity) || 1,
-              unit_price: Number(pp.unit_price) || 0,
-              total_price: Number(pp.total_price) || 0,
-              item_type: (pp.item_type || 'produto') as ItemType,
-              item_description: pp.item_description || pp.description || '',
-              service_hours: pp.item_type === 'servico' ? (Number(pp.service_hours) || undefined) : undefined,
-              hourly_rate: pp.item_type === 'servico' ? (Number(pp.hourly_rate) || undefined) : undefined,
-            };
-            
-            console.log(`  ➡️ Produto processado:`, processed);
-            return processed;
-          });
-      } else {
-        console.log(`  ⚠️ Produtos inválidos ou ausentes para projeto ${p.id}:`, p.products);
-      }
-      
-      console.log(`✅ [AppContext] Projeto ${p.id} processado com ${processedProducts.length} produtos`);
-      
-      return {
-        id: p.id,
-        order_number: p.order_number || `P-${p.number || '000'}`,
-        number: p.number || 0,
-        client_id: p.client_id,
-        client_name: p.client?.name || 'Cliente não encontrado',
-        description: p.description || '',
-        status: p.status || 'orcamento',
-        type: p.type || 'orcamento',
-        products: processedProducts,
-        budget: Number(p.budget) || 0,
-        start_date: p.start_date || new Date().toISOString().split('T')[0],
-        end_date: p.end_date || new Date().toISOString().split('T')[0],
-        delivery_deadline_days: Number(p.delivery_deadline_days) || 15,
-        materials_cost: p.materials_cost ? Number(p.materials_cost) : undefined,
-        labor_cost: p.labor_cost ? Number(p.labor_cost) : undefined,
-        profit_margin: p.profit_margin ? Number(p.profit_margin) : undefined,
-        payment_terms: p.payment_terms || undefined,
-        user_id: p.user_id,
-        created_at: p.created_at,
-        updated_at: p.updated_at
-      };
-    });
+  const { data, error } = await supabase
+    .from("projects")
+    .select(`
+      *,
+      client:clients(name),
+      products:project_products(
+        id,
+        project_id,
+        product_id,
+        product_name,
+        quantity,
+        unit_price,
+        total_price,
+        item_type,
+        item_description,
+        service_hours,
+        hourly_rate
+      )
+    `)
+    .eq("user_id", user.id)
+    .order('created_at', { ascending: false });
     
-    console.log(`✅ [AppContext] Total de projetos carregados: ${merged.length}`);
-    console.log('🔍 [AppContext] Projetos processados:', merged.map(p => ({
+  if (error) {
+    console.error('❌ [AppContext] Erro ao carregar projetos:', error);
+    throw error;
+  }
+
+  // ADICIONAR ESTA VALIDAÇÃO
+  if (!data) {
+    console.log('⚠️ [AppContext] Nenhum projeto encontrado');
+    setProjects([]);
+    return;
+  }
+
+  const merged = data.map((p: any) => {
+    // Garantir que products seja sempre um array
+    const productsArray = Array.isArray(p.products) ? p.products : [];
+    
+    const processedProducts: ProjectProduct[] = productsArray
+      .filter((pp: any) => pp && typeof pp === 'object')
+      .map((pp: any) => ({
+        id: pp.id || `temp-${Date.now()}-${Math.random()}`,
+        product_id: pp.product_id || null,
+        product_name: pp.product_name || pp.name || 'Produto sem nome',
+        quantity: Number(pp.quantity) || 1,
+        unit_price: Number(pp.unit_price) || 0,
+        total_price: Number(pp.total_price) || 0,
+        item_type: (pp.item_type || 'produto') as ItemType,
+        item_description: pp.item_description || pp.description || '',
+        service_hours: pp.item_type === 'servico' ? (Number(pp.service_hours) || undefined) : undefined,
+        hourly_rate: pp.item_type === 'servico' ? (Number(pp.hourly_rate) || undefined) : undefined,
+      }));
+    
+    return {
       id: p.id,
-      order_number: p.order_number,
-      products_count: p.products?.length || 0
-    })));
-    
-    setProjects(merged);
-  }, [user]);
+      order_number: p.order_number || `P-${p.number || '000'}`,
+      number: p.number || 0,
+      client_id: p.client_id,
+      client_name: p.client?.name || 'Cliente não encontrado',
+      description: p.description || '',
+      status: p.status || 'orcamento',
+      type: p.type || 'orcamento',
+      products: processedProducts,
+      budget: Number(p.budget) || 0,
+      start_date: p.start_date || new Date().toISOString().split('T')[0],
+      end_date: p.end_date || new Date().toISOString().split('T')[0],
+      delivery_deadline_days: Number(p.delivery_deadline_days) || 15,
+      materials_cost: p.materials_cost ? Number(p.materials_cost) : undefined,
+      labor_cost: p.labor_cost ? Number(p.labor_cost) : undefined,
+      profit_margin: p.profit_margin ? Number(p.profit_margin) : undefined,
+      payment_terms: p.payment_terms || undefined,
+      user_id: p.user_id,
+      created_at: p.created_at,
+      updated_at: p.updated_at
+    };
+  });
+
+  console.log(`✅ [AppContext] Total de projetos carregados: ${merged.length}`);
+  setProjects(merged);
+}, [user]);
 
   const loadTransactions = useCallback(async () => {
     if (!user) return;
