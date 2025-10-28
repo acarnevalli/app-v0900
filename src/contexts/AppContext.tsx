@@ -632,11 +632,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       .from('financial_transactions')
       .select(`
         *,
-        client:clients!client_id(name),
-        supplier:suppliers!supplier_id(name),
-        project:projects!project_id(order_number),
-        bank_account:bank_accounts!bank_account_id(name),
-        cost_center:cost_centers!cost_center_id(name)
+        client:clients!financial_transactions_client_id_fkey(name),
+        supplier:suppliers!financial_transactions_supplier_id_fkey(name),
+        project:projects!financial_transactions_project_id_fkey(order_number),
+        bank_account:bank_accounts!financial_transactions_bank_account_id_fkey(name),
+        cost_center:cost_centers!financial_transactions_cost_center_id_fkey(name)
       `)
       .eq('user_id', user.id)
       .order('due_date', { ascending: false });
