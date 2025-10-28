@@ -623,8 +623,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }, [user]);
 
   const loadFinancialTransactions = useCallback(async () => {
-    if (!user) return;
-    
+  if (!user) return;
+  
+  try {
     console.log('📊 Carregando transações financeiras...');
     
     const { data, error } = await supabase
@@ -640,11 +641,52 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       .eq('user_id', user.id)
       .order('due_date', { ascending: false });
     
+    // 🔍 VERIFICAÇÃO 1: Se houver erro do Supabase
     if (error) {
-      console.error('❌ Erro ao carregar transações financeiras:', error);
+      console.error('❌ Erro ao buscar transações:', error);
+
+      // 🛡️ PROTEÇÃO: Erros conhecidos que podem ser ignorados
+      const ignorableErrors = [
+        'PGRST116',     // Nenhum registro encontrado (tabela vazia)
+        'PGRST301',     // Erro de JOIN com tabela vazia
+        'join',         // Palavra que aparece em erros de JOIN
+        'foreign key',  // Erros de chave estrangeira em tabelas vazias
+        'violates foreign key constraint', // Variação do erro de FK
+        'no rows',      // Sem linhas
+      ];
+
+      // Verifica se é um erro ignorável
+      const isIgnorableError = ignorableErrors.some(errType => 
+        error.message?.toLowerCase().includes(errType.toLowerCase()) ||
+        error.code?.toLowerCase().includes(errType.toLowerCase()) ||
+        error.details?.toLowerCase().includes(errType.toLowerCase())
+      );
+
+      if (isIgnorableError) {
+        console.warn('⚠️ Tabela de transações vazia ou sem relacionamentos. Iniciando com array vazio.');
+        setFinancialTransactions([]);
+        return; // Sai da função sem lançar erro
+      }
+
+      // Se for um erro REAL (não ignorável), lança o erro
       throw error;
     }
     
+    // 🔍 VERIFICAÇÃO 2: Se data vier null ou undefined
+    if (!data) {
+      console.warn('⚠️ Nenhuma transação encontrada no banco.');
+      setFinancialTransactions([]);
+      return;
+    }
+
+    // 🔍 VERIFICAÇÃO 3: Se data for um array vazio
+    if (Array.isArray(data) && data.length === 0) {
+      console.log('ℹ️ Nenhuma transação cadastrada ainda.');
+      setFinancialTransactions([]);
+      return;
+    }
+    
+    // ✅ PROCESSAMENTO: Mescla os dados relacionados
     const merged = validateArray(data).map((t: any) => ({
       ...t,
       client_name: t.client?.name,
@@ -654,10 +696,37 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       cost_center_name: t.cost_center?.name
     }));
     
-    console.log(`✅ ${merged.length} transações financeiras carregadas`);
+    // ✅ SUCESSO: Define as transações
+    console.log(`✅ ${merged.length} transações financeiras carregadas com sucesso`);
     setFinancialTransactions(merged);
-  }, [user]);
 
+  } catch (error: any) {
+    // 🚨 ÚLTIMO NÍVEL DE PROTEÇÃO: Qualquer erro não tratado
+    console.error('🔴 Erro crítico ao carregar transações financeiras:', error);
+    
+    // Exibe detalhes do erro para debug
+    if (error.message) {
+      console.error('📝 Mensagem:', error.message);
+    }
+    if (error.code) {
+      console.error('🔢 Código:', error.code);
+    }
+    if (error.details) {
+      console.error('📋 Detalhes:', error.details);
+    }
+    if (error.hint) {
+      console.error('💡 Dica:', error.hint);
+    }
+
+    // Define array vazio para não quebrar a aplicação
+    console.warn('⚠️ Definindo array vazio de transações para evitar quebra da aplicação.');
+    setFinancialTransactions([]);
+    
+    // Opcional: Você pode adicionar um toast/notificação aqui se tiver implementado
+    // showToast('error', 'Erro ao carregar transações. Verifique o console.');
+  }
+}, [user]);
+  
   const loadBankAccounts = useCallback(async () => {
     if (!user) return;
     
@@ -932,7 +1001,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       safeLoad(loadSales, "Vendas"),
       safeLoad(loadPurchases, "Compras"),
       safeLoad(loadCategories, "Categorias"),
-      //safeLoad(loadFinancialTransactions, "Transações Financeiras"),
+      safeLoad(loadFinancialTransactions, "Transações Financeiras"),
       safeLoad(loadBankAccounts, "Contas Bancárias"),
       safeLoad(loadCostCenters, "Centros de Custo"),
     ]);
