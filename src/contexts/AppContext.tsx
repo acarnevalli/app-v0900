@@ -463,6 +463,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const ensureUser = () => {
     if (!user) throw new Error('Usuário não autenticado');
   };
+  
+  //Parte 2 //  
+
     // ---------------------------------------------------------------
   // FUNÇÕES DE CARREGAMENTO (load*)
   // ---------------------------------------------------------------
@@ -822,6 +825,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     loadData();
     return () => { isMounted = false; };
   }, [user, isAuthenticated, authLoading, refreshData]);
+
+  // PARTE 3A/3 //
+
     // ============================================
   // MÉTODOS CRUD - CLIENTES, PRODUTOS, CATEGORIAS
   // ============================================
@@ -1029,278 +1035,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (error) throw error;
     await loadCostCenters();
   }, [user, loadCostCenters]);
-    // ============================================
-  // MÉTODOS DE INTEGRAÇÃO AUTOMÁTICA (CORRIGIDOS)
-  // ============================================
 
-  const createTransactionsFromSale = useCallback(async (saleId: string, saleData: Sale) => {
-    ensureUser();
-    const defaultAccount = bankAccounts.find(acc => acc.active) || bankAccounts[0];
-    if (!defaultAccount) throw new Error('Configure uma conta bancária antes de registrar transações');
-    const client = clients.find(c => c.id === saleData.client_id);
-    if (saleData.status === 'completed') {
-      const transaction: CreateFinancialTransactionData = { type: 'income', category: 'Vendas',
-        description: `Venda #${saleId.substring(0, 8)} - ${client?.name || 'Cliente'}`, amount: saleData.total, date: saleData.date,
-        due_date: saleData.date, payment_date: saleData.date, status: 'paid', payment_method: (saleData.payment_method as any) || 'dinheiro',
-        reference_type: 'sale', reference_id: saleId, client_id: saleData.client_id, notes: saleData.notes, account_id: defaultAccount.id };
-      await addFinancialTransaction(transaction);
-    }
-  }, [user, clients, addFinancialTransaction, bankAccounts]);
-
-  const createTransactionsFromPurchase = useCallback(async (purchaseId: string, purchaseData: Purchase) => {
-    ensureUser();
-    const defaultAccount = bankAccounts.find(acc => acc.active) || bankAccounts[0];
-    if (!defaultAccount) throw new Error('Configure uma conta bancária antes de registrar transações');
-    const supplier = suppliers.find(s => s.id === purchaseData.supplier_id);
-    const paymentInfo = (purchaseData as any).payment_info;
-    if (!paymentInfo) { console.warn('⚠️ Compra sem informações de pagamento'); return; }
-    const installments = paymentInfo.installments || 1;
-    const installmentValue = paymentInfo.installment_value || (purchaseData.total / installments);
-    const firstDueDate = new Date(paymentInfo.first_due_date || purchaseData.date);
-    for (let i = 0; i < installments; i++) {
-      const dueDate = new Date(firstDueDate);
-      dueDate.setMonth(dueDate.getMonth() + i);
-      const transaction: CreateFinancialTransactionData = { type: 'expense', category: 'Compras',
-        description: `Compra NF ${purchaseData.invoice_number || purchaseId.substring(0, 8)} - ${supplier?.name || 'Fornecedor'} - Parcela ${i + 1}/${installments}`,
-        amount: installmentValue, date: purchaseData.date, due_date: dueDate.toISOString().split('T')[0], status: paymentInfo.paid ? 'paid' : 'pending',
-        payment_date: paymentInfo.paid ? paymentInfo.paid_date : undefined, payment_method: paymentInfo.payment_method, installment_number: i + 1,
-        total_installments: installments, reference_type: 'purchase', reference_id: purchaseId, reference_number: purchaseData.invoice_number,
-        supplier_id: purchaseData.supplier_id, notes: purchaseData.notes, account_id: defaultAccount.id };
-      await addFinancialTransaction(transaction);
-    }
-    if (paymentInfo.has_shipping && paymentInfo.shipping_cost > 0) {
-      const shippingTransaction: CreateFinancialTransactionData = { type: 'expense', category: 'Frete',
-        description: `Frete - Compra NF ${purchaseData.invoice_number || purchaseId.substring(0, 8)} - ${paymentInfo.shipping_type || 'Entrega'}`,
-        amount: paymentInfo.shipping_cost, date: purchaseData.date, due_date: paymentInfo.first_due_date || purchaseData.date,
-        status: paymentInfo.paid ? 'paid' : 'pending', payment_date: paymentInfo.paid ? paymentInfo.paid_date : undefined,
-        payment_method: paymentInfo.payment_method, reference_type: 'purchase', reference_id: purchaseId,
-        supplier_id: purchaseData.supplier_id, account_id: defaultAccount.id };
-      await addFinancialTransaction(shippingTransaction);
-    }
-  }, [user, suppliers, addFinancialTransaction, bankAccounts]);
   
-  const createTransactionsFromProject = useCallback(async (projectId: string, projectData: any) => {
-    if (projectData.type !== 'venda') return;
-    const client = clients.find(c => c.id === projectData.client_id);
-    const { payment_terms } = projectData;
-    if (!payment_terms) { console.warn('Projeto sem termos de pagamento'); return; }
-    try {
-      for (let i = 0; i < payment_terms.installments; i++) {
-        const dueDate = new Date(projectData.start_date);
-        dueDate.setMonth(dueDate.getMonth() + i);
-        const transaction = { type: 'entrada' as const, category: 'Vendas',
-          description: `${projectData.order_number || 'Venda'} - ${client?.name || 'Cliente'} - Parcela ${i + 1}/${payment_terms.installments}`,
-          amount: payment_terms.installment_value || 0, date: dueDate.toISOString().split('T')[0], project_id: projectId,
-          project_title: projectData.description || 'Sem descrição', user_id: user!.id, created_at: new Date().toISOString() };
-        await supabase.from('transactions').insert([transaction]);
-      }
-    } catch (error) { console.error('❌ Erro ao criar transações financeiras:', error); throw error; }
-  }, [user, clients]);
+  // PARTE 3B1/3 //
 
   // ============================================
-  // MÉTODOS DE ESTOQUE
-  // ============================================
-  
-  const addStockMovement = useCallback(async (data: Omit<StockMovement, "id" | "created_at" | "user_id">) => {
-    ensureUser();
-    const product = products.find(p => p.id === data.product_id);
-    if (!product) throw new Error(`Produto não encontrado: ${data.product_id}`);
-    const newStock = data.movement_type === 'entrada' ? product.current_stock + data.quantity : product.current_stock - data.quantity;
-    if (newStock < 0) throw new Error(`Estoque insuficiente para ${product.name}. Disponível: ${product.current_stock}, Solicitado: ${data.quantity}`);
-    const movementData = { ...data, user_id: user!.id, created_at: new Date().toISOString() };
-    const { error } = await supabase.from("stock_movements").insert([movementData]);
-    if (error) throw error;
-    await updateProduct({ ...product, current_stock: newStock });
-    await loadStockMovements();
-  }, [user, products, updateProduct, loadStockMovements]);
-
-  const processProjectStockMovement = useCallback(async (projectId: string, products: ProjectProduct[]) => {
-    ensureUser();
-    if (!products || products.length === 0) return;
-    const movementPromises = products.map(item => 
-      addStockMovement({ product_id: item.product_id!, product_name: item.product_name, movement_type: 'saida', quantity: item.quantity,
-        unit_price: item.unit_price, total_value: item.total_price, project_id: projectId, reference_type: 'project',
-        date: new Date().toISOString(), notes: `Saída para projeto #${projectId}` })
-    );
-    await Promise.all(movementPromises);
-  }, [addStockMovement]);
-
-  const addTransaction = useCallback(async (data: Omit<Transaction, "id" | "created_at" | "user_id">) => {
-    ensureUser();
-    const newTransaction = { ...data, user_id: user!.id, created_at: new Date().toISOString() };
-    const { error } = await supabase.from("transactions").insert([newTransaction]);
-    if (error) throw error;
-    await loadTransactions();
-  }, [user, loadTransactions]);
-
-  // ============================================
-  // CRUD - SALES
-  // ============================================
-
-  const addSale = useCallback(async (sale: Omit<Sale, 'id' | 'created_at' | 'updated_at' | 'user_id'>) => {
-    ensureUser();
-    const newSale = { date: sale.date, client_id: sale.client_id, total: sale.total, status: sale.status, payment_method: sale.payment_method,
-      notes: sale.notes, user_id: user!.id, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
-    const { data: insertedSale, error: saleError } = await supabase.from('sales').insert([newSale]).select().single();
-    if (saleError) throw saleError;
-    if (sale.items && sale.items.length > 0) {
-      const saleItems = sale.items.map(item => ({ sale_id: insertedSale.id, product_id: item.product_id, product_name: item.product_name,
-        quantity: item.quantity, unit_price: item.unit_price, total: item.total })).filter(item => item.quantity > 0);
-      const { error: itemsError } = await supabase.from('sale_items').insert(saleItems);
-      if (itemsError) throw itemsError;
-    }
-    if (sale.items && sale.status === 'completed') await processProjectStockMovement(insertedSale.id, sale.items);
-    if (sale.status === 'completed') await addTransaction({ type: 'entrada', category: 'venda', description: `Venda para cliente #${sale.client_id}`, amount: sale.total, date: sale.date });
-    await refreshData();
-  }, [user, processProjectStockMovement, addTransaction, refreshData]);
-
-  const updateSale = useCallback(async (id: string, sale: Partial<Sale>) => {
-    ensureUser();
-    const { error } = await supabase.from('sales').update({ ...sale, updated_at: new Date().toISOString() }).eq('id', id).eq('user_id', user!.id);
-    if (error) throw error;
-    await loadSales();
-  }, [user, loadSales]);
-
-  const deleteSale = useCallback(async (id: string) => {
-    ensureUser();
-    const { error } = await supabase.from('sales').delete().eq('id', id).eq('user_id', user!.id);
-    if (error) throw error;
-    await loadSales();
-  }, [user, loadSales]);
-
-  // ============================================
-  // CRUD - PURCHASES
-  // ============================================
-
-  const addPurchase = useCallback(async (purchase: Omit<Purchase, 'id' | 'created_at' | 'updated_at' | 'user_id'>) => {
-    ensureUser();
-    const newPurchase = { date: purchase.date, supplier_id: purchase.supplier_id, total: purchase.total, status: purchase.status,
-      invoice_number: purchase.invoice_number, notes: purchase.notes, user_id: user!.id, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
-    const { data: insertedPurchase, error: purchaseError } = await supabase.from('purchases').insert([newPurchase]).select().single();
-    if (purchaseError) throw purchaseError;
-    if (purchase.items && purchase.items.length > 0) {
-      const purchaseItems = purchase.items.map(item => ({ purchase_id: insertedPurchase.id, product_id: item.product_id, product_name: item.product_name,
-        quantity: item.quantity, unit_cost: item.unit_cost, total: item.total })).filter(item => item.quantity > 0);
-      const { error: itemsError } = await supabase.from('purchase_items').insert(purchaseItems);
-      if (itemsError) throw itemsError;
-    }
-    if (purchase.status === 'received') {
-      const movements = purchase.items?.map(item => 
-        addStockMovement({ product_id: item.product_id, product_name: item.product_name, movement_type: 'entrada', quantity: item.quantity,
-          unit_price: item.unit_cost, total_value: item.total, reference_type: 'manual', date: purchase.date, notes: `Compra #${insertedPurchase.id}` })
-      ) || [];
-      await Promise.all(movements);
-      await addTransaction({ type: 'saida', category: 'compra', description: `Compra do fornecedor #${purchase.supplier_id}`, amount: purchase.total, date: purchase.date });
-    }
-    if (insertedPurchase && insertedPurchase.id) await createTransactionsFromPurchase(insertedPurchase.id, purchase as Purchase);
-    await refreshData();
-  }, [user, addStockMovement, addTransaction, refreshData, createTransactionsFromPurchase]);
-
-  const updatePurchase = useCallback(async (id: string, purchase: Partial<Purchase>) => {
-    ensureUser();
-    const { error } = await supabase.from('purchases').update({ ...purchase, updated_at: new Date().toISOString() }).eq('id', id).eq('user_id', user!.id);
-    if (error) throw error;
-    await loadPurchases();
-  }, [user, loadPurchases]);
-
-  const deletePurchase = useCallback(async (id: string) => {
-    ensureUser();
-    const { error } = await supabase.from('purchases').delete().eq('id', id).eq('user_id', user!.id);
-    if (error) throw error;
-    await loadPurchases();
-  }, [user, loadPurchases]);
-
-  // ============================================
-  // CRUD - SUPPLIERS
-  // ============================================
-
-  const addSupplier = useCallback(async (supplier: Omit<Supplier, 'id' | 'created_at' | 'updated_at'>) => {
-    ensureUser();
-    const newSupplier = { ...supplier, user_id: user!.id, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
-    const { error } = await supabase.from('suppliers').insert([newSupplier]);
-    if (error) throw error;
-    await loadSuppliers();
-  }, [user, loadSuppliers]);
-
-  const updateSupplier = useCallback(async (id: string, supplier: Partial<Supplier>) => {
-    ensureUser();
-    const { error } = await supabase.from('suppliers').update({ ...supplier, updated_at: new Date().toISOString() }).eq('id', id);
-    if (error) throw error;
-    await loadSuppliers();
-  }, [user, loadSuppliers]);
-
-  const deleteSupplier = useCallback(async (id: string) => {
-    ensureUser();
-    const { error } = await supabase.from('suppliers').delete().eq('id', id);
-    if (error) throw error;
-    await loadSuppliers();
-  }, [user, loadSuppliers]);
-
-  // ============================================
-  // CRUD - PROJECTS
-  // ============================================
-
-  const addProject = useCallback(async (data: Omit<Project, "id" | "created_at" | "updated_at" | "number" | "order_number" | "user_id">): Promise<any> => {
-    ensureUser();
-    if (!data.description || data.description.trim() === '') throw new Error('Descrição é obrigatória');
-    if (!data.client_id) throw new Error('Cliente é obrigatório');
-    if (!data.products || data.products.length === 0) throw new Error('Adicione pelo menos um produto ou serviço');
-    const deliveryDeadlineDays = data.delivery_deadline_days || 15;
-    const startDate = new Date(data.start_date);
-    const endDate = new Date(startDate);
-    endDate.setDate(endDate.getDate() + deliveryDeadlineDays);
-    const newProject = { client_id: data.client_id, description: data.description.trim(), status: data.status, type: data.type, budget: data.budget,
-      start_date: data.start_date, end_date: data.end_date || endDate.toISOString().split('T')[0], delivery_deadline_days: deliveryDeadlineDays,
-      materials_cost: data.materials_cost, labor_cost: data.labor_cost, profit_margin: data.profit_margin, payment_terms: data.payment_terms,
-      number: 0, user_id: user!.id, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
-    const { data: insertedProject, error } = await supabase.from("projects").insert([cleanUndefined(newProject)]).select().single();
-    if (error) throw error;
-    if (data.products && data.products.length > 0) {
-      const projectProducts = data.products.map(p => {
-        if (p.item_type === 'servico') {
-          if (!p.service_hours || p.service_hours <= 0) throw new Error(`Serviço "${p.product_name}" precisa ter horas definidas`);
-          if (!p.hourly_rate || p.hourly_rate <= 0) throw new Error(`Serviço "${p.product_name}" precisa ter valor por hora definido`);
-        }
-        return { project_id: insertedProject.id, product_id: p.product_id || null, product_name: p.product_name, quantity: p.quantity,
-          unit_price: p.unit_price, total_price: p.total_price, item_type: p.item_type || 'produto', item_description: p.item_description,
-          service_hours: p.item_type === 'servico' ? p.service_hours : null, hourly_rate: p.item_type === 'servico' ? p.hourly_rate : null, user_id: user!.id };
-      }).filter(p => p.quantity > 0);
-      if (projectProducts.length > 0) {
-        const { error: prodError } = await supabase.from("project_products").insert(projectProducts).select();
-        if (prodError) { alert(`Erro ao salvar produtos no novo projeto: ${prodError.message}`); throw prodError; }
-      }
-    }
-    if (insertedProject && insertedProject.id && data.type === 'venda') {
-      try { await createTransactionsFromProject(insertedProject.id, { ...data, id: insertedProject.id, order_number: insertedProject.order_number } as Project); }
-      catch (error) { console.error('❌ Erro ao criar transações financeiras, mas projeto foi salvo:', error); }
-    }
-    await loadProjects();
-    return insertedProject;
-  }, [user, loadProjects, createTransactionsFromProject]);
-      
-  const updateProject = useCallback(async (id: string, data: Partial<Project>) => {
-    ensureUser();
-    if (data.delivery_deadline_days && data.start_date) {
-      const startDate = new Date(data.start_date);
-      const endDate = new Date(startDate);
-      endDate.setDate(endDate.getDate() + data.delivery_deadline_days);
-      data.end_date = endDate.toISOString().split('T')[0];
-    }
-    const { error } = await supabase.from("projects").update({ ...cleanUndefined(data), updated_at: new Date().toISOString() }).eq("id", id).eq("user_id", user!.id);
-    if (error) throw error;
-    if (data.products !== undefined) {
-      const { error: deleteError } = await supabase.from("project_products").delete().eq("project_id", id);
-      if (deleteError) throw deleteError;
-      if (data.products && data.products.length > 0) {
-        const projectProducts = data.products.map(p => {
-          if (p.item_type === 'servico') {
-            if (!p.service_hours || p.service_hours <= 0) throw new Error(`Serviço "${p.product_name}" precisa ter horas definidas`);
-            if (!p.hourly_rate || p.hourly_rate <= 0) throw new Error(`Serviço "${p.product_name}" precisa ter valor por hora definido`);
-          }
-          return { project_id: id, product_id: p.product_id || null, product_name: p.product_name || 'Produto sem nome',
-            quantity: Number(p.quantity) || 1, unit_price: Number(p.unit_price) || 0, total_price: Number(p.total_price) || 0,
-            item_type
-                    // ============================================
   // INTEGRAÇÕES AUTOMÁTICAS (CORRIGIDAS)
   // ============================================
 
@@ -1506,7 +1245,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (error) throw error;
     await loadSuppliers();
   }, [user, loadSuppliers]);
-            // ============================================
+
+  
+  // PARTE 3B2/3 //
+
+  // ============================================
   // CRUD - PROJECTS
   // ============================================
 
