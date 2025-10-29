@@ -112,11 +112,11 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage }) => {
       <div className="p-6 border-b border-amber-700/50">
         <div className="flex items-center space-x-3">
             <img src="favicon.svg" alt="Logo" className="h-16 w-16 brightness-0 invert" />
-        </div>
           <div>
             <h1 className="text-xl font-bold text-white drop-shadow-sm">MarcenariaPro</h1>
             <p className="text-sm text-amber-200/90">Gestão Completa</p>
         </div>
+      </div>
         
         {/* Informações do usuário */}
         <div className="mt-4 pt-4 border-t border-amber-700/50">
