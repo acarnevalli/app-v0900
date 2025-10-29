@@ -112,7 +112,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage }) => {
       <div className="p-6 border-b border-amber-700/50">
         <div className="flex items-center space-x-3">
           <div className="bg-gradient-to-br from-white to-amber-50 rounded-xl p-3 shadow-lg">
-            <Package className="h-7 w-7 text-amber-800" />
+            <img src="public/logo.svg" alt="Logo" className="h-7 w-7" />
           </div>
           <div>
             <h1 className="text-xl font-bold text-white drop-shadow-sm">MarcenariaPro</h1>
