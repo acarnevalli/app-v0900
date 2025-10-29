@@ -585,7 +585,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           bank_accounts!financial_transactions_account_id_fkey(name),
           cost_centers!financial_transactions_cost_center_id_fkey(name)
         `)
-        .eq('user_id', user.id)
+        .eq('created_by', user.id)
         .order('due_date', { ascending: false });
 
       if (error) {
@@ -606,7 +606,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           const { data: simpleData, error: simpleError } = await supabase
             .from('financial_transactions')
             .select('*')
-            .eq('user_id', user.id)
+            .eq('created_by', user.id)
             .order('due_date', { ascending: false });
 
           if (simpleError) {
