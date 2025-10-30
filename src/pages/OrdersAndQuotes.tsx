@@ -15,7 +15,11 @@ import {
   Wrench,
   TrendingUp,
   AlertCircle,
-  X
+  X,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  BarChart3
 } from 'lucide-react';
 import { useApp, Project } from '../contexts/AppContext';
 import { formatCurrency, formatDate } from '../lib/utils';
@@ -262,6 +266,12 @@ const OrdersAndQuotes: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [detailsProject, setDetailsProject] = useState<Project | null>(null);
+  
+  // Novos estados para filtro de data
+  const [dateFilterType, setDateFilterType] = useState<'month' | 'week' | 'biweekly' | 'year' | 'custom'>('month');
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
 
   // ====== FUNÇÕES DE FORMATAÇÃO ======
   
@@ -287,28 +297,152 @@ const OrdersAndQuotes: React.FC = () => {
     return texts[status as keyof typeof texts] || status;
   };
 
-  const getTypeColor = (type: string) => {
-    return type === 'orcamento' 
-      ? 'bg-blue-50 text-blue-700 border-blue-200' 
-      : 'bg-green-50 text-green-700 border-green-200';
+  // ====== FUNÇÕES DE FILTRO DE DATA ======
+  
+  const getDateRange = () => {
+    const date = new Date(currentDate);
+    let startDate: Date, endDate: Date;
+
+    switch (dateFilterType) {
+      case 'week':
+        const dayOfWeek = date.getDay();
+        startDate = new Date(date);
+        startDate.setDate(date.getDate() - dayOfWeek);
+        startDate.setHours(0, 0, 0, 0);
+        endDate = new Date(startDate);
+        endDate.setDate(startDate.getDate() + 6);
+        endDate.setHours(23, 59, 59, 999);
+        break;
+
+      case 'biweekly':
+        const dayOfMonth = date.getDate();
+        if (dayOfMonth <= 15) {
+          startDate = new Date(date.getFullYear(), date.getMonth(), 1);
+          endDate = new Date(date.getFullYear(), date.getMonth(), 15, 23, 59, 59, 999);
+        } else {
+          startDate = new Date(date.getFullYear(), date.getMonth(), 16);
+          endDate = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
+        }
+        break;
+
+      case 'year':
+        startDate = new Date(date.getFullYear(), 0, 1);
+        endDate = new Date(date.getFullYear(), 11, 31, 23, 59, 59, 999);
+        break;
+
+      case 'custom':
+        if (customStartDate && customEndDate) {
+          startDate = new Date(customStartDate);
+          endDate = new Date(customEndDate);
+          endDate.setHours(23, 59, 59, 999);
+        } else {
+          return null;
+        }
+        break;
+
+      case 'month':
+      default:
+        startDate = new Date(date.getFullYear(), date.getMonth(), 1);
+        endDate = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
+        break;
+    }
+
+    return { startDate, endDate };
   };
 
-  const getTypeText = (type: string) => {
-    return type === 'orcamento' ? '📋 Orçamento' : '✅ Venda';
+  const getDateRangeLabel = () => {
+    const date = new Date(currentDate);
+    const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 
+                    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+    switch (dateFilterType) {
+      case 'week':
+        const range = getDateRange();
+        if (range) {
+          return `${range.startDate.getDate()}/${range.startDate.getMonth() + 1} - ${range.endDate.getDate()}/${range.endDate.getMonth() + 1}/${range.endDate.getFullYear()}`;
+        }
+        return '';
+
+      case 'biweekly':
+        const dayOfMonth = date.getDate();
+        const quinzena = dayOfMonth <= 15 ? '1ª Quinzena' : '2ª Quinzena';
+        return `${quinzena} - ${months[date.getMonth()]} ${date.getFullYear()}`;
+
+      case 'year':
+        return `${date.getFullYear()}`;
+
+      case 'custom':
+        if (customStartDate && customEndDate) {
+          return `${new Date(customStartDate).toLocaleDateString('pt-BR')} - ${new Date(customEndDate).toLocaleDateString('pt-BR')}`;
+        }
+        return 'Selecione as datas';
+
+      case 'month':
+      default:
+        return `${months[date.getMonth()]} ${date.getFullYear()}`;
+    }
+  };
+
+  const navigateDate = (direction: 'prev' | 'next') => {
+    const newDate = new Date(currentDate);
+
+    switch (dateFilterType) {
+      case 'week':
+        newDate.setDate(newDate.getDate() + (direction === 'next' ? 7 : -7));
+        break;
+
+      case 'biweekly':
+        const dayOfMonth = newDate.getDate();
+        if (direction === 'next') {
+          if (dayOfMonth <= 15) {
+            newDate.setDate(16);
+          } else {
+            newDate.setMonth(newDate.getMonth() + 1, 1);
+          }
+        } else {
+          if (dayOfMonth > 15) {
+            newDate.setDate(1);
+          } else {
+            newDate.setMonth(newDate.getMonth() - 1, 16);
+          }
+        }
+        break;
+
+      case 'year':
+        newDate.setFullYear(newDate.getFullYear() + (direction === 'next' ? 1 : -1));
+        break;
+
+      case 'month':
+      default:
+        newDate.setMonth(newDate.getMonth() + (direction === 'next' ? 1 : -1));
+        break;
+    }
+
+    setCurrentDate(newDate);
   };
 
   // ====== ESTATÍSTICAS ======
   
   const stats = useMemo(() => {
-    const totalOrcamentos = projects.filter(p => p.type === 'orcamento').length;
-    const totalVendas = projects.filter(p => p.type === 'venda').length;
+    const dateRange = getDateRange();
+    let filteredByDate = projects;
+
+    if (dateRange) {
+      filteredByDate = projects.filter(p => {
+        const projectDate = new Date(p.start_date);
+        return projectDate >= dateRange.startDate && projectDate <= dateRange.endDate;
+      });
+    }
+
+    const totalOrcamentos = filteredByDate.filter(p => p.type === 'orcamento').length;
+    const totalVendas = filteredByDate.filter(p => p.type === 'venda').length;
     
-    const vendasAprovadas = projects.filter(p => 
+    const vendasAprovadas = filteredByDate.filter(p => 
       p.type === 'venda' && 
       (p.status === 'aprovado' || p.status === 'em_producao')
     ).length;
     
-    const valorTotalVendas = projects
+    const valorTotalVendas = filteredByDate
       .filter(p => p.type === 'venda' && p.status !== 'cancelado')
       .reduce((sum, p) => sum + (p.budget || 0), 0);
     
@@ -318,12 +452,21 @@ const OrdersAndQuotes: React.FC = () => {
       vendasAprovadas,
       valorTotalVendas
     };
-  }, [projects]);
+  }, [projects, currentDate, dateFilterType, customStartDate, customEndDate]);
 
   // ====== FILTROS ======
   
   const filteredProjects = useMemo(() => {
     let filtered = projects;
+    
+    // Filtro de data
+    const dateRange = getDateRange();
+    if (dateRange) {
+      filtered = filtered.filter(p => {
+        const projectDate = new Date(p.start_date);
+        return projectDate >= dateRange.startDate && projectDate <= dateRange.endDate;
+      });
+    }
     
     // Filtro de busca
     if (searchTerm.trim()) {
@@ -347,7 +490,7 @@ const OrdersAndQuotes: React.FC = () => {
     }
     
     return filtered;
-  }, [projects, searchTerm, statusFilter, typeFilter]);
+  }, [projects, searchTerm, statusFilter, typeFilter, currentDate, dateFilterType, customStartDate, customEndDate]);
 
   // ====== HANDLERS ======
   
@@ -381,6 +524,11 @@ const OrdersAndQuotes: React.FC = () => {
     setDetailsProject(project);
   };
 
+  const handleExportData = () => {
+    // Função para exportar dados (futura implementação)
+    alert('Exportação de dados em desenvolvimento!');
+  };
+
   // ====== RENDER PRINCIPAL ======
   
   return (
@@ -391,57 +539,129 @@ const OrdersAndQuotes: React.FC = () => {
           <h1 className="text-3xl font-bold text-gray-800">Vendas e Orçamentos</h1>
           <p className="text-gray-600 mt-1">Gerencie seus pedidos, orçamentos e vendas</p>
         </div>
-        <button
-          onClick={handleNewOrder}
-          className="bg-gradient-to-r from-amber-600 to-amber-700 text-white px-6 py-3 rounded-lg font-medium flex items-center space-x-2 hover:from-amber-700 hover:to-amber-800 transition-all duration-200 shadow-lg hover:shadow-xl"
-        >
-          <Plus className="h-5 w-5" />
-          <span>Novo Pedido</span>
-        </button>
+        <div className="flex space-x-3">
+          <button
+            onClick={handleExportData}
+            className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-lg font-medium flex items-center space-x-2 hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-lg hover:shadow-xl"
+          >
+            <Download className="h-5 w-5" />
+            <span>Exportar</span>
+          </button>
+          <button
+            onClick={handleNewOrder}
+            className="bg-gradient-to-r from-amber-600 to-amber-700 text-white px-6 py-3 rounded-lg font-medium flex items-center space-x-2 hover:from-amber-700 hover:to-amber-800 transition-all duration-200 shadow-lg hover:shadow-xl"
+          >
+            <Plus className="h-5 w-5" />
+            <span>Novo Pedido</span>
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 mb-1">Orçamentos</p>
               <p className="text-2xl font-bold text-blue-600">{stats.totalOrcamentos}</p>
+              <p className="text-xs text-gray-500 mt-1">{getDateRangeLabel()}</p>
             </div>
             <FileText className="h-8 w-8 text-blue-500" />
           </div>
         </div>
         
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 mb-1">Vendas</p>
               <p className="text-2xl font-bold text-green-600">{stats.totalVendas}</p>
+              <p className="text-xs text-gray-500 mt-1">{getDateRangeLabel()}</p>
             </div>
             <TrendingUp className="h-8 w-8 text-green-500" />
           </div>
         </div>
         
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 mb-1">Em Andamento</p>
               <p className="text-2xl font-bold text-orange-600">{stats.vendasAprovadas}</p>
+              <p className="text-xs text-gray-500 mt-1">{getDateRangeLabel()}</p>
             </div>
             <Clock className="h-8 w-8 text-orange-500" />
           </div>
         </div>
         
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 mb-1">Total em Vendas</p>
               <p className="text-2xl font-bold text-gray-800">
                 {formatCurrency(stats.valorTotalVendas)}
               </p>
+              <p className="text-xs text-gray-500 mt-1">{getDateRangeLabel()}</p>
             </div>
             <DollarSign className="h-8 w-8 text-amber-500" />
           </div>
+        </div>
+      </div>
+
+      {/* Filtros de Data */}
+      <div className="bg-white rounded-xl shadow-lg p-6">
+        <div className="flex items-center space-x-2 mb-4">
+          <Calendar className="h-5 w-5 text-gray-500" />
+          <span className="font-medium text-gray-700">Período:</span>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <select
+            value={dateFilterType}
+            onChange={(e) => setDateFilterType(e.target.value as any)}
+            className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+          >
+            <option value="month">Mensal</option>
+            <option value="week">Semanal</option>
+            <option value="biweekly">Quinzenal</option>
+            <option value="year">Anual</option>
+            <option value="custom">Período Personalizado</option>
+          </select>
+
+          {dateFilterType !== 'custom' ? (
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => navigateDate('prev')}
+                className="p-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <ChevronLeft className="h-5 w-5 text-gray-600" />
+              </button>
+              <div className="flex-1 text-center font-medium text-gray-800 bg-amber-50 py-3 rounded-lg border border-amber-200">
+                {getDateRangeLabel()}
+              </div>
+              <button
+                onClick={() => navigateDate('next')}
+                className="p-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <ChevronRight className="h-5 w-5 text-gray-600" />
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                placeholder="Data inicial"
+              />
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                placeholder="Data final"
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -486,6 +706,19 @@ const OrdersAndQuotes: React.FC = () => {
         </div>
       </div>
 
+      {/* Resultado da busca */}
+      {filteredProjects.length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center justify-between">
+          <div className="flex items-center space-x-2 text-blue-800">
+            <BarChart3 className="h-5 w-5" />
+            <span className="font-medium">
+              {filteredProjects.length} {filteredProjects.length === 1 ? 'registro encontrado' : 'registros encontrados'}
+            </span>
+          </div>
+          <span className="text-sm text-blue-600">{getDateRangeLabel()}</span>
+        </div>
+      )}
+
       {/* Tabela de Pedidos/Orçamentos */}
       <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100">
         <div className="overflow-x-auto">
@@ -502,13 +735,13 @@ const OrdersAndQuotes: React.FC = () => {
                   Cliente
                 </th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                  Tipo
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
                   Valor (R$)
                 </th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
                   Situação
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                  Nota Fiscal
                 </th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
                   Ações
@@ -523,8 +756,11 @@ const OrdersAndQuotes: React.FC = () => {
                       <AlertCircle className="h-12 w-12 text-gray-300 mb-2" />
                       <p className="text-gray-500 font-medium">
                         {searchTerm || statusFilter !== 'all' || typeFilter !== 'all' 
-                          ? 'Nenhum pedido encontrado' 
-                          : 'Nenhum pedido cadastrado'}
+                          ? 'Nenhum pedido encontrado com os filtros aplicados' 
+                          : `Nenhum pedido cadastrado em ${getDateRangeLabel()}`}
+                      </p>
+                      <p className="text-gray-400 text-sm mt-1">
+                        Tente ajustar os filtros ou período
                       </p>
                     </div>
                   </td>
@@ -545,7 +781,19 @@ const OrdersAndQuotes: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
-                      {project.client_name || 'Cliente não identificado'}
+                      <div className="flex items-center space-x-2">
+                        <User className="h-4 w-4 text-gray-400" />
+                        <span>{project.client_name || 'Cliente não identificado'}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-3 py-1 inline-flex text-xs font-medium rounded-full border ${
+                        project.type === 'orcamento' 
+                          ? 'bg-blue-50 text-blue-700 border-blue-200' 
+                          : 'bg-green-50 text-green-700 border-green-200'
+                      }`}>
+                        {project.type === 'orcamento' ? 'Orçamento' : 'Venda'}
+                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {formatCurrency(project.budget)}
@@ -555,13 +803,17 @@ const OrdersAndQuotes: React.FC = () => {
                         {getStatusText(project.status)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <button className="text-blue-600 hover:text-blue-800 font-medium hover:underline transition-colors flex items-center space-x-1">
-                        <FileText className="h-4 w-4" />
-                        <span>Emitir NF-e</span>
-                      </button>
-                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2 flex">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRowClick(project);
+                        }}
+                        className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                        title="Visualizar"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
