@@ -14,11 +14,243 @@ import {
   Package,
   Wrench,
   TrendingUp,
-  AlertCircle
+  AlertCircle,
+  X
 } from 'lucide-react';
 import { useApp, Project } from '../contexts/AppContext';
 import { formatCurrency, formatDate } from '../lib/utils';
 import ProjectFormModal from '../components/ProjectFormModal';
+
+// ====== MODAL DE VISUALIZAÇÃO DE DETALHES ======
+interface ProjectDetailsModalProps {
+  project: Project;
+  onClose: () => void;
+}
+
+const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ project, onClose }) => {
+  const getStatusColor = (status: string) => {
+    const colors = {
+      orcamento: 'bg-blue-100 text-blue-800 border-blue-200',
+      aprovado: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+      em_producao: 'bg-orange-100 text-orange-800 border-orange-200',
+      concluido: 'bg-green-100 text-green-800 border-green-200',
+      entregue: 'bg-purple-100 text-purple-800 border-purple-200'
+    };
+    return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800 border-gray-200';
+  };
+
+  const getStatusText = (status: string) => {
+    const texts = {
+      orcamento: 'Orçamento',
+      aprovado: 'Aprovado',
+      em_producao: 'Em Produção',
+      concluido: 'Concluído',
+      entregue: 'Entregue'
+    };
+    return texts[status as keyof typeof texts] || status;
+  };
+
+  const getTypeText = (type: string) => {
+    return type === 'orcamento' ? '📋 Orçamento' : '✅ Venda';
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="sticky top-0 bg-gradient-to-r from-amber-600 to-amber-700 px-8 py-6 flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-white">
+              {project.type === 'orcamento' ? 'Orçamento' : 'Venda'} #{project.order_number}
+            </h2>
+            <p className="text-amber-100 text-sm mt-1">Detalhes completos do pedido</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-white hover:bg-amber-800 p-2 rounded-lg transition-colors"
+          >
+            <X className="h-6 w-6" />
+          </button>
+        </div>
+
+        {/* Conteúdo */}
+        <div className="p-8 space-y-6">
+          {/* Tipo e Status */}
+          <div className="flex items-center space-x-4">
+            <span className={`px-4 py-2 rounded-lg text-sm font-medium border ${
+              project.type === 'orcamento' 
+                ? 'bg-blue-50 text-blue-700 border-blue-200' 
+                : 'bg-green-50 text-green-700 border-green-200'
+            }`}>
+              {getTypeText(project.type)}
+            </span>
+            <span className={`px-4 py-2 rounded-lg text-sm font-medium border ${getStatusColor(project.status)}`}>
+              {getStatusText(project.status)}
+            </span>
+          </div>
+
+          {/* Informações do Cliente */}
+          <div className="bg-gray-50 rounded-lg p-4">
+            <h3 className="font-bold text-gray-800 mb-3 flex items-center space-x-2">
+              <User className="h-5 w-5 text-amber-600" />
+              <span>Informações do Cliente</span>
+            </h3>
+            <div className="space-y-2">
+              <div>
+                <p className="text-sm text-gray-600">Cliente</p>
+                <p className="font-medium text-gray-900">{project.client_name || 'Não identificado'}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Descrição */}
+          <div>
+            <h3 className="font-bold text-gray-800 mb-2">Descrição</h3>
+            <p className="text-gray-700 bg-gray-50 rounded-lg p-4">{project.description}</p>
+          </div>
+
+          {/* Produtos e Serviços */}
+          {project.products && project.products.length > 0 && (
+            <div>
+              <h3 className="font-bold text-gray-800 mb-3 flex items-center space-x-2">
+                <Package className="h-5 w-5 text-blue-600" />
+                <span>Itens do Pedido</span>
+              </h3>
+              <div className="space-y-2 bg-gray-50 rounded-lg p-4">
+                {project.products.map((product, idx) => (
+                  <div key={idx} className="flex items-center justify-between py-2 border-b border-gray-200 last:border-0">
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-900">{product.product_name}</p>
+                      <p className="text-sm text-gray-600">
+                        {product.item_type === 'produto' ? '📦 Produto' : '🔧 Serviço'}
+                      </p>
+                    </div>
+                    <p className="font-medium text-gray-900">{product.quantity}x</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Valores e Pagamento */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
+              <h3 className="font-bold text-blue-900 mb-2 flex items-center space-x-2">
+                <DollarSign className="h-5 w-5" />
+                <span>Valor</span>
+              </h3>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-gray-700">Valor Total:</span>
+                  <span className="font-bold text-blue-900">{formatCurrency(project.budget)}</span>
+                </div>
+                {project.payment_terms?.discount_percentage && project.payment_terms.discount_percentage > 0 && (
+                  <>
+                    <div className="flex justify-between text-green-700">
+                      <span>Desconto ({project.payment_terms.discount_percentage}%):</span>
+                      <span className="font-bold">
+                        -{formatCurrency((project.budget * project.payment_terms.discount_percentage) / 100)}
+                      </span>
+                    </div>
+                    <div className="border-t border-blue-200 pt-2 flex justify-between">
+                      <span className="font-bold">Total com Desconto:</span>
+                      <span className="font-bold text-green-700">
+                        {formatCurrency(project.payment_terms.total_with_discount || 0)}
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {project.payment_terms && (
+              <div className="bg-green-50 rounded-lg p-4 border border-green-100">
+                <h3 className="font-bold text-green-900 mb-2 flex items-center space-x-2">
+                  <FileText className="h-5 w-5" />
+                  <span>Parcelamento</span>
+                </h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-gray-700">Parcelas:</span>
+                    <span className="font-bold text-green-900">{project.payment_terms.installments}x</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-700">Valor por Parcela:</span>
+                    <span className="font-bold text-green-900">
+                      {formatCurrency(project.payment_terms.installment_value || 0)}
+                    </span>
+                  </div>
+                  {project.payment_terms.payment_method && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-700">Método:</span>
+                      <span className="font-bold text-green-900">{project.payment_terms.payment_method}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Datas e Prazos */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-orange-50 rounded-lg p-4 border border-orange-100">
+              <h3 className="font-bold text-orange-900 mb-2 flex items-center space-x-2">
+                <Calendar className="h-5 w-5" />
+                <span>Data de Início</span>
+              </h3>
+              <p className="text-lg font-bold text-orange-900">{formatDate(project.start_date)}</p>
+            </div>
+
+            <div className="bg-purple-50 rounded-lg p-4 border border-purple-100">
+              <h3 className="font-bold text-purple-900 mb-2 flex items-center space-x-2">
+                <Calendar className="h-5 w-5" />
+                <span>Data de Entrega</span>
+              </h3>
+              <p className="text-lg font-bold text-purple-900">{formatDate(project.end_date)}</p>
+            </div>
+          </div>
+
+          {/* Prazo em Dias */}
+          <div className="bg-amber-50 rounded-lg p-4 border border-amber-100">
+            <h3 className="font-bold text-amber-900 mb-2 flex items-center space-x-2">
+              <Clock className="h-5 w-5" />
+              <span>Prazo de Entrega</span>
+            </h3>
+            <p className="text-lg font-bold text-amber-900">{project.delivery_deadline_days} dias</p>
+          </div>
+
+          {/* Margem de Lucro (se houver) */}
+          {project.profit_margin !== undefined && (
+            <div className="bg-green-50 rounded-lg p-4 border border-green-100">
+              <h3 className="font-bold text-green-900 mb-2">Margem de Lucro</h3>
+              <p className="text-lg font-bold text-green-900">{project.profit_margin}%</p>
+            </div>
+          )}
+
+          {/* Notas ou Observações */}
+          {project.notes && (
+            <div>
+              <h3 className="font-bold text-gray-800 mb-2">Observações</h3>
+              <p className="text-gray-700 bg-gray-50 rounded-lg p-4">{project.notes}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="sticky bottom-0 bg-gray-100 px-8 py-4 flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-6 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition-colors font-medium"
+          >
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ====== COMPONENTE PRINCIPAL ======
 
 const OrdersAndQuotes: React.FC = () => {
   const { projects, deleteProject, clients } = useApp();
@@ -29,6 +261,7 @@ const OrdersAndQuotes: React.FC = () => {
   const [typeFilter, setTypeFilter] = useState('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [detailsProject, setDetailsProject] = useState<Project | null>(null);
 
   // ====== FUNÇÕES DE FORMATAÇÃO ======
   
@@ -144,30 +377,8 @@ const OrdersAndQuotes: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  // ====== RENDERIZAÇÃO DE ITENS ======
-  
-  const renderItemsList = (products: any[]) => {
-    if (!products || products.length === 0) return null;
-    
-    const produtosCount = products.filter(p => p.item_type === 'produto').length;
-    const servicosCount = products.filter(p => p.item_type === 'servico').length;
-    
-    return (
-      <div className="flex items-center space-x-3 text-sm text-gray-600">
-        {produtosCount > 0 && (
-          <div className="flex items-center space-x-1">
-            <Package className="h-4 w-4 text-blue-500" />
-            <span>{produtosCount} produto{produtosCount !== 1 ? 's' : ''}</span>
-          </div>
-        )}
-        {servicosCount > 0 && (
-          <div className="flex items-center space-x-1">
-            <Wrench className="h-4 w-4 text-orange-500" />
-            <span>{servicosCount} serviço{servicosCount !== 1 ? 's' : ''}</span>
-          </div>
-        )}
-      </div>
-    );
+  const handleRowClick = (project: Project) => {
+    setDetailsProject(project);
   };
 
   // ====== RENDER PRINCIPAL ======
@@ -274,165 +485,121 @@ const OrdersAndQuotes: React.FC = () => {
           </select>
         </div>
       </div>
-        {/* Lista de Pedidos/Orçamentos */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {filteredProjects.map((project) => (
-          <div key={project.id} className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 overflow-hidden border border-gray-100">
-            <div className="p-6">
-              {/* Cabeçalho do Card */}
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-3 mb-2">
-                    <span className="text-2xl font-bold text-amber-600">
-                      {project.order_number}
-                    </span>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getTypeColor(project.type)}`}>
-                      {getTypeText(project.type)}
-                    </span>
-                  </div>
-                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(project.status)}`}>
-                    {getStatusText(project.status)}
-                  </span>
-                </div>
-                <div className="flex space-x-2 ml-4">
-                  <button
-                    onClick={() => handleEdit(project)}
-                    className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                    title="Editar"
+
+      {/* Tabela de Pedidos/Orçamentos */}
+      <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                  Data
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                  Número
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                  Cliente
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                  Valor (R$)
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                  Situação
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                  Nota Fiscal
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                  Ações
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {filteredProjects.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-12 text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <AlertCircle className="h-12 w-12 text-gray-300 mb-2" />
+                      <p className="text-gray-500 font-medium">
+                        {searchTerm || statusFilter !== 'all' || typeFilter !== 'all' 
+                          ? 'Nenhum pedido encontrado' 
+                          : 'Nenhum pedido cadastrado'}
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filteredProjects.map((project) => (
+                  <tr
+                    key={project.id}
+                    onClick={() => handleRowClick(project)}
+                    className="hover:bg-amber-50 transition-colors cursor-pointer"
                   >
-                    <Edit2 className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(project.id)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    title="Excluir"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Descrição */}
-              <p className="text-gray-700 mb-4 line-clamp-2 min-h-[3rem]">
-                {project.description}
-              </p>
-
-              {/* Informações */}
-              <div className="space-y-3">
-                {/* Cliente */}
-                <div className="flex items-center space-x-3 text-gray-600">
-                  <User className="h-4 w-4 text-amber-600 flex-shrink-0" />
-                  <span className="text-sm truncate">{project.client_name || 'Cliente não identificado'}</span>
-                </div>
-
-                {/* Itens */}
-                {renderItemsList(project.products)}
-
-                {/* Valor */}
-                <div className="flex items-center space-x-3 text-gray-600">
-                  <DollarSign className="h-4 w-4 text-green-600 flex-shrink-0" />
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-800">
-                      {formatCurrency(project.budget)}
-                    </span>
-                    {project.payment_terms && project.payment_terms.discount_percentage > 0 && (
-                      <span className="text-xs text-green-600">
-                        Com desconto: {formatCurrency(project.payment_terms.total_with_discount || 0)}
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {formatDate(project.start_date)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="px-3 py-1 inline-flex items-center space-x-1 rounded-full text-sm font-bold text-amber-700 bg-amber-50 border border-amber-200">
+                        {project.order_number}
                       </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Pagamento */}
-                {project.payment_terms && (
-                  <div className="flex items-center space-x-3 text-gray-600">
-                    <FileText className="h-4 w-4 text-blue-600 flex-shrink-0" />
-                    <span className="text-sm">
-                      {project.payment_terms.installments}x de {formatCurrency(project.payment_terms.installment_value || 0)}
-                    </span>
-                  </div>
-                )}
-
-                {/* Datas */}
-                <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                  <div className="flex items-center space-x-2 text-gray-600">
-                    <Calendar className="h-4 w-4 text-amber-600" />
-                    <span className="text-sm">
-                      Início: {formatDate(project.start_date)}
-                    </span>
-                  </div>
-                  <div className="flex items-center space-x-2 text-gray-600">
-                    <Clock className="h-4 w-4 text-orange-600" />
-                    <span className="text-sm">
-                      {project.delivery_deadline_days} dias
-                    </span>
-                  </div>
-                </div>
-
-                {/* Data de Entrega */}
-                <div className="flex items-center space-x-2 text-gray-600">
-                  <Calendar className="h-4 w-4 text-green-600" />
-                  <span className="text-sm">
-                    Entrega: {formatDate(project.end_date)}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Barra de Progresso */}
-            <div className="px-6 pb-4">
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className={`h-2 rounded-full transition-all duration-300 ${
-                    project.status === 'orcamento' ? 'bg-blue-500 w-1/5' :
-                    project.status === 'aprovado' ? 'bg-yellow-500 w-2/5' :
-                    project.status === 'em_producao' ? 'bg-orange-500 w-3/5' :
-                    project.status === 'concluido' ? 'bg-green-500 w-4/5' :
-                    'bg-purple-500 w-full'
-                  }`}
-                ></div>
-              </div>
-            </div>
-          </div>
-        ))}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-900">
+                      {project.client_name || 'Cliente não identificado'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {formatCurrency(project.budget)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-3 py-1 inline-flex text-xs font-bold rounded-full border ${getStatusColor(project.status)}`}>
+                        {getStatusText(project.status)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <button className="text-blue-600 hover:text-blue-800 font-medium hover:underline transition-colors flex items-center space-x-1">
+                        <FileText className="h-4 w-4" />
+                        <span>Emitir NF-e</span>
+                      </button>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2 flex">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEdit(project);
+                        }}
+                        className="p-2 text-amber-600 hover:bg-amber-100 rounded-lg transition-colors"
+                        title="Editar"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(project.id);
+                        }}
+                        className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                        title="Excluir"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {/* Empty State */}
-      {filteredProjects.length === 0 && (
-        <div className="text-center py-16">
-          <div className="bg-white rounded-xl shadow-lg p-12">
-            <div className="text-gray-400 mb-4">
-              {searchTerm || statusFilter !== 'all' || typeFilter !== 'all' ? (
-                <AlertCircle className="h-16 w-16 mx-auto" />
-              ) : (
-                <FileText className="h-16 w-16 mx-auto" />
-              )}
-            </div>
-            <h3 className="text-xl font-medium text-gray-500 mb-2">
-              {searchTerm || statusFilter !== 'all' || typeFilter !== 'all' 
-                ? 'Nenhum pedido encontrado' 
-                : 'Nenhum pedido cadastrado'}
-            </h3>
-            <p className="text-gray-400 mb-6">
-              {searchTerm || statusFilter !== 'all' || typeFilter !== 'all'
-                ? 'Tente ajustar os filtros de busca'
-                : 'Comece criando seu primeiro orçamento ou venda'
-              }
-            </p>
-            {!searchTerm && statusFilter === 'all' && typeFilter === 'all' && (
-              <button
-                onClick={handleNewOrder}
-                className="px-6 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors inline-flex items-center space-x-2"
-              >
-                <Plus className="h-5 w-5" />
-                <span>Criar Primeiro Pedido</span>
-              </button>
-            )}
-          </div>
-        </div>
+      {/* Modal de Detalhes */}
+      {detailsProject && (
+        <ProjectDetailsModal
+          project={detailsProject}
+          onClose={() => setDetailsProject(null)}
+        />
       )}
 
-      {/* Modal */}
+      {/* Modal de Edição/Criação */}
       {isModalOpen && (
         <ProjectFormModal
           project={editingProject}
