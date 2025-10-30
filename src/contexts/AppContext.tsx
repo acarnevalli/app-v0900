@@ -801,47 +801,69 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setPurchases(merged);
   }, [user]);
 
-  const updatePDFSettings = (settings: PDFSettings) => {
-    setPdfSettings(settings);
-    localStorage.setItem('pdfSettings', JSON.stringify(settings));
-  };
+const updatePDFSettings = (settings: PDFSettings) => {
+  setPdfSettings(settings);
+  localStorage.setItem('pdfSettings', JSON.stringify(settings));
+};
 
-  const refreshData = useCallback(async () => {
-    if (!user) return;
-    setLoading(true);
-    setError(null);
-    const results = await Promise.allSettled([
-      safeLoad(loadClients, "Clientes"), safeLoad(loadProducts, "Produtos"), safeLoad(loadProjects, "Projetos"),
-      safeLoad(loadTransactions, "Transações"), safeLoad(loadStockMovements, "Estoque"), safeLoad(loadSuppliers, "Fornecedores"),
-      safeLoad(loadSales, "Vendas"), safeLoad(loadPurchases, "Compras"), safeLoad(loadCategories, "Categorias"),
-      safeLoad(loadFinancialTransactions, "Transações Financeiras"), safeLoad(loadBankAccounts, "Contas Bancárias"),
-      safeLoad(loadCostCenters, "Centros de Custo"),
-    ]);
-    const hasErrors = results.some(r => r.status === 'rejected');
-    if (hasErrors) console.warn('Alguns dados não foram carregados completamente');
-    setLoading(false);
-  }, [user, loadClients, loadProducts, loadProjects, loadTransactions, loadStockMovements, loadSuppliers, loadSales, loadPurchases, loadCategories, loadFinancialTransactions, loadBankAccounts, loadCostCenters]);
+const refreshData = useCallback(async () => {
+  if (!user) return;
+  setLoading(true);
+  setError(null);
+  const results = await Promise.allSettled([
+    safeLoad(loadClients, "Clientes"),
+    safeLoad(loadProducts, "Produtos"),
+    safeLoad(loadProjects, "Projetos"),
+    safeLoad(loadTransactions, "Transações"),
+    safeLoad(loadStockMovements, "Estoque"),
+    safeLoad(loadSuppliers, "Fornecedores"),
+    safeLoad(loadSales, "Vendas"),
+    safeLoad(loadPurchases, "Compras"),
+    safeLoad(loadCategories, "Categorias"),
+    safeLoad(loadFinancialTransactions, "Transações Financeiras"),
+    safeLoad(loadBankAccounts, "Contas Bancárias"),
+    safeLoad(loadCostCenters, "Centros de Custo"),
+  ]);
+  const hasErrors = results.some(r => r.status === 'rejected');
+  if (hasErrors) console.warn('Alguns dados não foram carregados completamente');
+  setLoading(false);
+}, [user, loadClients, loadProducts, loadProjects, loadTransactions, loadStockMovements, loadSuppliers, loadSales, loadPurchases, loadCategories, loadFinancialTransactions, loadBankAccounts, loadCostCenters]);
 
-  useEffect(() => {
-    if (authLoading) return;
-      let isMounted = true;
-      const loadData = async () => {
-        if (isAuthenticated && user) { await refreshData(); } 
-        else { setLoading(false); setError(null); }
-    }
-    const savedSettings = localStorage.getItem('pdfSettings');
-      if (savedSettings) {
-      setPdfSettings(JSON.parse(savedSettings));
-      }
-  }, []);;
+useEffect(() => {
+  if (authLoading) return;
   
-    loadData();
-    return () => { isMounted = false; };
-  }, [user, isAuthenticated, authLoading, refreshData]);
+  let isMounted = true;
+  
+  const loadData = async () => {
+    if (isAuthenticated && user) {
+      await refreshData();
+    } else {
+      setLoading(false);
+      setError(null);
+    }
+  };
+  
+  // Carregar configurações do PDF do localStorage
+  const savedSettings = localStorage.getItem('pdfSettings');
+  if (savedSettings) {
+    try {
+      setPdfSettings(JSON.parse(savedSettings));
+    } catch (e) {
+      console.error('Erro ao carregar configurações do PDF:', e);
+    }
+  }
+  
+  // Executar carregamento de dados
+  loadData();
+  
+  return () => {
+    isMounted = false;
+  };
+}, [user, isAuthenticated, authLoading, refreshData]);
 
   // PARTE 3A/3 //
 
-    // ============================================
+  // ============================================
   // MÉTODOS CRUD - CLIENTES, PRODUTOS, CATEGORIAS
   // ============================================
 
