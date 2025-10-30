@@ -556,14 +556,7 @@ const OrdersAndQuotes: React.FC = () => {
           <h1 className="text-3xl font-bold text-gray-800">Vendas e Orçamentos</h1>
           <p className="text-gray-600 mt-1">Gerencie seus pedidos, orçamentos e vendas</p>
         </div>
-        <div className="flex space-x-3">
-          <button
-            onClick={handleExportData}
-            className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-lg font-medium flex items-center space-x-2 hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-lg hover:shadow-xl"
-          >
-            <Download className="h-5 w-5" />
-            <span>Exportar</span>
-          </button>          
+        <div className="flex space-x-3">          
           <div className="flex space-x-3">
         <button
           onClick={() => setIsPDFSettingsOpen(true)}
