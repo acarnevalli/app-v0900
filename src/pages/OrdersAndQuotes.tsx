@@ -19,8 +19,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
+  Settings,
   BarChart3
 } from 'lucide-react';
+import { Settings } from 'lucide-react';
 import { useApp, Project } from '../contexts/AppContext';
 import { formatCurrency, formatDate } from '../lib/utils';
 import ProjectFormModal from '../components/ProjectFormModal';
