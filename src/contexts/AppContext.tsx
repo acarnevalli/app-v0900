@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "./AuthContext";
+import { PDFSettings, defaultSettings } from '../components/PDFSettingsModal';
 
 // ---------------------------------------------------------------
 // Funções auxiliares
@@ -440,6 +441,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [stockMovements, setStockMovements] = useState<StockMovement[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
+  const [pdfSettings, setPdfSettings] = useState<PDFSettings>(defaultSettings);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -467,7 +469,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   //Parte 2 //  
 
     // ---------------------------------------------------------------
-  // FUNÇÕES DE CARREGAMENTO (load*)
+  // FUNÇÕES DE CARREGAMENTO (FUNÇÕES DE CONTEXTO) 
   // ---------------------------------------------------------------
 
   const loadCategories = useCallback(async () => {
@@ -799,6 +801,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setPurchases(merged);
   }, [user]);
 
+  const updatePDFSettings = (settings: PDFSettings) => {
+    setPdfSettings(settings);
+    localStorage.setItem('pdfSettings', JSON.stringify(settings));
+  };
+
   const refreshData = useCallback(async () => {
     if (!user) return;
     setLoading(true);
@@ -817,11 +824,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (authLoading) return;
-    let isMounted = true;
-    const loadData = async () => {
-      if (isAuthenticated && user) { await refreshData(); } 
-      else { setLoading(false); setError(null); }
-    };
+      let isMounted = true;
+      const loadData = async () => {
+        if (isAuthenticated && user) { await refreshData(); } 
+        else { setLoading(false); setError(null); }
+    }
+    const savedSettings = localStorage.getItem('pdfSettings');
+      if (savedSettings) {
+      setPdfSettings(JSON.parse(savedSettings));
+      }
+  }, []);;
+  
     loadData();
     return () => { isMounted = false; };
   }, [user, isAuthenticated, authLoading, refreshData]);
@@ -1483,6 +1496,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       createTransactionsFromSale, createTransactionsFromPurchase, createTransactionsFromProject,
       getFinancialSummary, getCashFlow, getExpensesByCategory,
       reloadProject, debugProject,
+      pdfSettings,
+      updatePDFSettings,
     }}>
       {loading ? (
         <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50">
