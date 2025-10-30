@@ -24,6 +24,10 @@ import {
 import { useApp, Project } from '../contexts/AppContext';
 import { formatCurrency, formatDate } from '../lib/utils';
 import ProjectFormModal from '../components/ProjectFormModal';
+import { PDFDownloadLink } from '@react-pdf/renderer';
+import { FileText, Settings } from 'lucide-react';
+import PDFSettingsModal from '../components/PDFSettingsModal';
+import ProjectPDFDocument from '../components/ProjectPDFDocument';
 
 // ====== MODAL DE VISUALIZAÇÃO DE DETALHES ======
 interface ProjectDetailsModalProps {
@@ -69,6 +73,13 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ project, onCl
             </h2>
             <p className="text-amber-100 text-sm mt-1">Detalhes completos do pedido</p>
           </div>
+          <button
+            onClick={() => setIsPDFSettingsOpen(true)}
+              className="bg-gradient-to-r from-purple-600 to-purple-700 text-white px-6 py-3 rounded-lg font-medium flex items-center space-x-2 hover:from-purple-700 hover:to-purple-800 transition-all duration-200 shadow-lg hover:shadow-xl"
+          >
+          <Settings className="h-5 w-5" />
+            <span>Config. PDF</span>
+          </button>
           <button
             onClick={onClose}
             className="text-white hover:bg-amber-800 p-2 rounded-lg transition-colors"
@@ -272,6 +283,10 @@ const OrdersAndQuotes: React.FC = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
+
+  // Novos estados para função de gerar PDF
+  const [isPDFSettingsOpen, setIsPDFSettingsOpen] = useState(false);
+  const { pdfSettings, updatePDFSettings } = useApp();
 
   // ====== FUNÇÕES DE FORMATAÇÃO ======
   
@@ -546,14 +561,30 @@ const OrdersAndQuotes: React.FC = () => {
           >
             <Download className="h-5 w-5" />
             <span>Exportar</span>
-          </button>
-          <button
-            onClick={handleNewOrder}
-            className="bg-gradient-to-r from-amber-600 to-amber-700 text-white px-6 py-3 rounded-lg font-medium flex items-center space-x-2 hover:from-amber-700 hover:to-amber-800 transition-all duration-200 shadow-lg hover:shadow-xl"
-          >
-            <Plus className="h-5 w-5" />
-            <span>Novo Pedido</span>
-          </button>
+          </button>          
+          <div className="flex space-x-3">
+        <button
+          onClick={() => setIsPDFSettingsOpen(true)}
+            className="bg-gradient-to-r from-purple-600 to-purple-700 text-white px-6 py-3 rounded-lg font-medium flex items-center space-x-2 hover:from-purple-700 hover:to-purple-800 transition-all duration-200 shadow-lg hover:shadow-xl"
+        >
+          <Settings className="h-5 w-5" />
+          <span>Config. PDF</span>
+        </button>
+        <button
+          onClick={handleExportData}
+          className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-lg font-medium flex items-center space-x-2 hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-lg hover:shadow-xl"
+        >
+          <Download className="h-5 w-5" />
+          <span>Exportar</span>
+        </button>
+        <button
+          onClick={handleNewOrder}
+          className="bg-gradient-to-r from-amber-600 to-amber-700 text-white px-6 py-3 rounded-lg font-medium flex items-center space-x-2 hover:from-amber-700 hover:to-amber-800 transition-all duration-200 shadow-lg hover:shadow-xl"
+        >
+          <Plus className="h-5 w-5" />
+          <span>Novo Pedido</span>
+        </button>
+          </div>
         </div>
       </div>
 
@@ -845,17 +876,41 @@ const OrdersAndQuotes: React.FC = () => {
 
       {/* Modal de Detalhes */}
       {detailsProject && (
-        <ProjectDetailsModal
-          project={detailsProject}
-          onClose={() => setDetailsProject(null)}
-        />
-      )}
-
+  <ProjectDetailsModal
+    project={detailsProject}
+    onClose={() => setDetailsProject(null)}
+    pdfContent={
+      <PDFDownloadLink
+        document={<ProjectPDFDocument project={detailsProject} settings={pdfSettings} />}
+        fileName={`${detailsProject.type === 'orcamento' ? 'Orcamento' : 'Pedido'}-${detailsProject.order_number}.pdf`}
+        className="px-6 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-colors font-medium flex items-center space-x-2"
+      >
+        {({ loading }) => (
+          <>
+            <FileText className="h-5 w-5" />
+            <span>{loading ? 'Gerando PDF...' : 'Baixar PDF'}</span>
+          </>
+        )}
+      </PDFDownloadLink>
+    }
+  />
+)}
+      
       {/* Modal de Edição/Criação */}
       {isModalOpen && (
         <ProjectFormModal
           project={editingProject}
           onClose={handleModalClose}
+        />
+      )}
+      
+      {/* Modal de Configurações do PDF */}
+      {isPDFSettingsOpen && (
+        <PDFSettingsModal
+          isOpen={isPDFSettingsOpen}
+          onClose={() => setIsPDFSettingsOpen(false)}
+          currentSettings={pdfSettings}
+          onSave={updatePDFSettings}
         />
       )}
     </div>
