@@ -1094,19 +1094,42 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const client = clients.find(c => c.id === projectData.client_id);
     const { payment_terms } = projectData;
     if (!payment_terms) return;
+      const defaultAccount = bankAccounts.find(acc => acc.active) || bankAccounts[0];
+      if (!defaultAccount) {
+        console.error('❌ Nenhuma conta bancária ativa encontrada');
+        return;
+      }
     try {
+      // Criar uma transação para cada parcela
       for (let i = 0; i < payment_terms.installments; i++) {
         const dueDate = new Date(projectData.start_date);
         dueDate.setMonth(dueDate.getMonth() + i);
-        const transaction = { type: 'entrada' as const, category: 'Vendas',
+        
+        const transaction: CreateFinancialTransactionData = {
+          type: 'income', // Venda = Receita (A RECEBER)
+          category: 'Vendas',
           description: `${projectData.order_number || 'Venda'} - ${client?.name || 'Cliente'} - Parcela ${i + 1}/${payment_terms.installments}`,
-          amount: payment_terms.installment_value || 0, date: dueDate.toISOString().split('T')[0], project_id: projectId,
-          project_title: projectData.description || 'Sem descrição', user_id: user!.id, created_at: new Date().toISOString() };
-        await supabase.from('transactions').insert([transaction]);
+          amount: payment_terms.installment_value || 0,
+          date: projectData.start_date,
+          due_date: dueDate.toISOString().split('T')[0],
+          status: 'pending',
+          payment_method: payment_terms.payment_method,
+          reference_type: 'project',
+          reference_id: projectId,
+          client_id: projectData.client_id,
+          account_id: defaultAccount.id, // ✅ OBRIGATÓRIO
+          installment_number: i + 1,
+          total_installments: payment_terms.installments
+        }; 
+        await addFinancialTransaction(transaction);
       }
-    } catch (error) { console.error('❌ Erro ao criar transações:', error); throw error; }
-  }, [user, clients]);
-
+    console.log(`✅ ${payment_terms.installments} transações financeiras criadas para venda ${projectData.order_number}`);
+    } catch (error) {
+    console.error('❌ Erro ao criar transações financeiras:', error);
+    throw error;
+  }
+}, [clients, bankAccounts, addFinancialTransaction]);
+  
   // ============================================
   // ESTOQUE E TRANSAÇÕES SIMPLES
   // ============================================
