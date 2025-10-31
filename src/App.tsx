@@ -16,6 +16,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { DebugAuth } from './components/DebugAuth';
 import { ToastProvider } from './contexts/ToastContext';
+import { CompanySettings } from '../components/CompanySettings';
 
 
 // Componente AppContent separado - FORA do return
