@@ -1,15 +1,15 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { 
-  Plus, 
-  Search, 
-  Calendar, 
-  User, 
-  DollarSign, 
-  Clock, 
-  Edit2, 
-  Trash2, 
-  FileText, 
-  Download, 
+import {
+  Plus,
+  Search,
+  Calendar,
+  User,
+  DollarSign,
+  Clock,
+  Edit2,
+  Trash2,
+  FileText,
+  Download,
   Filter,
   Package,
   TrendingUp,
@@ -27,17 +27,20 @@ import { formatCurrency, formatDate } from '../lib/utils';
 import ProjectFormModal from '../components/ProjectFormModal';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import { OrderPDFDocument } from '../components/OrderPDFDocument';
-import { companyService } from '../services/companyService';
-import { CompanyData } from '../types/company';
+import { useCompanyInfo } from '../hooks/useCompanyInfo';
 
-// ====== MODAL DE VISUALIZAÇÃO DE DETALHES ======
+// Interface melhorada com tipagem correta
 interface ProjectDetailsModalProps {
   project: Project;
   onClose: () => void;
-  companyData: CompanyData | null;
+  companyData: any | null;
 }
 
-const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ project, onClose, companyData }) => {
+const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({
+  project,
+  onClose,
+  companyData
+}) => {
   const getStatusColor = (status: string) => {
     const colors = {
       orcamento: 'bg-blue-100 text-blue-800 border-blue-200',
@@ -64,6 +67,17 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ project, onCl
     return type === 'orcamento' ? '📋 Orçamento' : '✅ Venda';
   };
 
+  // Dados padrão caso companyData seja null
+  const safeCompanyData = companyData || {
+    company_name: 'Empresa não configurada',
+    cnpj: '',
+    address: '',
+    city: '',
+    phone: '',
+    email: '',
+    logo_url: ''
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -83,153 +97,140 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ project, onCl
           </button>
         </div>
 
-        {/* Conteúdo */}
+        {/* Conteúdo Completo */}
         <div className="p-8 space-y-6">
-          {/* Tipo e Status */}
-          <div className="flex items-center space-x-4">
-            <span className={`px-4 py-2 rounded-lg text-sm font-medium border ${
-              project.type === 'orcamento' 
-                ? 'bg-blue-50 text-blue-700 border-blue-200' 
-                : 'bg-green-50 text-green-700 border-green-200'
-            }`}>
-              {getTypeText(project.type)}
-            </span>
-            <span className={`px-4 py-2 rounded-lg text-sm font-medium border ${getStatusColor(project.status)}`}>
-              {getStatusText(project.status)}
-            </span>
+          {/* Cliente */}
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <h3 className="font-semibold text-gray-700 mb-2 flex items-center gap-2">
+              <User size={18} />
+              Cliente
+            </h3>
+            <p className="text-gray-900 font-medium">{project.client_name || 'Não identificado'}</p>
           </div>
 
-          {/* Informações do Cliente */}
-          <div className="bg-gray-50 rounded-lg p-4">
-            <h3 className="font-bold text-gray-800 mb-3 flex items-center space-x-2">
-              <User className="h-5 w-5 text-amber-600" />
-              <span>Informações do Cliente</span>
-            </h3>
-            <div className="space-y-2">
-              <div>
-                <p className="text-sm text-gray-600">Cliente</p>
-                <p className="font-medium text-gray-900">{project.client_name || 'Não identificado'}</p>
+          {/* Status e Tipo */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <span className="text-sm text-gray-600 block mb-2">Status:</span>
+              <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(project.status)}`}>
+                {getStatusText(project.status)}
               </div>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <span className="text-sm text-gray-600 block mb-2">Tipo:</span>
+              <p className="font-medium text-lg">{getTypeText(project.type)}</p>
             </div>
           </div>
 
-          {/* Descrição */}
-          <div>
-            <h3 className="font-bold text-gray-800 mb-2">Descrição</h3>
-            <p className="text-gray-700 bg-gray-50 rounded-lg p-4">{project.description}</p>
+          {/* Datas */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-orange-50 p-4 rounded-lg border border-orange-100">
+              <span className="text-sm text-gray-600 block mb-1">Data de Início:</span>
+              <p className="font-medium text-orange-900">{formatDate(project.start_date)}</p>
+            </div>
+            <div className="bg-purple-50 p-4 rounded-lg border border-purple-100">
+              <span className="text-sm text-gray-600 block mb-1">Data de Entrega:</span>
+              <p className="font-medium text-purple-900">{formatDate(project.end_date)}</p>
+            </div>
           </div>
 
-          {/* Produtos e Serviços */}
+          {/* Prazo em Dias */}
+          <div className="bg-amber-50 p-4 rounded-lg border border-amber-100">
+            <h3 className="font-bold text-amber-900 mb-2 flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              Prazo de Entrega
+            </h3>
+            <p className="text-lg font-bold text-amber-900">{project.delivery_deadline_days} dias</p>
+          </div>
+
+          {/* Descrição */}
+          {project.description && (
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="font-semibold text-gray-700 mb-2">Descrição:</h3>
+              <p className="text-gray-700 whitespace-pre-wrap">{project.description}</p>
+            </div>
+          )}
+
+          {/* Produtos/Serviços */}
           {project.products && project.products.length > 0 && (
             <div>
-              <h3 className="font-bold text-gray-800 mb-3 flex items-center space-x-2">
-                <Package className="h-5 w-5 text-blue-600" />
-                <span>Itens do Pedido</span>
+              <h3 className="font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <Package size={18} />
+                Itens do Pedido
               </h3>
-              <div className="space-y-2 bg-gray-50 rounded-lg p-4">
-                {project.products.map((product, idx) => (
-                  <div key={idx} className="flex items-center justify-between py-2 border-b border-gray-200 last:border-0">
+              <div className="space-y-2">
+                {project.products.map((item, idx) => (
+                  <div key={idx} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg hover:bg-gray-100 transition-colors">
                     <div className="flex-1">
-                      <p className="font-medium text-gray-900">{product.product_name}</p>
+                      <p className="font-medium text-gray-900">{item.product_name}</p>
                       <p className="text-sm text-gray-600">
-                        {product.item_type === 'produto' ? '📦 Produto' : '🔧 Serviço'}
+                        {item.item_type === 'produto' ? '📦 Produto' : '🔧 Serviço'} - Quantidade: {item.quantity}
                       </p>
                     </div>
-                    <p className="font-medium text-gray-900">{product.quantity}x</p>
+                    <p className="font-bold text-lg text-amber-600">{formatCurrency(item.unit_price || 0)}</p>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Valores e Pagamento */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
-              <h3 className="font-bold text-blue-900 mb-2 flex items-center space-x-2">
-                <DollarSign className="h-5 w-5" />
-                <span>Valor</span>
+          {/* Totais */}
+          <div className="border-t-2 border-gray-200 pt-4">
+            <div className="flex justify-between items-center">
+              <span className="text-xl font-semibold text-gray-700">Valor Total:</span>
+              <span className="text-3xl font-bold text-amber-600">{formatCurrency(project.budget)}</span>
+            </div>
+          </div>
+
+          {/* Desconto e Total com Desconto */}
+          {project.payment_terms?.discount_percentage && project.payment_terms.discount_percentage > 0 && (
+            <>
+              <div className="flex justify-between text-green-700 bg-green-50 p-4 rounded-lg">
+                <span>Desconto ({project.payment_terms.discount_percentage}%):</span>
+                <span className="font-bold">
+                  -{formatCurrency((project.budget * project.payment_terms.discount_percentage) / 100)}
+                </span>
+              </div>
+              <div className="border-t border-green-200 pt-2 flex justify-between bg-green-50 p-4 rounded-lg">
+                <span className="font-bold">Total com Desconto:</span>
+                <span className="font-bold text-green-700">
+                  {formatCurrency(project.payment_terms.total_with_discount || 0)}
+                </span>
+              </div>
+            </>
+          )}
+
+          {/* Condições de Pagamento */}
+          {project.payment_terms && (
+            <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+              <h3 className="font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <DollarSign size={18} />
+                Condições de Pagamento
               </h3>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-gray-700">Valor Total:</span>
-                  <span className="font-bold text-blue-900">{formatCurrency(project.budget)}</span>
-                </div>
-                {project.payment_terms?.discount_percentage && project.payment_terms.discount_percentage > 0 && (
-                  <>
-                    <div className="flex justify-between text-green-700">
-                      <span>Desconto ({project.payment_terms.discount_percentage}%):</span>
-                      <span className="font-bold">
-                        -{formatCurrency((project.budget * project.payment_terms.discount_percentage) / 100)}
-                      </span>
-                    </div>
-                    <div className="border-t border-blue-200 pt-2 flex justify-between">
-                      <span className="font-bold">Total com Desconto:</span>
-                      <span className="font-bold text-green-700">
-                        {formatCurrency(project.payment_terms.total_with_discount || 0)}
-                      </span>
-                    </div>
-                  </>
+              <div className="space-y-2 text-sm">
+                <p className="flex justify-between">
+                  <span className="text-gray-600">Parcelas:</span>
+                  <span className="font-medium">{project.payment_terms.installments}x</span>
+                </p>
+                <p className="flex justify-between">
+                  <span className="text-gray-600">Valor por Parcela:</span>
+                  <span className="font-medium">
+                    {formatCurrency(project.payment_terms.installment_value || 0)}
+                  </span>
+                </p>
+                {project.payment_terms.payment_method && (
+                  <p className="flex justify-between">
+                    <span className="text-gray-600">Método:</span>
+                    <span className="font-medium capitalize">
+                      {project.payment_terms.payment_method.replace(/_/g, ' ')}
+                    </span>
+                  </p>
                 )}
               </div>
             </div>
+          )}
 
-            {project.payment_terms && (
-              <div className="bg-green-50 rounded-lg p-4 border border-green-100">
-                <h3 className="font-bold text-green-900 mb-2 flex items-center space-x-2">
-                  <FileText className="h-5 w-5" />
-                  <span>Parcelamento</span>
-                </h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-gray-700">Parcelas:</span>
-                    <span className="font-bold text-green-900">{project.payment_terms.installments}x</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-700">Valor por Parcela:</span>
-                    <span className="font-bold text-green-900">
-                      {formatCurrency(project.payment_terms.installment_value || 0)}
-                    </span>
-                  </div>
-                  {project.payment_terms.payment_method && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-700">Método:</span>
-                      <span className="font-bold text-green-900">{project.payment_terms.payment_method}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Datas e Prazos */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-orange-50 rounded-lg p-4 border border-orange-100">
-              <h3 className="font-bold text-orange-900 mb-2 flex items-center space-x-2">
-                <Calendar className="h-5 w-5" />
-                <span>Data de Início</span>
-              </h3>
-              <p className="text-lg font-bold text-orange-900">{formatDate(project.start_date)}</p>
-            </div>
-
-            <div className="bg-purple-50 rounded-lg p-4 border border-purple-100">
-              <h3 className="font-bold text-purple-900 mb-2 flex items-center space-x-2">
-                <Calendar className="h-5 w-5" />
-                <span>Data de Entrega</span>
-              </h3>
-              <p className="text-lg font-bold text-purple-900">{formatDate(project.end_date)}</p>
-            </div>
-          </div>
-
-          {/* Prazo em Dias */}
-          <div className="bg-amber-50 rounded-lg p-4 border border-amber-100">
-            <h3 className="font-bold text-amber-900 mb-2 flex items-center space-x-2">
-              <Clock className="h-5 w-5" />
-              <span>Prazo de Entrega</span>
-            </h3>
-            <p className="text-lg font-bold text-amber-900">{project.delivery_deadline_days} dias</p>
-          </div>
-
-          {/* Margem de Lucro (se houver) */}
+          {/* Margem de Lucro */}
           {project.profit_margin !== undefined && (
             <div className="bg-green-50 rounded-lg p-4 border border-green-100">
               <h3 className="font-bold text-green-900 mb-2">Margem de Lucro</h3>
@@ -237,25 +238,28 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ project, onCl
             </div>
           )}
 
-          {/* Notas ou Observações */}
+          {/* Observações */}
           {project.notes && (
             <div>
               <h3 className="font-bold text-gray-800 mb-2">Observações</h3>
-              <p className="text-gray-700 bg-gray-50 rounded-lg p-4">{project.notes}</p>
+              <p className="text-gray-700 bg-gray-50 rounded-lg p-4 whitespace-pre-wrap">{project.notes}</p>
             </div>
           )}
         </div>
 
         {/* Footer com Botões */}
-        <div className="sticky bottom-0 bg-gray-100 px-8 py-4 flex justify-between items-center">
+        <div className="sticky bottom-0 bg-gray-100 px-8 py-4 flex justify-between items-center border-t">
           <PDFDownloadLink
-            document={<OrderPDFDocument companyData={companyData} orderData={project} />}
-            fileName={`${project.type}-${project.order_number}-${new Date().getTime()}.pdf`}
+            document={<OrderPDFDocument companyData={safeCompanyData} orderData={project} />}
+            fileName={`${project.type}-${project.order_number}-${Date.now()}.pdf`}
             className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
           >
-            {({ blob, url, loading, error }) =>
+            {({ loading }) =>
               loading ? (
-                <span>Preparando PDF...</span>
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <span>Preparando PDF...</span>
+                </>
               ) : (
                 <>
                   <Printer size={18} />
@@ -264,7 +268,6 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ project, onCl
               )
             }
           </PDFDownloadLink>
-          
           <button
             onClick={onClose}
             className="px-6 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition-colors font-medium"
@@ -277,38 +280,35 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ project, onCl
   );
 };
 
-// ====== COMPONENTE PRINCIPAL ======
-
+// Componente Principal
 const OrdersAndQuotes: React.FC = () => {
   const { projects, deleteProject, clients } = useApp();
-  
-  // ====== ESTADOS ======
+
+  // Estados de filtro
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [detailsProject, setDetailsProject] = useState<Project | null>(null);
-  const [companyData, setCompanyData] = useState<CompanyData | null>(null);
-  
-  // Novos estados para filtro de data
+
+  // Estados para filtro de data
   const [dateFilterType, setDateFilterType] = useState<'month' | 'week' | 'biweekly' | 'year' | 'custom'>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
 
-  // ====== CARREGAR DADOS DA EMPRESA ======
+  // Hook centralizado para dados da empresa
+  const { companyInfo, loading: companyLoading, error: companyError } = useCompanyInfo();
+
+  // Tratamento de erro da empresa
   useEffect(() => {
-    loadCompanyData();
-  }, []);
+    if (companyError) {
+      console.error('Erro ao carregar informações da empresa:', companyError);
+    }
+  }, [companyError]);
 
-  const loadCompanyData = async () => {
-    const data = await companyService.getCompanyData();
-    setCompanyData(data);
-  };
-
-  // ====== FUNÇÕES DE FORMATAÇÃO ======
-  
+  // Funções de Status
   const getStatusColor = (status: string) => {
     const colors = {
       orcamento: 'bg-blue-100 text-blue-800 border-blue-200',
@@ -331,8 +331,7 @@ const OrdersAndQuotes: React.FC = () => {
     return texts[status as keyof typeof texts] || status;
   };
 
-  // ====== FUNÇÕES DE FILTRO DE DATA ======
-  
+  // Funções de Filtro de Data
   const getDateRange = () => {
     const date = new Date(currentDate);
     let startDate: Date, endDate: Date;
@@ -386,8 +385,8 @@ const OrdersAndQuotes: React.FC = () => {
 
   const getDateRangeLabel = () => {
     const date = new Date(currentDate);
-    const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 
-                    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
     switch (dateFilterType) {
       case 'week':
@@ -455,8 +454,7 @@ const OrdersAndQuotes: React.FC = () => {
     setCurrentDate(newDate);
   };
 
-  // ====== ESTATÍSTICAS ======
-  
+  // Estatísticas
   const stats = useMemo(() => {
     const dateRange = getDateRange();
     let filteredByDate = projects;
@@ -470,16 +468,16 @@ const OrdersAndQuotes: React.FC = () => {
 
     const totalOrcamentos = filteredByDate.filter(p => p.type === 'orcamento').length;
     const totalVendas = filteredByDate.filter(p => p.type === 'venda').length;
-    
-    const vendasAprovadas = filteredByDate.filter(p => 
-      p.type === 'venda' && 
+
+    const vendasAprovadas = filteredByDate.filter(p =>
+      p.type === 'venda' &&
       (p.status === 'aprovado' || p.status === 'em_producao')
     ).length;
-    
+
     const valorTotalVendas = filteredByDate
       .filter(p => p.type === 'venda' && p.status !== 'cancelado')
       .reduce((sum, p) => sum + (p.budget || 0), 0);
-    
+
     return {
       totalOrcamentos,
       totalVendas,
@@ -488,12 +486,10 @@ const OrdersAndQuotes: React.FC = () => {
     };
   }, [projects, currentDate, dateFilterType, customStartDate, customEndDate]);
 
-  // ====== FILTROS ======
-  
+  // Filtros
   const filteredProjects = useMemo(() => {
     let filtered = projects;
-    
-    // Filtro de data
+
     const dateRange = getDateRange();
     if (dateRange) {
       filtered = filtered.filter(p => {
@@ -501,33 +497,29 @@ const OrdersAndQuotes: React.FC = () => {
         return projectDate >= dateRange.startDate && projectDate <= dateRange.endDate;
       });
     }
-    
-    // Filtro de busca
+
     if (searchTerm.trim()) {
       const search = searchTerm.toLowerCase();
-      filtered = filtered.filter(p => 
+      filtered = filtered.filter(p =>
         p.order_number?.toLowerCase().includes(search) ||
         p.description?.toLowerCase().includes(search) ||
         p.client_name?.toLowerCase().includes(search) ||
         p.products?.some(prod => prod.product_name.toLowerCase().includes(search))
       );
     }
-    
-    // Filtro de status
+
     if (statusFilter !== 'all') {
       filtered = filtered.filter(p => p.status === statusFilter);
     }
-    
-    // Filtro de tipo
+
     if (typeFilter !== 'all') {
       filtered = filtered.filter(p => p.type === typeFilter);
     }
-    
+
     return filtered;
   }, [projects, searchTerm, statusFilter, typeFilter, currentDate, dateFilterType, customStartDate, customEndDate]);
 
-  // ====== HANDLERS ======
-  
+  // Handlers
   const handleEdit = (project: Project) => {
     setEditingProject(project);
     setIsModalOpen(true);
@@ -535,7 +527,7 @@ const OrdersAndQuotes: React.FC = () => {
 
   const handleDelete = async (projectId: string) => {
     if (!window.confirm('Tem certeza que deseja excluir este pedido/orçamento?')) return;
-    
+
     try {
       await deleteProject(projectId);
     } catch (error) {
@@ -559,18 +551,15 @@ const OrdersAndQuotes: React.FC = () => {
   };
 
   const handleExportData = () => {
-    // Função para exportar dados (futura implementação)
     alert('Exportação de dados em desenvolvimento!');
   };
 
-  // ✅ NAVEGAÇÃO VIA EVENTO CUSTOMIZADO
   const handleCompanySettings = () => {
     const event = new CustomEvent('changePage', { detail: 'company-settings' });
     window.dispatchEvent(event);
   };
 
-  // ====== RENDER PRINCIPAL ======
-  
+  // Render Principal
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -616,7 +605,7 @@ const OrdersAndQuotes: React.FC = () => {
             <FileText className="h-8 w-8 text-blue-500" />
           </div>
         </div>
-        
+
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
@@ -627,7 +616,7 @@ const OrdersAndQuotes: React.FC = () => {
             <TrendingUp className="h-8 w-8 text-green-500" />
           </div>
         </div>
-        
+
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
@@ -638,7 +627,7 @@ const OrdersAndQuotes: React.FC = () => {
             <Clock className="h-8 w-8 text-orange-500" />
           </div>
         </div>
-        
+
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <div>
@@ -659,7 +648,7 @@ const OrdersAndQuotes: React.FC = () => {
           <Calendar className="h-5 w-5 text-gray-500" />
           <span className="font-medium text-gray-700">Período:</span>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <select
             value={dateFilterType}
@@ -802,8 +791,8 @@ const OrdersAndQuotes: React.FC = () => {
                     <div className="flex flex-col items-center justify-center">
                       <AlertCircle className="h-12 w-12 text-gray-300 mb-2" />
                       <p className="text-gray-500 font-medium">
-                        {searchTerm || statusFilter !== 'all' || typeFilter !== 'all' 
-                          ? 'Nenhum pedido encontrado com os filtros aplicados' 
+                        {searchTerm || statusFilter !== 'all' || typeFilter !== 'all'
+                          ? 'Nenhum pedido encontrado com os filtros aplicados'
                           : `Nenhum pedido cadastrado em ${getDateRangeLabel()}`}
                       </p>
                       <p className="text-gray-400 text-sm mt-1">
@@ -835,8 +824,8 @@ const OrdersAndQuotes: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-3 py-1 inline-flex text-xs font-medium rounded-full border ${
-                        project.type === 'orcamento' 
-                          ? 'bg-blue-50 text-blue-700 border-blue-200' 
+                        project.type === 'orcamento'
+                          ? 'bg-blue-50 text-blue-700 border-blue-200'
                           : 'bg-green-50 text-green-700 border-green-200'
                       }`}>
                         {project.type === 'orcamento' ? 'Orçamento' : 'Venda'}
@@ -895,10 +884,10 @@ const OrdersAndQuotes: React.FC = () => {
         <ProjectDetailsModal
           project={detailsProject}
           onClose={() => setDetailsProject(null)}
-          companyData={companyData}
+          companyData={companyInfo}
         />
       )}
-      
+
       {/* Modal de Edição/Criação */}
       {isModalOpen && (
         <ProjectFormModal
