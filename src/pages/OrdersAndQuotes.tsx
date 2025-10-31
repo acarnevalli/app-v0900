@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Plus, 
   Search, 
@@ -12,7 +12,6 @@ import {
   Download, 
   Filter,
   Package,
-  Wrench,
   TrendingUp,
   AlertCircle,
   X,
@@ -20,24 +19,26 @@ import {
   ChevronRight,
   Eye,
   Settings,
-  BarChart3
+  BarChart3,
+  Printer
 } from 'lucide-react';
-import { Settings } from 'lucide-react';
 import { useApp, Project } from '../contexts/AppContext';
 import { formatCurrency, formatDate } from '../lib/utils';
 import ProjectFormModal from '../components/ProjectFormModal';
 import { PDFDownloadLink } from '@react-pdf/renderer';
-import { FileText, Settings } from 'lucide-react';
-import PDFSettingsModal from '../components/PDFSettingsModal';
-import ProjectPDFDocument from '../components/ProjectPDFDocument';
+import { OrderPDFDocument } from '../components/OrderPDFDocument';
+import { companyService } from '../services/companyService';
+import { CompanyData } from '../types/company';
+import { useNavigate } from 'react-router-dom';
 
 // ====== MODAL DE VISUALIZAÇÃO DE DETALHES ======
 interface ProjectDetailsModalProps {
   project: Project;
   onClose: () => void;
+  companyData: CompanyData | null;
 }
 
-const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ project, onClose }) => {
+const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ project, onClose, companyData }) => {
   const getStatusColor = (status: string) => {
     const colors = {
       orcamento: 'bg-blue-100 text-blue-800 border-blue-200',
@@ -75,13 +76,6 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ project, onCl
             </h2>
             <p className="text-amber-100 text-sm mt-1">Detalhes completos do pedido</p>
           </div>
-          <button
-            onClick={() => setIsPDFSettingsOpen(true)}
-              className="bg-gradient-to-r from-purple-600 to-purple-700 text-white px-6 py-3 rounded-lg font-medium flex items-center space-x-2 hover:from-purple-700 hover:to-purple-800 transition-all duration-200 shadow-lg hover:shadow-xl"
-          >
-          <Settings className="h-5 w-5" />
-            <span>Config. PDF</span>
-          </button>
           <button
             onClick={onClose}
             className="text-white hover:bg-amber-800 p-2 rounded-lg transition-colors"
@@ -253,8 +247,25 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ project, onCl
           )}
         </div>
 
-        {/* Footer */}
-        <div className="sticky bottom-0 bg-gray-100 px-8 py-4 flex justify-end">
+        {/* Footer com Botões */}
+        <div className="sticky bottom-0 bg-gray-100 px-8 py-4 flex justify-between items-center">
+          <PDFDownloadLink
+            document={<OrderPDFDocument companyData={companyData} orderData={project} />}
+            fileName={`${project.type}-${project.order_number}-${new Date().getTime()}.pdf`}
+            className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+          >
+            {({ blob, url, loading, error }) =>
+              loading ? (
+                <span>Preparando PDF...</span>
+              ) : (
+                <>
+                  <Printer size={18} />
+                  <span>Imprimir PDF</span>
+                </>
+              )
+            }
+          </PDFDownloadLink>
+          
           <button
             onClick={onClose}
             className="px-6 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition-colors font-medium"
@@ -271,6 +282,7 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ project, onCl
 
 const OrdersAndQuotes: React.FC = () => {
   const { projects, deleteProject, clients } = useApp();
+  const navigate = useNavigate();
   
   // ====== ESTADOS ======
   const [searchTerm, setSearchTerm] = useState('');
@@ -279,6 +291,7 @@ const OrdersAndQuotes: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [detailsProject, setDetailsProject] = useState<Project | null>(null);
+  const [companyData, setCompanyData] = useState<CompanyData | null>(null);
   
   // Novos estados para filtro de data
   const [dateFilterType, setDateFilterType] = useState<'month' | 'week' | 'biweekly' | 'year' | 'custom'>('month');
@@ -286,9 +299,15 @@ const OrdersAndQuotes: React.FC = () => {
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
 
-  // Novos estados para função de gerar PDF
-  const [isPDFSettingsOpen, setIsPDFSettingsOpen] = useState(false);
-  const { pdfSettings, updatePDFSettings } = useApp();
+  // ====== CARREGAR DADOS DA EMPRESA ======
+  useEffect(() => {
+    loadCompanyData();
+  }, []);
+
+  const loadCompanyData = async () => {
+    const data = await companyService.getCompanyData();
+    setCompanyData(data);
+  };
 
   // ====== FUNÇÕES DE FORMATAÇÃO ======
   
@@ -546,6 +565,10 @@ const OrdersAndQuotes: React.FC = () => {
     alert('Exportação de dados em desenvolvimento!');
   };
 
+  const handleCompanySettings = () => {
+    navigate('/settings/company');
+  };
+
   // ====== RENDER PRINCIPAL ======
   
   return (
@@ -556,30 +579,28 @@ const OrdersAndQuotes: React.FC = () => {
           <h1 className="text-3xl font-bold text-gray-800">Vendas e Orçamentos</h1>
           <p className="text-gray-600 mt-1">Gerencie seus pedidos, orçamentos e vendas</p>
         </div>
-        <div className="flex space-x-3">          
-          <div className="flex space-x-3">
-        <button
-          onClick={() => setIsPDFSettingsOpen(true)}
+        <div className="flex space-x-3">
+          <button
+            onClick={handleCompanySettings}
             className="bg-gradient-to-r from-purple-600 to-purple-700 text-white px-6 py-3 rounded-lg font-medium flex items-center space-x-2 hover:from-purple-700 hover:to-purple-800 transition-all duration-200 shadow-lg hover:shadow-xl"
-        >
-          <Settings className="h-5 w-5" />
-          <span>Config. PDF</span>
-        </button>
-        <button
-          onClick={handleExportData}
-          className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-lg font-medium flex items-center space-x-2 hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-lg hover:shadow-xl"
-        >
-          <Download className="h-5 w-5" />
-          <span>Exportar</span>
-        </button>
-        <button
-          onClick={handleNewOrder}
-          className="bg-gradient-to-r from-amber-600 to-amber-700 text-white px-6 py-3 rounded-lg font-medium flex items-center space-x-2 hover:from-amber-700 hover:to-amber-800 transition-all duration-200 shadow-lg hover:shadow-xl"
-        >
-          <Plus className="h-5 w-5" />
-          <span>Novo Pedido</span>
-        </button>
-          </div>
+          >
+            <Settings className="h-5 w-5" />
+            <span>Configurar Empresa</span>
+          </button>
+          <button
+            onClick={handleExportData}
+            className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-lg font-medium flex items-center space-x-2 hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-lg hover:shadow-xl"
+          >
+            <Download className="h-5 w-5" />
+            <span>Exportar</span>
+          </button>
+          <button
+            onClick={handleNewOrder}
+            className="bg-gradient-to-r from-amber-600 to-amber-700 text-white px-6 py-3 rounded-lg font-medium flex items-center space-x-2 hover:from-amber-700 hover:to-amber-800 transition-all duration-200 shadow-lg hover:shadow-xl"
+          >
+            <Plus className="h-5 w-5" />
+            <span>Novo Pedido</span>
+          </button>
         </div>
       </div>
 
@@ -871,41 +892,18 @@ const OrdersAndQuotes: React.FC = () => {
 
       {/* Modal de Detalhes */}
       {detailsProject && (
-  <ProjectDetailsModal
-    project={detailsProject}
-    onClose={() => setDetailsProject(null)}
-    pdfContent={
-      <PDFDownloadLink
-        document={<ProjectPDFDocument project={detailsProject} settings={pdfSettings} />}
-        fileName={`${detailsProject.type === 'orcamento' ? 'Orcamento' : 'Pedido'}-${detailsProject.order_number}.pdf`}
-        className="px-6 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-colors font-medium flex items-center space-x-2"
-      >
-        {({ loading }) => (
-          <>
-            <FileText className="h-5 w-5" />
-            <span>{loading ? 'Gerando PDF...' : 'Baixar PDF'}</span>
-          </>
-        )}
-      </PDFDownloadLink>
-    }
-  />
-)}
+        <ProjectDetailsModal
+          project={detailsProject}
+          onClose={() => setDetailsProject(null)}
+          companyData={companyData}
+        />
+      )}
       
       {/* Modal de Edição/Criação */}
       {isModalOpen && (
         <ProjectFormModal
           project={editingProject}
           onClose={handleModalClose}
-        />
-      )}
-      
-      {/* Modal de Configurações do PDF */}
-      {isPDFSettingsOpen && (
-        <PDFSettingsModal
-          isOpen={isPDFSettingsOpen}
-          onClose={() => setIsPDFSettingsOpen(false)}
-          currentSettings={pdfSettings}
-          onSave={updatePDFSettings}
         />
       )}
     </div>
