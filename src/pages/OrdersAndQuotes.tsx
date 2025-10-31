@@ -17,8 +17,7 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  Eye,
-  Settings,
+  Eye,  
   BarChart3,
   Printer
 } from 'lucide-react';
@@ -554,11 +553,6 @@ const OrdersAndQuotes: React.FC = () => {
     alert('Exportação de dados em desenvolvimento!');
   };
 
-  const handleCompanySettings = () => {
-    const event = new CustomEvent('changePage', { detail: 'company-settings' });
-    window.dispatchEvent(event);
-  };
-
   // Render Principal
   return (
     <div className="space-y-6">
@@ -568,14 +562,7 @@ const OrdersAndQuotes: React.FC = () => {
           <h1 className="text-3xl font-bold text-gray-800">Vendas e Orçamentos</h1>
           <p className="text-gray-600 mt-1">Gerencie seus pedidos, orçamentos e vendas</p>
         </div>
-        <div className="flex space-x-3">
-          <button
-            onClick={handleCompanySettings}
-            className="bg-gradient-to-r from-purple-600 to-purple-700 text-white px-6 py-3 rounded-lg font-medium flex items-center space-x-2 hover:from-purple-700 hover:to-purple-800 transition-all duration-200 shadow-lg hover:shadow-xl"
-          >
-            <Settings className="h-5 w-5" />
-            <span>Configurar Empresa</span>
-          </button>
+        <div className="flex space-x-3">      
           <button
             onClick={handleExportData}
             className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-lg font-medium flex items-center space-x-2 hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-lg hover:shadow-xl"
