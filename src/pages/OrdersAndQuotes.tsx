@@ -29,7 +29,6 @@ import { PDFDownloadLink } from '@react-pdf/renderer';
 import { OrderPDFDocument } from '../components/OrderPDFDocument';
 import { companyService } from '../services/companyService';
 import { CompanyData } from '../types/company';
-import { useNavigate } from 'react-router-dom';
 
 // ====== MODAL DE VISUALIZAÇÃO DE DETALHES ======
 interface ProjectDetailsModalProps {
@@ -282,7 +281,6 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ project, onCl
 
 const OrdersAndQuotes: React.FC = () => {
   const { projects, deleteProject, clients } = useApp();
-  const navigate = useNavigate();
   
   // ====== ESTADOS ======
   const [searchTerm, setSearchTerm] = useState('');
@@ -565,8 +563,10 @@ const OrdersAndQuotes: React.FC = () => {
     alert('Exportação de dados em desenvolvimento!');
   };
 
+  // ✅ NAVEGAÇÃO VIA EVENTO CUSTOMIZADO
   const handleCompanySettings = () => {
-    navigate('/settings/company');
+    const event = new CustomEvent('changePage', { detail: 'company-settings' });
+    window.dispatchEvent(event);
   };
 
   // ====== RENDER PRINCIPAL ======
