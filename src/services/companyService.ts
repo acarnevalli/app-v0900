@@ -18,7 +18,11 @@ export const companyService = {
         return null;
       }
 
-      return data as CompanyData | null;
+      if (!data) {
+        return null;
+      }
+
+      return mapDbDataToCompanyData(data);
     } catch (err) {
       console.error('Erro na requisição:', err);
       return null;
@@ -62,7 +66,7 @@ export const companyService = {
           return null;
         }
 
-        return this.mapDbDataToCompanyData(data);
+        return mapDbDataToCompanyData(data);
       } else {
         // Criar novo
         const { data, error } = await supabase
@@ -98,7 +102,7 @@ export const companyService = {
           return null;
         }
 
-        return this.mapDbDataToCompanyData(data);
+        return mapDbDataToCompanyData(data);
       }
     } catch (err) {
       console.error('Erro na requisição:', err);
@@ -136,30 +140,30 @@ export const companyService = {
       return null;
     }
   },
-
-  // Função auxiliar para mapear dados do banco para o formato da interface
-  private mapDbDataToCompanyData(dbData: any): CompanyData {
-    return {
-      id: dbData.id,
-      cnpj: dbData.cnpj,
-      razaoSocial: dbData.razao_social,
-      nomeFantasia: dbData.nome_fantasia,
-      cnaePrimario: dbData.cnae_primario,
-      dataFundacao: dbData.data_fundacao,
-      regimeTributacao: dbData.regime_tributacao,
-      inscricaoMunicipal: dbData.inscricao_municipal,
-      inscricaoEstadual: dbData.inscricao_estadual,
-      endereco: dbData.endereco,
-      numero: dbData.numero,
-      complemento: dbData.complemento,
-      colacao: dbData.colacao,
-      bairro: dbData.bairro,
-      cep: dbData.cep,
-      foneComercial: dbData.fone_comercial,
-      email: dbData.email,
-      logoUrl: dbData.logo_url,
-      criadoEm: dbData.criado_em,
-      atualizadoEm: dbData.atualizado_em,
-    };
-  },
 };
+
+// Função auxiliar para mapear dados do banco para o formato da interface
+function mapDbDataToCompanyData(dbData: any): CompanyData {
+  return {
+    id: dbData.id,
+    cnpj: dbData.cnpj,
+    razaoSocial: dbData.razao_social,
+    nomeFantasia: dbData.nome_fantasia,
+    cnaePrimario: dbData.cnae_primario,
+    dataFundacao: dbData.data_fundacao,
+    regimeTributacao: dbData.regime_tributacao,
+    inscricaoMunicipal: dbData.inscricao_municipal,
+    inscricaoEstadual: dbData.inscricao_estadual,
+    endereco: dbData.endereco,
+    numero: dbData.numero,
+    complemento: dbData.complemento,
+    colacao: dbData.colacao,
+    bairro: dbData.bairro,
+    cep: dbData.cep,
+    foneComercial: dbData.fone_comercial,
+    email: dbData.email,
+    logoUrl: dbData.logo_url,
+    criadoEm: dbData.criado_em,
+    atualizadoEm: dbData.atualizado_em,
+  };
+}
