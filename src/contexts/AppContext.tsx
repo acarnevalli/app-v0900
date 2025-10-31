@@ -608,7 +608,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           const { data: simpleData, error: simpleError } = await supabase
             .from('financial_transactions')
             .select('*')
-            .eq('created_by', user.id)
+            .eq('user_id', user.id)
             .order('due_date', { ascending: false });
 
           if (simpleError) {
