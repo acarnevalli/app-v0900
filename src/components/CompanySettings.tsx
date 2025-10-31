@@ -1,7 +1,21 @@
 import { useState, useEffect } from 'react';
 import { CompanyData } from '../types/company';
 import { companyService } from '../services/companyService';
-import { Save, AlertCircle, Upload, Loader } from 'lucide-react';
+import { Save, AlertCircle, Loader } from 'lucide-react';
+import { 
+  formatCNPJ, 
+  formatCEP, 
+  formatPhone, 
+  formatIE, 
+  formatIM,
+  formatCNAE,
+  unformatCNPJ,
+  unformatCEP,
+  unformatPhone,
+  unformatIE,
+  unformatIM,
+  unformatCNAE
+} from '../lib/formatters';
 
 export function CompanySettings() {
   const [formData, setFormData] = useState<CompanyData>({
@@ -46,9 +60,33 @@ export function CompanySettings() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+    let formattedValue = value;
+
+    // Aplicar formatação automática baseada no tipo de campo
+    switch (name) {
+      case 'cnpj':
+        formattedValue = formatCNPJ(value);
+        break;
+      case 'cep':
+        formattedValue = formatCEP(value);
+        break;
+      case 'foneComercial':
+        formattedValue = formatPhone(value);
+        break;
+      case 'inscricaoEstadual':
+        formattedValue = formatIE(value);
+        break;
+      case 'inscricaoMunicipal':
+        formattedValue = formatIM(value);
+        break;
+      case 'cnaePrimario':
+        formattedValue = formatCNAE(value);
+        break;
+    }
+
     setFormData(prev => ({
       ...prev,
-      [name]: value,
+      [name]: formattedValue,
     }));
   };
 
@@ -108,9 +146,25 @@ export function CompanySettings() {
       return;
     }
 
+    // Preparar dados para enviar (remover formatação)
+    const dataToSave: CompanyData = {
+      ...formData,
+      cnpj: unformatCNPJ(formData.cnpj),
+      cep: unformatCEP(formData.cep),
+      foneComercial: unformatPhone(formData.foneComercial),
+      inscricaoEstadual: unformatIE(formData.inscricaoEstadual),
+      inscricaoMunicipal: unformatIM(formData.inscricaoMunicipal),
+      cnaePrimario: unformatCNAE(formData.cnaePrimario),
+    };
+
     try {
-      const result = await companyService.updateCompanyData(formData);
+      const result = await companyService.updateCompanyData(dataToSave);
       if (result) {
+        // Recarregar dados para formatar novamente após salvar
+        const savedData = await companyService.getCompanyData();
+        if (savedData) {
+          setFormData(savedData);
+        }
         setSuccess(true);
         setTimeout(() => setSuccess(false), 3000);
       } else {
@@ -191,13 +245,14 @@ export function CompanySettings() {
           <legend className="text-lg font-semibold text-gray-700 px-2">Dados Básicos</legend>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">CNPJ *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">CNPJ * (Formato: 00.000.000/0000-00)</label>
               <input
                 type="text"
                 name="cnpj"
                 value={formData.cnpj}
                 onChange={handleChange}
                 required
+                maxLength={18}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
                 placeholder="00.000.000/0000-00"
               />
@@ -225,13 +280,15 @@ export function CompanySettings() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">CNAE Primário</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">CNAE Primário (Formato: 0000-0/00)</label>
               <input
                 type="text"
                 name="cnaePrimario"
                 value={formData.cnaePrimario}
                 onChange={handleChange}
+                maxLength={10}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                placeholder="0000-0/00"
               />
             </div>
           </div>
@@ -266,23 +323,27 @@ export function CompanySettings() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Inscrição Municipal</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Inscrição Municipal (Formato: 00.000.000/0000-00)</label>
               <input
                 type="text"
                 name="inscricaoMunicipal"
                 value={formData.inscricaoMunicipal}
                 onChange={handleChange}
+                maxLength={22}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                placeholder="00.000.000/0000-00"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Inscrição Estadual</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Inscrição Estadual (Formato: 000.000.000.000)</label>
               <input
                 type="text"
                 name="inscricaoEstadual"
                 value={formData.inscricaoEstadual}
                 onChange={handleChange}
+                maxLength={18}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                placeholder="000.000.000.000"
               />
             </div>
           </div>
@@ -325,13 +386,14 @@ export function CompanySettings() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">CEP *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">CEP * (Formato: 00000-000)</label>
               <input
                 type="text"
                 name="cep"
                 value={formData.cep}
                 onChange={handleChange}
                 required
+                maxLength={9}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
                 placeholder="00000-000"
               />
@@ -365,13 +427,14 @@ export function CompanySettings() {
           <legend className="text-lg font-semibold text-gray-700 px-2">Contatos</legend>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Telefone Comercial *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Telefone Comercial * (Formato: (00) 0000-0000)</label>
               <input
-                type="tel"
+                type="text"
                 name="foneComercial"
                 value={formData.foneComercial}
                 onChange={handleChange}
                 required
+                maxLength={15}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
                 placeholder="(00) 0000-0000"
               />
