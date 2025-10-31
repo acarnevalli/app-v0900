@@ -3,7 +3,7 @@ import Sidebar from './components/Sidebar';
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './pages/Dashboard';
 import Clients from './pages/Clients';
-import OrdersAndQuotes from './pages/OrdersAndQuotes';  // ✅ CORRIGIDO
+import OrdersAndQuotes from './pages/OrdersAndQuotes';
 import Purchases from './pages/Purchases';
 import Finance from './pages/Finance';
 import Products from './pages/Products';
@@ -16,7 +16,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { DebugAuth } from './components/DebugAuth';
 import { ToastProvider } from './contexts/ToastContext';
-import { CompanySettings } from '../components/CompanySettings';
+import { CompanySettings } from './components/CompanySettings';
 
 
 // Componente AppContent separado - FORA do return
@@ -37,8 +37,21 @@ const AppContent: React.FC = () => {
       }
     };
 
+    // ✅ LISTENER PARA NAVEGAÇÃO VIA EVENTO CUSTOMIZADO
+    const handleChangePage = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      if (customEvent.detail) {
+        setCurrentPage(customEvent.detail);
+      }
+    };
+
     window.addEventListener('error', handleError);
-    return () => window.removeEventListener('error', handleError);
+    window.addEventListener('changePage', handleChangePage);
+    
+    return () => {
+      window.removeEventListener('error', handleError);
+      window.removeEventListener('changePage', handleChangePage);
+    };
   }, []);
 
   if (isLoading) {
@@ -65,7 +78,7 @@ const AppContent: React.FC = () => {
       case 'suppliers':
         return <Suppliers />;
       
-      // ✅ NOVA ROTA UNIFICADA
+      // ✅ ROTA UNIFICADA
       case 'ordersandquotes':
         return <OrdersAndQuotes />;
       
@@ -88,6 +101,11 @@ const AppContent: React.FC = () => {
         return <Users />;
       case 'settings':
         return <Settings />;
+      
+      // ✅ NOVA ROTA: CONFIGURAÇÕES DA EMPRESA
+      case 'company-settings':
+        return <CompanySettings />;
+      
       default:
         return <Dashboard />;
     }
