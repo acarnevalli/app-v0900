@@ -6,6 +6,7 @@ import CompanySettingsModal from '../components/CompanySettingsModal';
 import ImportExportModal from '../components/ImportExportModal';
 import ProductSettingsModal from '../components/ProductSettingsModal';
 import { defaultCostCenters } from '../utils/defaultCostCenters';
+import { useCompanyInfo } from '../hooks/useCompanyInfo';
 
 const Settings: React.FC = () => {
   const { user, logout } = useAuth();
@@ -13,7 +14,16 @@ const Settings: React.FC = () => {
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
   const [isImportExportModalOpen, setIsImportExportModalOpen] = useState(false);
   const [isProductSettingsModalOpen, setIsProductSettingsModalOpen] = useState(false);
-
+  
+  
+  const { companyInfo, loading, updateCompanyInfo } = useCompanyInfo();
+    const handleSave = async () => {
+    await updateCompanyInfo({
+      company_name: formData.company_name,
+      cnpj: formData.cnpj,
+    });
+  };
+  
   const handleLogout = () => {
     if (window.confirm('Deseja realmente sair do sistema?')) {
       logout();
