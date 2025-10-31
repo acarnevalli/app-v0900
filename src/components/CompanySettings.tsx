@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { CompanyData } from '../types/company';
 import { companyService } from '../services/companyService';
-import { Save, AlertCircle } from 'lucide-react';
+import { Save, AlertCircle, Upload, Loader } from 'lucide-react';
 
 export function CompanySettings() {
   const [formData, setFormData] = useState<CompanyData>({
@@ -25,8 +25,10 @@ export function CompanySettings() {
   });
 
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
   useEffect(() => {
     loadCompanyData();
@@ -36,6 +38,9 @@ export function CompanySettings() {
     const data = await companyService.getCompanyData();
     if (data) {
       setFormData(data);
+      if (data.logoUrl) {
+        setLogoPreview(data.logoUrl);
+      }
     }
   };
 
@@ -47,11 +52,61 @@ export function CompanySettings() {
     }));
   };
 
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validar tipo de arquivo
+    if (!file.type.startsWith('image/')) {
+      setError('Por favor, selecione um arquivo de imagem');
+      return;
+    }
+
+    // Validar tamanho (máximo 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Arquivo muito grande. Máximo 5MB');
+      return;
+    }
+
+    setUploading(true);
+    setError(null);
+
+    try {
+      const logoUrl = await companyService.uploadLogo(file);
+      
+      if (logoUrl) {
+        setFormData(prev => ({
+          ...prev,
+          logoUrl: logoUrl,
+        }));
+        setLogoPreview(logoUrl);
+        setSuccess(true);
+        setTimeout(() => setSuccess(false), 3000);
+      } else {
+        setError('Erro ao fazer upload do logo');
+      }
+    } catch (err) {
+      console.error('Erro ao fazer upload:', err);
+      setError('Erro ao fazer upload do logo');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
     setSuccess(false);
+
+    // Validação básica
+    if (!formData.cnpj || !formData.razaoSocial || !formData.nomeFantasia || 
+        !formData.endereco || !formData.numero || !formData.bairro || 
+        !formData.cep || !formData.foneComercial || !formData.email) {
+      setError('Por favor, preencha todos os campos obrigatórios (marcados com *)');
+      setLoading(false);
+      return;
+    }
 
     try {
       const result = await companyService.updateCompanyData(formData);
@@ -87,6 +142,50 @@ export function CompanySettings() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Seção: Logo da Empresa */}
+        <fieldset className="border rounded-lg p-4">
+          <legend className="text-lg font-semibold text-gray-700 px-2">Logo da Empresa</legend>
+          <div className="mt-4 flex flex-col md:flex-row gap-6">
+            {/* Preview do Logo */}
+            <div className="flex items-center justify-center">
+              {logoPreview ? (
+                <img 
+                  src={logoPreview} 
+                  alt="Logo da empresa" 
+                  className="w-32 h-32 object-contain border-2 border-gray-300 rounded-lg"
+                />
+              ) : (
+                <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-gray-50">
+                  <span className="text-gray-400 text-center">Sem logo</span>
+                </div>
+              )}
+            </div>
+
+            {/* Upload Input */}
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Selecione o Logo
+              </label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleLogoUpload}
+                disabled={uploading}
+                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-amber-600 file:text-white hover:file:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+              <p className="text-xs text-gray-500 mt-2">
+                Formatos: JPG, PNG, GIF (máximo 5MB)
+              </p>
+              {uploading && (
+                <div className="mt-2 flex items-center gap-2 text-amber-600">
+                  <Loader size={16} className="animate-spin" />
+                  <span>Enviando arquivo...</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </fieldset>
+
         {/* Seção: Dados Básicos */}
         <fieldset className="border rounded-lg p-4">
           <legend className="text-lg font-semibold text-gray-700 px-2">Dados Básicos</legend>
@@ -288,30 +387,27 @@ export function CompanySettings() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
               />
             </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">URL do Logo (opcional)</label>
-              <input
-                type="url"
-                name="logoUrl"
-                value={formData.logoUrl}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
-                placeholder="https://..."
-              />
-            </div>
           </div>
         </fieldset>
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || uploading}
           className="w-full bg-amber-600 hover:bg-amber-700 disabled:bg-gray-400 text-white font-semibold py-2 rounded-lg transition-colors flex items-center justify-center gap-2"
         >
-          <Save size={20} />
-          {loading ? 'Salvando...' : 'Salvar Configurações'}
+          {loading ? (
+            <>
+              <Loader size={20} className="animate-spin" />
+              Salvando...
+            </>
+          ) : (
+            <>
+              <Save size={20} />
+              Salvar Configurações
+            </>
+          )}
         </button>
       </form>
     </div>
   );
 }
-
