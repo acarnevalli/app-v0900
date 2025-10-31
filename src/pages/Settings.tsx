@@ -14,16 +14,14 @@ const Settings: React.FC = () => {
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
   const [isImportExportModalOpen, setIsImportExportModalOpen] = useState(false);
   const [isProductSettingsModalOpen, setIsProductSettingsModalOpen] = useState(false);
-  
-  
-  const { companyInfo, loading, updateCompanyInfo } = useCompanyInfo();
-    const handleSave = async () => {
-    await updateCompanyInfo({
-      company_name: formData.company_name,
-      cnpj: formData.cnpj,
-    });
-  };
-  
+
+  const {
+    companyInfo,
+    loading: companyLoading,
+    error: companyError,
+    updateCompanyInfo,
+  } = useCompanyInfo();
+
   const handleLogout = () => {
     if (window.confirm('Deseja realmente sair do sistema?')) {
       logout();
@@ -31,16 +29,16 @@ const Settings: React.FC = () => {
   };
 
   const handleCreateDefaultCostCenters = async () => {
-  try {
-    for (const cc of defaultCostCenters) {
-      await addCostCenter(cc);
+    try {
+      for (const cc of defaultCostCenters) {
+        await addCostCenter(cc);
+      }
+      alert('Centros de custo padrão criados com sucesso!');
+    } catch (error) {
+      console.error('Erro ao criar centros de custo:', error);
+      alert('Erro ao criar centros de custo');
     }
-    alert('Centros de custo padrão criados com sucesso!');
-  } catch (error) {
-    console.error('Erro ao criar centros de custo:', error);
-    alert('Erro ao criar centros de custo');
-  }
-};
+  };
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -62,21 +60,19 @@ const Settings: React.FC = () => {
               <p className="font-medium text-gray-800">{user?.email}</p>
             </div>
           </div>
-          <div className="pt-4">
+          <div className="pt-4 flex space-x-2">
             <button
               onClick={handleLogout}
               className="flex items-center space-x-2 px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
             >
-
+              <LogOut className="h-4 w-4" />
+              <span>Sair do Sistema</span>
+            </button>
             <button
               onClick={handleCreateDefaultCostCenters}
               className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
             >
               Criar Centros de Custo Padrão
-              </button>
-              
-              <LogOut className="h-4 w-4" />
-              <span>Sair do Sistema</span>
             </button>
           </div>
         </div>
@@ -94,6 +90,17 @@ const Settings: React.FC = () => {
           </div>
           <h3 className="text-lg font-semibold text-gray-800 mb-2">Dados da Empresa</h3>
           <p className="text-gray-600 text-sm">Configure as informações da sua marcenaria</p>
+          {companyLoading && <span className="text-xs text-gray-400">Carregando dados...</span>}
+          {companyError && <span className="text-xs text-red-600">{companyError}</span>}
+          {companyInfo && (
+            <div className="mt-2 text-xs text-gray-500">
+              <div>Razão Social: {companyInfo.company_name}</div>
+              <div>CNPJ: {companyInfo.cnpj}</div>
+              <div>Cidade: {companyInfo.city}</div>
+              <div>Email: {companyInfo.email}</div>
+              {/* Exibir outros campos conforme necessário */}
+            </div>
+          )}
         </div>
 
         <div
@@ -147,6 +154,9 @@ const Settings: React.FC = () => {
         <CompanySettingsModal
           isOpen={isCompanyModalOpen}
           onClose={() => setIsCompanyModalOpen(false)}
+          companyInfo={companyInfo}
+          loading={companyLoading}
+          onSave={updateCompanyInfo}
         />
       )}
 
