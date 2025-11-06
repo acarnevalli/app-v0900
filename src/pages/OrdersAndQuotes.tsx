@@ -17,7 +17,7 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  Eye,  
+  Eye,
   BarChart3,
   Printer
 } from 'lucide-react';
@@ -28,18 +28,13 @@ import { PDFDownloadLink } from '@react-pdf/renderer';
 import { OrderPDFDocument } from '../components/OrderPDFDocument';
 import { useCompanyInfo } from '../hooks/useCompanyInfo';
 
-// Interface melhorada com tipagem correta
 interface ProjectDetailsModalProps {
   project: Project;
   onClose: () => void;
   companyData: any | null;
 }
 
-const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({
-  project,
-  onClose,
-  companyData
-}) => {
+const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ project, onClose, companyData }) => {
   const getStatusColor = (status: string) => {
     const colors = {
       orcamento: 'bg-blue-100 text-blue-800 border-blue-200',
@@ -66,7 +61,6 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({
     return type === 'orcamento' ? '📋 Orçamento' : '✅ Venda';
   };
 
-  // Dados padrão caso companyData seja null
   const safeCompanyData = companyData || {
     company_name: 'Empresa não configurada',
     cnpj: '',
@@ -80,7 +74,6 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        {/* Header */}
         <div className="sticky top-0 bg-gradient-to-r from-amber-600 to-amber-700 px-8 py-6 flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold text-white">
@@ -96,9 +89,7 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({
           </button>
         </div>
 
-        {/* Conteúdo Completo */}
         <div className="p-8 space-y-6">
-          {/* Cliente */}
           <div className="bg-gray-50 p-4 rounded-lg">
             <h3 className="font-semibold text-gray-700 mb-2 flex items-center gap-2">
               <User size={18} />
@@ -107,7 +98,6 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({
             <p className="text-gray-900 font-medium">{project.client_name || 'Não identificado'}</p>
           </div>
 
-          {/* Status e Tipo */}
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-gray-50 p-4 rounded-lg">
               <span className="text-sm text-gray-600 block mb-2">Status:</span>
@@ -121,7 +111,6 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({
             </div>
           </div>
 
-          {/* Datas */}
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-orange-50 p-4 rounded-lg border border-orange-100">
               <span className="text-sm text-gray-600 block mb-1">Data de Início:</span>
@@ -133,7 +122,6 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({
             </div>
           </div>
 
-          {/* Prazo em Dias */}
           <div className="bg-amber-50 p-4 rounded-lg border border-amber-100">
             <h3 className="font-bold text-amber-900 mb-2 flex items-center gap-2">
               <Clock className="h-5 w-5" />
@@ -142,7 +130,6 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({
             <p className="text-lg font-bold text-amber-900">{project.delivery_deadline_days} dias</p>
           </div>
 
-          {/* Descrição */}
           {project.description && (
             <div className="bg-gray-50 p-4 rounded-lg">
               <h3 className="font-semibold text-gray-700 mb-2">Descrição:</h3>
@@ -150,7 +137,6 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({
             </div>
           )}
 
-          {/* Produtos/Serviços */}
           {project.products && project.products.length > 0 && (
             <div>
               <h3 className="font-semibold text-gray-700 mb-3 flex items-center gap-2">
@@ -173,7 +159,6 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({
             </div>
           )}
 
-          {/* Totais */}
           <div className="border-t-2 border-gray-200 pt-4">
             <div className="flex justify-between items-center">
               <span className="text-xl font-semibold text-gray-700">Valor Total:</span>
@@ -181,7 +166,6 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({
             </div>
           </div>
 
-          {/* Desconto e Total com Desconto */}
           {project.payment_terms?.discount_percentage && project.payment_terms.discount_percentage > 0 && (
             <>
               <div className="flex justify-between text-green-700 bg-green-50 p-4 rounded-lg">
@@ -199,7 +183,6 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({
             </>
           )}
 
-          {/* Condições de Pagamento */}
           {project.payment_terms && (
             <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
               <h3 className="font-semibold text-gray-700 mb-3 flex items-center gap-2">
@@ -229,7 +212,6 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({
             </div>
           )}
 
-          {/* Margem de Lucro */}
           {project.profit_margin !== undefined && (
             <div className="bg-green-50 rounded-lg p-4 border border-green-100">
               <h3 className="font-bold text-green-900 mb-2">Margem de Lucro</h3>
@@ -237,7 +219,6 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({
             </div>
           )}
 
-          {/* Observações */}
           {project.notes && (
             <div>
               <h3 className="font-bold text-gray-800 mb-2">Observações</h3>
@@ -246,7 +227,6 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({
           )}
         </div>
 
-        {/* Footer com Botões */}
         <div className="sticky bottom-0 bg-gray-100 px-8 py-4 flex justify-between items-center border-t">
           <PDFDownloadLink
             document={<OrderPDFDocument companyData={safeCompanyData} orderData={project} />}
@@ -279,11 +259,9 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({
   );
 };
 
-// Componente Principal
 const OrdersAndQuotes: React.FC = () => {
-  const { projects, deleteProject, clients } = useApp();
+  const { projects, deleteProject, clients, addSale, addProject, updateProject } = useApp();
 
-  // Estados de filtro
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -291,23 +269,19 @@ const OrdersAndQuotes: React.FC = () => {
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [detailsProject, setDetailsProject] = useState<Project | null>(null);
 
-  // Estados para filtro de data
   const [dateFilterType, setDateFilterType] = useState<'month' | 'week' | 'biweekly' | 'year' | 'custom'>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
 
-  // Hook centralizado para dados da empresa
   const { companyInfo, loading: companyLoading, error: companyError } = useCompanyInfo();
 
-  // Tratamento de erro da empresa
   useEffect(() => {
     if (companyError) {
       console.error('Erro ao carregar informações da empresa:', companyError);
     }
   }, [companyError]);
 
-  // Funções de Status
   const getStatusColor = (status: string) => {
     const colors = {
       orcamento: 'bg-blue-100 text-blue-800 border-blue-200',
@@ -330,7 +304,6 @@ const OrdersAndQuotes: React.FC = () => {
     return texts[status as keyof typeof texts] || status;
   };
 
-  // Funções de Filtro de Data
   const getDateRange = () => {
     const date = new Date(currentDate);
     let startDate: Date, endDate: Date;
@@ -453,7 +426,6 @@ const OrdersAndQuotes: React.FC = () => {
     setCurrentDate(newDate);
   };
 
-  // Estatísticas
   const stats = useMemo(() => {
     const dateRange = getDateRange();
     let filteredByDate = projects;
@@ -485,7 +457,6 @@ const OrdersAndQuotes: React.FC = () => {
     };
   }, [projects, currentDate, dateFilterType, customStartDate, customEndDate]);
 
-  // Filtros
   const filteredProjects = useMemo(() => {
     let filtered = projects;
 
@@ -518,10 +489,43 @@ const OrdersAndQuotes: React.FC = () => {
     return filtered;
   }, [projects, searchTerm, statusFilter, typeFilter, currentDate, dateFilterType, customStartDate, customEndDate]);
 
-  // Handlers
   const handleEdit = (project: Project) => {
     setEditingProject(project);
     setIsModalOpen(true);
+  };
+
+  const handleSaveProject = async (projectData: any) => {
+    try {
+      if (projectData.type === 'venda' && !editingProject) {
+        const saleItems = projectData.products?.map((item: any) => ({
+          productid: item.productid,
+          productname: item.product_name || item.productname,
+          quantity: item.quantity,
+          unitprice: item.unit_price,
+          total: (item.unit_price || 0) * item.quantity
+        })) || [];
+
+        await addSale({
+          date: projectData.start_date,
+          clientid: projectData.clientid,
+          clientname: projectData.client_name || '',
+          items: saleItems,
+          total: projectData.budget || 0,
+          status: 'completed',
+          paymentmethod: projectData.payment_terms?.payment_method || '',
+          notes: projectData.notes || ''
+        });
+      } else if (editingProject) {
+        await updateProject(editingProject.id, projectData);
+      } else {
+        await addProject(projectData);
+      }
+      setIsModalOpen(false);
+      setEditingProject(null);
+    } catch (error) {
+      console.error('Erro ao salvar:', error);
+      alert('Erro ao salvar pedido/venda: ' + (error as any)?.message);
+    }
   };
 
   const handleDelete = async (projectId: string) => {
@@ -553,16 +557,14 @@ const OrdersAndQuotes: React.FC = () => {
     alert('Exportação de dados em desenvolvimento!');
   };
 
-  // Render Principal
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-800">Vendas e Orçamentos</h1>
           <p className="text-gray-600 mt-1">Gerencie seus pedidos, orçamentos e vendas</p>
         </div>
-        <div className="flex space-x-3">      
+        <div className="flex space-x-3">
           <button
             onClick={handleExportData}
             className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-lg font-medium flex items-center space-x-2 hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-lg hover:shadow-xl"
@@ -580,7 +582,6 @@ const OrdersAndQuotes: React.FC = () => {
         </div>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
@@ -629,7 +630,6 @@ const OrdersAndQuotes: React.FC = () => {
         </div>
       </div>
 
-      {/* Filtros de Data */}
       <div className="bg-white rounded-xl shadow-lg p-6">
         <div className="flex items-center space-x-2 mb-4">
           <Calendar className="h-5 w-5 text-gray-500" />
@@ -688,7 +688,6 @@ const OrdersAndQuotes: React.FC = () => {
         </div>
       </div>
 
-      {/* Filtros */}
       <div className="bg-white rounded-xl shadow-lg p-6">
         <div className="flex items-center space-x-2 mb-4">
           <Filter className="h-5 w-5 text-gray-500" />
@@ -729,7 +728,6 @@ const OrdersAndQuotes: React.FC = () => {
         </div>
       </div>
 
-      {/* Resultado da busca */}
       {filteredProjects.length > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center justify-between">
           <div className="flex items-center space-x-2 text-blue-800">
@@ -742,33 +740,18 @@ const OrdersAndQuotes: React.FC = () => {
         </div>
       )}
 
-      {/* Tabela de Pedidos/Orçamentos */}
       <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                  Data
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                  Número
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                  Cliente
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                  Tipo
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                  Valor (R$)
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                  Situação
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                  Ações
-                </th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Data</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Número</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Cliente</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Tipo</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Valor (R$)</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Situação</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -866,7 +849,6 @@ const OrdersAndQuotes: React.FC = () => {
         </div>
       </div>
 
-      {/* Modal de Detalhes */}
       {detailsProject && (
         <ProjectDetailsModal
           project={detailsProject}
@@ -875,11 +857,11 @@ const OrdersAndQuotes: React.FC = () => {
         />
       )}
 
-      {/* Modal de Edição/Criação */}
       {isModalOpen && (
         <ProjectFormModal
           project={editingProject}
           onClose={handleModalClose}
+          onSave={handleSaveProject}
         />
       )}
     </div>
