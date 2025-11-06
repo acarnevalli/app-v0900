@@ -24,7 +24,7 @@ interface ProjectFormModalProps {
 }
 
 const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose }) => {
-  const { clients, products, addProject, updateProject, addSale, loading } = useApp();
+  const { clients, products, addProject, updateProject, loading } = useApp();
 
   const hasLoadedData = useRef(false);
   const isInitialized = useRef(false);
@@ -314,54 +314,14 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
     console.log('💾 Dados para salvar:', projectData);
 
     try {
-      if (formData.type === 'venda' && !project) {
-        console.log('🔄 NOVA VENDA: Chamando addSale com dados corrigidos');
-        const clientInfo = clients.find(c => c.id === formData.client_id);
-        
-        if (!clientInfo) {
-          alert('Erro: Cliente não encontrado');
-          return;
-        }
-
-        console.log('👤 Cliente selecionado:', {
-          id: clientInfo.id,
-          name: clientInfo.name,
-          email: clientInfo.email
-        });
-        
-        const saleItems = validatedProducts.map(item => ({
-          productid: item.product_id,
-          productname: item.product_name,
-          quantity: item.quantity,
-          unitprice: item.unit_price,
-          total: item.total_price
-        }));
-
-        console.log('📦 Itens da venda:', saleItems);
-
-        const saleData = {
-          date: formData.start_date,
-          clientid: formData.client_id,
-          clientname: clientInfo.name,
-          items: saleItems,
-          total: budget,
-          status: 'completed' as const,
-          paymentmethod: paymentTerms.payment_method,
-          notes: formData.description
-        };
-
-        console.log('💳 Dados completos da venda:', saleData);
-
-        await addSale(saleData);
-        console.log('✅ Venda salva com sucesso!');
-      } else if (project) {
+      if (project) {
         console.log('🔄 EDIÇÃO: Chamando updateProject');
         await updateProject(project.id, projectData);
         console.log('✅ Projeto atualizado com sucesso!');
       } else {
-        console.log('🔄 NOVO ORÇAMENTO: Chamando addProject');
+        console.log('🔄 NOVO: Chamando addProject (válido para orçamentos E vendas)');
         await addProject(projectData);
-        console.log('✅ Orçamento criado com sucesso!');
+        console.log('✅ Projeto/Venda criado com sucesso!');
       }
       
       onClose();
