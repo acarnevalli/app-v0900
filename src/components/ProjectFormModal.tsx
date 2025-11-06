@@ -315,8 +315,19 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
 
     try {
       if (formData.type === 'venda' && !project) {
-        console.log('🔄 NOVA VENDA: Chamando addSale');
+        console.log('🔄 NOVA VENDA: Chamando addSale com dados corrigidos');
         const clientInfo = clients.find(c => c.id === formData.client_id);
+        
+        if (!clientInfo) {
+          alert('Erro: Cliente não encontrado');
+          return;
+        }
+
+        console.log('👤 Cliente selecionado:', {
+          id: clientInfo.id,
+          name: clientInfo.name,
+          email: clientInfo.email
+        });
         
         const saleItems = validatedProducts.map(item => ({
           productid: item.product_id,
@@ -326,16 +337,22 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
           total: item.total_price
         }));
 
-        await addSale({
+        console.log('📦 Itens da venda:', saleItems);
+
+        const saleData = {
           date: formData.start_date,
           clientid: formData.client_id,
-          clientname: clientInfo?.name || '',
+          clientname: clientInfo.name,
           items: saleItems,
           total: budget,
-          status: 'completed',
+          status: 'completed' as const,
           paymentmethod: paymentTerms.payment_method,
           notes: formData.description
-        });
+        };
+
+        console.log('💳 Dados completos da venda:', saleData);
+
+        await addSale(saleData);
         console.log('✅ Venda salva com sucesso!');
       } else if (project) {
         console.log('🔄 EDIÇÃO: Chamando updateProject');
