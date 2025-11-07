@@ -17,7 +17,7 @@ const Projects: React.FC = () => {
     const colors = {
       orcamento: 'bg-blue-100 text-blue-800',
       aprovado: 'bg-yellow-100 text-yellow-800',
-      em_producao: 'bg-orange-100 text-orange-800',
+      emproducao: 'bg-orange-100 text-orange-800',
       concluido: 'bg-green-100 text-green-800',
       entregue: 'bg-purple-100 text-purple-800'
     };
@@ -28,7 +28,7 @@ const Projects: React.FC = () => {
     const texts = {
       orcamento: 'Orçamento',
       aprovado: 'Aprovado',
-      em_producao: 'Em Produção',
+      emproducao: 'Em Produção',
       concluido: 'Concluído',
       entregue: 'Entregue'
     };
@@ -251,7 +251,7 @@ const Projects: React.FC = () => {
     
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Cliente: ${project.client_name}`, 20, 68);
+    doc.text(`Cliente: ${project.clientname}`, 20, 68);
     doc.text(`Data: ${new Date().toLocaleDateString('pt-BR')}`, 140, 68);
     
     // Descrição do projeto (mais compacto)
@@ -294,13 +294,13 @@ const Projects: React.FC = () => {
       doc.setFont('helvetica', 'normal');
       project.products.forEach((product) => {
         doc.text(product.quantity.toString(), 20, yPosition);
-        doc.text(product.product_name, 35, yPosition);
+        doc.text(product.productname, 35, yPosition);
         // Descrição do produto (se houver)
         doc.setFontSize(7);
         doc.text('Produto personalizado conforme especificação', 35, yPosition + 3);
         doc.setFontSize(9);
-        doc.text(`${product.unit_price.toFixed(2).replace('.', ',')}`, 140, yPosition);
-        doc.text(`${product.total_price.toFixed(2).replace('.', ',')}`, 175, yPosition);
+        doc.text(`${product.unitprice.toFixed(2).replace('.', ',')}`, 140, yPosition);
+        doc.text(`${product.totalprice.toFixed(2).replace('.', ',')}`, 175, yPosition);
         yPosition += 7;
       });
       
@@ -314,14 +314,14 @@ const Projects: React.FC = () => {
       doc.text(`${project.budget.toFixed(2).replace('.', ',')}`, 175, yPosition);
       yPosition += 5;
       
-      if (project.payment_terms?.discount_percentage && project.payment_terms.discount_percentage > 0) {
+      if (project.paymentterms?.discountpercentage && project.paymentterms.discountpercentage > 0) {
         doc.text('Descontos', 140, yPosition);
-        const discountAmount = project.budget * (project.payment_terms.discount_percentage / 100);
+        const discountAmount = project.budget * (project.paymentterms.discountpercentage / 100);
         doc.text(`${discountAmount.toFixed(2).replace('.', ',')}`, 175, yPosition);
         yPosition += 5;
         
         doc.text('Valor líquido', 140, yPosition);
-        const finalValue = project.payment_terms.total_with_discount || (project.budget - discountAmount);
+        const finalValue = project.paymentterms.totalwithdiscount || (project.budget - discountAmount);
         doc.text(`${finalValue.toFixed(2).replace('.', ',')}`, 175, yPosition);
         yPosition += 5;
       }
@@ -337,7 +337,7 @@ const Projects: React.FC = () => {
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     
-    if (project.payment_terms) {
+    if (project.paymentterms) {
       const paymentMethodLabels: { [key: string]: string } = {
         'dinheiro': 'Dinheiro',
         'pix': 'PIX',
@@ -347,11 +347,11 @@ const Projects: React.FC = () => {
         'transferencia': 'Transferência'
       };
       
-      doc.text(`Forma de Pagamento: ${paymentMethodLabels[project.payment_terms.payment_method]}`, 20, yPosition);
+      doc.text(`Forma de Pagamento: ${paymentMethodLabels[project.paymentterms.paymentmethod]}`, 20, yPosition);
       yPosition += 6;
       
       // Tabela de parcelas
-      if (project.payment_terms.installments > 1) {
+      if (project.paymentterms.installments > 1) {
         yPosition += 4;
         doc.setFont('helvetica', 'bold');
         doc.text('Nº', 20, yPosition);
@@ -360,13 +360,13 @@ const Projects: React.FC = () => {
         yPosition += 6;
         
         doc.setFont('helvetica', 'normal');
-        for (let i = 1; i <= project.payment_terms.installments; i++) {
+        for (let i = 1; i <= project.paymentterms.installments; i++) {
           const installmentDate = new Date();
           installmentDate.setMonth(installmentDate.getMonth() + (i - 1));
           
           doc.text(`${i}º`, 20, yPosition);
           doc.text(installmentDate.toLocaleDateString('pt-BR'), 50, yPosition);
-          doc.text(`${(project.payment_terms.installment_value || 0).toFixed(2).replace('.', ',')}`, 120, yPosition);
+          doc.text(`${(project.paymentterms.installmentvalue || 0).toFixed(2).replace('.', ',')}`, 120, yPosition);
           yPosition += 5;
         }
       } else {
@@ -380,7 +380,7 @@ const Projects: React.FC = () => {
         doc.setFont('helvetica', 'normal');
         doc.text('1º', 20, yPosition);
         doc.text(new Date().toLocaleDateString('pt-BR'), 50, yPosition);
-        const finalAmount = project.payment_terms.total_with_discount || project.budget;
+        const finalAmount = project.paymentterms.totalwithdiscount || project.budget;
         doc.text(`${finalAmount.toFixed(2).replace('.', ',')}`, 120, yPosition);
       }
     }
@@ -398,14 +398,14 @@ const Projects: React.FC = () => {
     
     // Salvar o PDF
     const docType = project.type === 'orcamento' ? 'Orcamento' : 'Venda';
-    const fileName = `${project.client_name?.replace(/\s+/g, '_')} - ${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')} - ${docType}${project.number}.pdf`;
+    const fileName = `${project.clientname?.replace(/\s+/g, '_')} - ${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')} - ${docType}${project.number}.pdf`;
     doc.save(fileName);
   };
 
   const filteredProjects = projects.filter(project => {
     const matchesSearch = 
       project.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      project.client_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      project.clientname?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       project.description.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || project.status === statusFilter;
@@ -480,7 +480,7 @@ const Projects: React.FC = () => {
             <option value="all">Todos os Status</option>
             <option value="orcamento">Orçamento</option>
             <option value="aprovado">Aprovado</option>
-            <option value="em_producao">Em Produção</option>
+            <option value="emproducao">Em Produção</option>
             <option value="concluido">Concluído</option>
             <option value="entregue">Entregue</option>
           </select>
@@ -535,24 +535,24 @@ const Projects: React.FC = () => {
               <div className="space-y-3">
                 <div className="flex items-center space-x-3 text-gray-600">
                   <User className="h-4 w-4 text-amber-600" />
-                  <span className="text-sm">{project.client_name}</span>
+                  <span className="text-sm">{project.clientname}</span>
                 </div>
                 <div className="flex items-center space-x-3 text-gray-600">
                   <DollarSign className="h-4 w-4 text-green-600" />
                   <div className="flex flex-col">
                     <span className="text-sm font-medium">R$ {project.budget.toLocaleString()}</span>
-                    {project.payment_terms && project.payment_terms.discount_percentage > 0 && (
+                    {project.paymentterms && project.paymentterms.discountpercentage > 0 && (
                       <span className="text-xs text-green-600">
-                        Com desconto: R$ {project.payment_terms.total_with_discount?.toFixed(2)}
+                        Com desconto: R$ {project.paymentterms.totalwithdiscount?.toFixed(2)}
                       </span>
                     )}
                   </div>
                 </div>
-                {project.payment_terms && (
+                {project.paymentterms && (
                   <div className="flex items-center space-x-3 text-gray-600">
                     <FileText className="h-4 w-4 text-blue-600" />
                     <span className="text-sm">
-                      {project.payment_terms.installments}x de R$ {project.payment_terms.installment_value?.toFixed(2)}
+                      {project.paymentterms.installments}x de R$ {project.paymentterms.installmentvalue?.toFixed(2)}
                     </span>
                   </div>
                 )}
@@ -560,13 +560,13 @@ const Projects: React.FC = () => {
                   <div className="flex items-center space-x-3 text-gray-600">
                     <Calendar className="h-4 w-4 text-amber-600" />
                     <span className="text-sm">
-                      {new Date(project.start_date).toLocaleDateString('pt-BR')}
+                      {new Date(project.startdate).toLocaleDateString('pt-BR')}
                     </span>
                   </div>
                   <div className="flex items-center space-x-3 text-gray-600">
                     <Clock className="h-4 w-4 text-amber-600" />
                     <span className="text-sm">
-                      até {new Date(project.end_date).toLocaleDateString('pt-BR')}
+                      até {new Date(project.enddate).toLocaleDateString('pt-BR')}
                     </span>
                   </div>
                 </div>
@@ -580,7 +580,7 @@ const Projects: React.FC = () => {
                   className={`h-2 rounded-full transition-all duration-300 ${
                     project.status === 'orcamento' ? 'bg-blue-500 w-1/5' :
                     project.status === 'aprovado' ? 'bg-yellow-500 w-2/5' :
-                    project.status === 'em_producao' ? 'bg-orange-500 w-3/5' :
+                    project.status === 'emproducao' ? 'bg-orange-500 w-3/5' :
                     project.status === 'concluido' ? 'bg-green-500 w-4/5' :
                     'bg-purple-500 w-full'
                   }`}
