@@ -47,7 +47,7 @@ export interface CompanySettings {
     cnpj: string;
     ie: string; // Inscrição Estadual
     im: string; // Inscrição Municipal
-    taxRegime: 'simples_nacional' | 'lucro_presumido' | 'lucro_real' | 'mei';
+    taxRegime: 'simplesnacional' | 'lucropresumido' | 'lucroreal' | 'mei';
     icmsContributor: boolean;
     issContributor: boolean;
     pisContributor: boolean;
@@ -143,7 +143,7 @@ const defaultCompanySettings: CompanySettings = {
     cnpj: '88.235.288/0001-24',
     ie: '0850011930',
     im: '',
-    taxRegime: 'simples_nacional',
+    taxRegime: 'simplesnacional',
     icmsContributor: true,
     issContributor: false,
     pisContributor: false,
