@@ -154,7 +154,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, o
     setFormData(prev => ({ ...prev, [name]: value }));
     if (errors[name]) {
       setErrors(prev => {
-        const { [name]: , ...rest } = prev;
+        const { [name]: _, ...rest } = prev;
         return rest;
       });
     }
@@ -560,4 +560,5 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, o
 };
 
 export default ProductModal;
+
 
