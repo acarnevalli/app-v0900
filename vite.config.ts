@@ -2,7 +2,6 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 
-// https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -10,15 +9,15 @@ export default defineConfig({
       '@': path.resolve(__dirname, 'src'),
     },
   },
-  
- // Configurações para debug
   build: {
-    sourcemap: true,  // Habilita source maps
-    minify: false,    // Temporariamente desabilita minificação
+    sourcemap: true,
+    minify: false,
   },
-  // Para desenvolvimento
   server: {
-    host: true,  // Permite acesso externo
+    host: true,
     port: 5173,
   },
+  preview: {
+    allowedHosts: ['app-v0900.onrender.com'],
+  }
 })
