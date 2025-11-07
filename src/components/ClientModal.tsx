@@ -121,19 +121,19 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) =>
     cpf: client?.cpf ? formatCPF(client.cpf) : '',
     cnpj: client?.cnpj ? formatCNPJ(client.cnpj) : '',
     type: client?.type || 'pf' as 'pf' | 'pj',
-    razao_social: client?.razao_social || '',
-    inscricao_estadual: client?.inscricao_estadual || '',
-    isento_icms: client?.isento_icms || false,
+    razaosocial: client?.razaosocial || '',
+    inscricaoestadual: client?.inscricaoestadual || '',
+    isentoicms: client?.isentoicms || false,
     country: client?.country || 'Brasil',
     state: client?.state || '',
     city: client?.city || '',
-    zip_code: client?.zip_code ? formatZipCode(client.zip_code) : '',
+    zipcode: client?.zipcode ? formatZipCode(client.zipcode) : '',
     neighborhood: client?.neighborhood || '',
-    street_type: client?.street_type || 'Rua',
+    streettype: client?.streettype || 'Rua',
     street: client?.street || '',
     numero: client?.numero || '',
     complemento: client?.complemento || '',
-    fl_ativo: client?.fl_ativo ?? true,
+    flativo: client?.flativo ?? true,
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -184,13 +184,13 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) =>
         }
       }
       
-      if (!formData.razao_social.trim()) {
-        newErrors.razao_social = 'Razão Social é obrigatória para Pessoa Jurídica';
+      if (!formData.razaosocial.trim()) {
+        newErrors.razaosocial = 'Razão Social é obrigatória para Pessoa Jurídica';
       }
     }
 
     // Validações de endereço
-    if (!formData.zip_code.trim()) newErrors.zip_code = 'CEP é obrigatório';
+    if (!formData.zipcode.trim()) newErrors.zipcode = 'CEP é obrigatório';
     if (!formData.street.trim()) newErrors.street = 'Logradouro é obrigatório';
     if (!formData.numero.trim()) newErrors.numero = 'Número é obrigatório';
     if (!formData.neighborhood.trim()) newErrors.neighborhood = 'Bairro é obrigatório';
@@ -204,21 +204,21 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) =>
 
   // ====== BUSCA CEP ======
   const handleCEPSearch = async () => {
-    const cleanCep = formData.zip_code.replace(/\D/g, '');
+    const cleanCep = formData.zipcode.replace(/\D/g, '');
     
     if (cleanCep.length !== 8) {
-      setErrors(prev => ({ ...prev, zip_code: 'CEP deve ter 8 dígitos' }));
+      setErrors(prev => ({ ...prev, zipcode: 'CEP deve ter 8 dígitos' }));
       return;
     }
 
     setIsSearchingCEP(true);
     setErrors(prev => {
-      const { zip_code, ...rest } = prev;
+      const { zipcode, ...rest } = prev;
       return rest;
     });
 
     try {
-      const addressData = await fetchAddressByCEP(formData.zip_code);
+      const addressData = await fetchAddressByCEP(formData.zipcode);
       
       if (addressData && !addressData.erro) {
         setFormData(prev => ({
@@ -227,7 +227,7 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) =>
           neighborhood: addressData.bairro || prev.neighborhood,
           city: addressData.localidade || prev.city,
           state: addressData.uf || prev.state,
-          street_type: 'Rua', // Você pode melhorar isso extraindo do logradouro
+          streettype: 'Rua', // Você pode melhorar isso extraindo do logradouro
         }));
         
         // Limpar erros dos campos preenchidos
@@ -236,10 +236,10 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) =>
           return rest;
         });
       } else {
-        setErrors(prev => ({ ...prev, zip_code: 'CEP não encontrado' }));
+        setErrors(prev => ({ ...prev, zipcode: 'CEP não encontrado' }));
       }
     } catch (error) {
-      setErrors(prev => ({ ...prev, zip_code: 'Erro ao buscar CEP' }));
+      setErrors(prev => ({ ...prev, zipcode: 'Erro ao buscar CEP' }));
     } finally {
       setIsSearchingCEP(false);
     }
@@ -259,9 +259,9 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) =>
     } else if (name === 'phone' || name === 'mobile') {
       const formatted = formatPhone(value);
       setFormData(prev => ({ ...prev, [name]: formatted }));
-    } else if (name === 'zip_code') {
+    } else if (name === 'zipcode') {
       const formatted = formatZipCode(value);
-      setFormData(prev => ({ ...prev, zip_code: formatted }));
+      setFormData(prev => ({ ...prev, zipcode: formatted }));
       
       // Buscar CEP automaticamente quando completo
       if (formatted.replace(/\D/g, '').length === 8) {
@@ -273,9 +273,9 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) =>
         type: value as 'pf' | 'pj',
         cpf: value === 'pf' ? prev.cpf : '',
         cnpj: value === 'pj' ? prev.cnpj : '',
-        razao_social: value === 'pf' ? '' : prev.razao_social,
-        inscricao_estadual: value === 'pf' ? '' : prev.inscricao_estadual,
-        isento_icms: value === 'pf' ? false : prev.isento_icms,
+        razaosocial: value === 'pf' ? '' : prev.razaosocial,
+        inscricaoestadual: value === 'pf' ? '' : prev.inscricaoestadual,
+        isentoicms: value === 'pf' ? false : prev.isentoicms,
       }));
     } else if (type === 'checkbox') {
       const checked = (e.target as HTMLInputElement).checked;
@@ -287,7 +287,7 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) =>
     // Limpar erro do campo alterado
     if (errors[name]) {
       setErrors(prev => {
-        const { [name]: _, ...rest } = prev;
+        const { [name]: , ...rest } = prev;
         return rest;
       });
     }
@@ -306,12 +306,12 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) =>
         cnpj: formData.type === 'pj' ? (formData.cnpj.replace(/\D/g, '') || undefined) : undefined,
         phone: formData.phone.replace(/\D/g, ''),
         mobile: formData.mobile.replace(/\D/g, ''),
-        zip_code: formData.zip_code.replace(/\D/g, ''),
-        fl_ativo: formData.fl_ativo,
+        zipcode: formData.zipcode.replace(/\D/g, ''),
+        flativo: formData.flativo,
         // Limpar campos específicos de PJ se for PF
-        razao_social: formData.type === 'pj' ? formData.razao_social : undefined,
-        inscricao_estadual: formData.type === 'pj' ? formData.inscricao_estadual : undefined,
-        isento_icms: formData.type === 'pj' ? formData.isento_icms : undefined,
+        razaosocial: formData.type === 'pj' ? formData.razaosocial : undefined,
+        inscricaoestadual: formData.type === 'pj' ? formData.inscricaoestadual : undefined,
+        isentoicms: formData.type === 'pj' ? formData.isentoicms : undefined,
       };
 
       if (client?.id) {
@@ -476,8 +476,8 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) =>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Inscrição Estadual</label>
                   <input
                     type="text"
-                    name="inscricao_estadual"
-                    value={formData.inscricao_estadual}
+                    name="inscricaoestadual"
+                    value={formData.inscricaoestadual}
                     onChange={handleChange}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                     placeholder="ISENTO ou número"
@@ -493,15 +493,15 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) =>
               <label className="block text-sm font-medium text-gray-700 mb-1">Razão Social *</label>
               <input
                 type="text"
-                name="razao_social"
-                value={formData.razao_social}
+                name="razaosocial"
+                value={formData.razaosocial}
                 onChange={handleChange}
                 className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
-                  errors.razao_social ? 'border-red-300' : 'border-gray-300'
+                  errors.razaosocial ? 'border-red-300' : 'border-gray-300'
                 }`}
                 placeholder="Razão Social da empresa"
               />
-              {errors.razao_social && <p className="mt-1 text-sm text-red-600">{errors.razao_social}</p>}
+              {errors.razaosocial && <p className="mt-1 text-sm text-red-600">{errors.razaosocial}</p>}
             </div>
           )}
 
@@ -510,8 +510,8 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) =>
             <div className="flex items-center space-x-2">
               <input
                 type="checkbox"
-                name="isento_icms"
-                checked={formData.isento_icms}
+                name="isentoicms"
+                checked={formData.isentoicms}
                 onChange={handleChange}
                 className="w-4 h-4 text-amber-600 rounded focus:ring-amber-500"
               />
@@ -591,11 +591,11 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) =>
                 <div className="relative">
                   <input
                     type="text"
-                    name="zip_code"
-                    value={formData.zip_code}
+                    name="zipcode"
+                    value={formData.zipcode}
                     onChange={handleChange}
                     className={`w-full px-4 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
-                      errors.zip_code ? 'border-red-300' : 'border-gray-300'
+                      errors.zipcode ? 'border-red-300' : 'border-gray-300'
                     }`}
                     placeholder="00000-000"
                     maxLength={9}
@@ -603,7 +603,7 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) =>
                   <button
                     type="button"
                     onClick={handleCEPSearch}
-                    disabled={isSearchingCEP || formData.zip_code.replace(/\D/g, '').length !== 8}
+                    disabled={isSearchingCEP || formData.zipcode.replace(/\D/g, '').length !== 8}
                     className="absolute right-2 top-1/2 transform -translate-y-1/2 text-amber-600 hover:text-amber-700 disabled:text-gray-300 disabled:cursor-not-allowed"
                     title="Buscar CEP"
                   >
@@ -614,7 +614,7 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) =>
                     )}
                   </button>
                 </div>
-                {errors.zip_code && <p className="mt-1 text-sm text-red-600">{errors.zip_code}</p>}
+                {errors.zipcode && <p className="mt-1 text-sm text-red-600">{errors.zipcode}</p>}
               </div>
 
               <div className="md:col-span-2">
@@ -754,8 +754,8 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) =>
             <div className="mt-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Logradouro</label>
               <select
-                name="street_type"
-                value={formData.street_type}
+                name="streettype"
+                value={formData.streettype}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
               >
@@ -777,8 +777,8 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) =>
           <div className="flex items-center space-x-2">
             <input
               type="checkbox"
-              name="fl_ativo"
-              checked={formData.fl_ativo}
+              name="flativo"
+              checked={formData.flativo}
               onChange={handleChange}
               className="w-4 h-4 text-amber-600 rounded focus:ring-amber-500"
             />
