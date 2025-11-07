@@ -52,16 +52,16 @@ export default function TransactionsTable({
 
   // Função para obter o nome da referência
   const getReferenceName = (transaction: FinancialTransaction): string => {
-    if (transaction.client_id) {
-      const client = clients.find(c => c.id === transaction.client_id);
+    if (transaction.clientid) {
+      const client = clients.find(c => c.id === transaction.clientid);
       return client?.name || 'Cliente não encontrado';
     }
-    if (transaction.supplier_id) {
-      const supplier = suppliers.find(s => s.id === transaction.supplier_id);
+    if (transaction.supplierid) {
+      const supplier = suppliers.find(s => s.id === transaction.supplierid);
       return supplier?.name || 'Fornecedor não encontrado';
     }
-    if (transaction.project_id) {
-      const project = projects.find(p => p.id === transaction.project_id);
+    if (transaction.projectid) {
+      const project = projects.find(p => p.id === transaction.projectid);
       return project?.name || 'Projeto não encontrado';
     }
     return '-';
@@ -233,9 +233,9 @@ export default function TransactionsTable({
                       <div className="text-sm font-medium text-gray-900">
                         {transaction.description}
                       </div>
-                      {transaction.installment_number && (
+                      {transaction.installmentnumber && (
                         <div className="text-xs text-gray-500">
-                          Parcela {transaction.installment_number}/{transaction.total_installments}
+                          Parcela {transaction.installmentnumber}/{transaction.totalinstallments}
                         </div>
                       )}
                     </td>
@@ -247,16 +247,16 @@ export default function TransactionsTable({
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2 text-sm text-gray-900">
                         <Calendar className="w-4 h-4 text-gray-400" />
-                        {new Date(transaction.due_date + 'T00:00:00').toLocaleDateString('pt-BR')}
+                        {new Date(transaction.duedate + 'T00:00:00').toLocaleDateString('pt-BR')}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">
                         R$ {transaction.amount.toFixed(2)}
                       </div>
-                      {transaction.paid_amount > 0 && transaction.status === 'partial' && (
+                      {transaction.paidamount > 0 && transaction.status === 'partial' && (
                         <div className="text-xs text-green-600">
-                          Pago: R$ {transaction.paid_amount.toFixed(2)}
+                          Pago: R$ {transaction.paidamount.toFixed(2)}
                         </div>
                       )}
                     </td>
