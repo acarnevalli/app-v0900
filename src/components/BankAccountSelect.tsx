@@ -57,8 +57,8 @@ export const BankAccountSelect: React.FC<BankAccountSelectProps> = ({
         {activeAccounts.map((account) => (
           <option key={account.id} value={account.id}>
             {account.name}
-            {account.bank_name && ` (${account.bank_name})`}
-            {showBalance && ` - Saldo: R$ ${account.current_balance.toLocaleString('pt-BR', {
+            {account.bankname && ` (${account.bankname})`}
+            {showBalance && ` - Saldo: R$ ${account.currentbalance.toLocaleString('pt-BR', {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2
             })}`}
