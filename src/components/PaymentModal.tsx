@@ -22,7 +22,7 @@ export default function PaymentModal({ isOpen, onClose, transaction }: PaymentMo
   const [error, setError] = useState<string>('');
 
   // Valores calculados
-  const remainingAmount = transaction.amount - (transaction.paid_amount || 0);
+  const remainingAmount = transaction.amount - (transaction.paidamount || 0);
   const maxPayment = remainingAmount + (transaction.discount || 0);
 
   // Filtrar apenas contas ativas
@@ -32,7 +32,7 @@ export default function PaymentModal({ isOpen, onClose, transaction }: PaymentMo
   useEffect(() => {
     if (isOpen) {
       setPaidAmount(remainingAmount.toFixed(2));
-      setBankAccountId(transaction.bank_account_id || '');
+      setBankAccountId(transaction.bankaccountid || '');
       setPaymentDate(new Date().toISOString().split('T')[0]);
       setError('');
     }
@@ -85,9 +85,9 @@ export default function PaymentModal({ isOpen, onClose, transaction }: PaymentMo
 
     try {
       await payTransaction(transaction.id, {
-        paid_amount: amount,
-        payment_date: paymentDate,
-        bank_account_id: bankAccountId
+        paidamount: amount,
+        paymentdate: paymentDate,
+        bankaccountid: bankAccountId
       });
       
       onClose();
@@ -139,11 +139,11 @@ export default function PaymentModal({ isOpen, onClose, transaction }: PaymentMo
                 R$ {transaction.amount.toFixed(2)}
               </span>
             </div>
-            {transaction.paid_amount > 0 && (
+            {transaction.paidamount > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Já Pago:</span>
                 <span className="font-medium text-green-600">
-                  R$ {transaction.paid_amount.toFixed(2)}
+                  R$ {transaction.paidamount.toFixed(2)}
                 </span>
               </div>
             )}
@@ -216,7 +216,7 @@ export default function PaymentModal({ isOpen, onClose, transaction }: PaymentMo
               <option value="">Selecione uma conta</option>
               {activeAccounts.map((account) => (
                 <option key={account.id} value={account.id}>
-                  {account.name} - Saldo: R$ {account.current_balance.toFixed(2)}
+                  {account.name} - Saldo: R$ {account.currentbalance.toFixed(2)}
                 </option>
               ))}
             </select>
