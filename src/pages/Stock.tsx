@@ -11,15 +11,15 @@ const Stock: React.FC = () => {
 
   const filteredMovements = stockMovements.filter(movement => {
     const matchesSearch = 
-      movement.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      movement.project_title?.toLowerCase().includes(searchTerm.toLowerCase());
+      movement.productname.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      movement.projecttitle?.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesType = typeFilter === 'all' || movement.type === typeFilter;
     
     return matchesSearch && matchesType;
   });
 
-  const lowStockProducts = products.filter(p => p.current_stock <= p.min_stock);
+  const lowStockProducts = products.filter(p => p.currentstock <= p.minstock);
 
   return (
     <div className="space-y-6">
@@ -51,8 +51,8 @@ const Stock: React.FC = () => {
               <div key={product.id} className="bg-white p-4 rounded-lg border border-red-200">
                 <h3 className="font-medium text-gray-800">{product.name}</h3>
                 <div className="flex justify-between items-center mt-2">
-                  <span className="text-sm text-gray-600">Atual: {product.current_stock} {product.unit}</span>
-                  <span className="text-sm text-red-600">Mín: {product.min_stock} {product.unit}</span>
+                  <span className="text-sm text-gray-600">Atual: {product.currentstock} {product.unit}</span>
+                  <span className="text-sm text-red-600">Mín: {product.minstock} {product.unit}</span>
                 </div>
               </div>
             ))}
@@ -139,7 +139,7 @@ const Stock: React.FC = () => {
                   </td>
                   <td className="px-6 py-4">
                     <div className="text-sm font-medium text-gray-900">
-                      {movement.product_name}
+                      {movement.productname}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -149,17 +149,17 @@ const Stock: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">
-                      {movement.unit_price ? `R$ ${movement.unit_price.toFixed(2)}` : '-'}
+                      {movement.unitprice ? `R$ ${movement.unitprice.toFixed(2)}` : '-'}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">
-                      {movement.total_value ? `R$ ${movement.total_value.toFixed(2)}` : '-'}
+                      {movement.totalvalue ? `R$ ${movement.totalvalue.toFixed(2)}` : '-'}
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="text-sm text-gray-600">
-                      {movement.project_title || '-'}
+                      {movement.projecttitle || '-'}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
