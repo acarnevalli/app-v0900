@@ -341,8 +341,8 @@ const Projects: React.FC = () => {
       const paymentMethodLabels: { [key: string]: string } = {
         'dinheiro': 'Dinheiro',
         'pix': 'PIX',
-        'cartao_credito': 'Cartão de Crédito',
-        'cartao_debito': 'Cartão de Débito',
+        'cartaocredito': 'Cartão de Crédito',
+        'cartaodebito': 'Cartão de Débito',
         'boleto': 'Boleto',
         'transferencia': 'Transferência'
       };
