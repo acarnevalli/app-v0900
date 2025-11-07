@@ -9,11 +9,11 @@ interface StockMovementModalProps {
 const StockMovementModal: React.FC<StockMovementModalProps> = ({ onClose }) => {
   const { products, projects, addStockMovement } = useApp();
   const [formData, setFormData] = useState({
-    product_id: '',
+    productid: '',
     type: 'entrada' as 'entrada' | 'saida',
     quantity: '',
-    unit_price: '',
-    project_id: '',
+    unitprice: '',
+    projectid: '',
     date: new Date().toISOString().split('T')[0]
   });
   const [productSearch, setProductSearch] = useState('');
@@ -26,23 +26,23 @@ const StockMovementModal: React.FC<StockMovementModalProps> = ({ onClose }) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    const product = products.find(p => p.id === formData.product_id);
-    const project = projects.find(p => p.id === formData.project_id);
+    const product = products.find(p => p.id === formData.productid);
+    const project = projects.find(p => p.id === formData.projectid);
     
     if (!product) return;
     
     const quantity = parseFloat(formData.quantity);
-    const unitPrice = formData.unit_price ? parseFloat(formData.unit_price) : undefined;
+    const unitPrice = formData.unitprice ? parseFloat(formData.unitprice) : undefined;
     
     const movementData = {
-      product_id: formData.product_id,
-      product_name: product.name,
+      productid: formData.productid,
+      productname: product.name,
       type: formData.type,
       quantity,
-      unit_price: unitPrice,
-      total_value: unitPrice ? quantity * unitPrice : undefined,
-      project_id: formData.project_id || undefined,
-      project_title: project?.title,
+      unitprice: unitPrice,
+      totalvalue: unitPrice ? quantity * unitPrice : undefined,
+      projectid: formData.projectid || undefined,
+      projecttitle: project?.title,
       date: formData.date
     };
     
@@ -57,7 +57,7 @@ const StockMovementModal: React.FC<StockMovementModalProps> = ({ onClose }) => {
     }));
   };
 
-  const selectedProduct = products.find(p => p.id === formData.product_id);
+  const selectedProduct = products.find(p => p.id === formData.productid);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -123,8 +123,8 @@ const StockMovementModal: React.FC<StockMovementModalProps> = ({ onClose }) => {
               </div>
               
               <select
-                name="product_id"
-                value={formData.product_id}
+                name="productid"
+                value={formData.productid}
                 onChange={handleChange}
                 required
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -132,7 +132,7 @@ const StockMovementModal: React.FC<StockMovementModalProps> = ({ onClose }) => {
                 <option value="">Selecione um produto</option>
                 {filteredProducts.map(product => (
                   <option key={product.id} value={product.id}>
-                    {product.name} - Estoque: {product.current_stock} {product.unit}
+                    {product.name} - Estoque: {product.currentstock} {product.unit}
                   </option>
                 ))}
               </select>
@@ -141,7 +141,7 @@ const StockMovementModal: React.FC<StockMovementModalProps> = ({ onClose }) => {
             {selectedProduct && (
               <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-800">
-                  <strong>Estoque atual:</strong> {selectedProduct.current_stock} {selectedProduct.unit}
+                  <strong>Estoque atual:</strong> {selectedProduct.currentstock} {selectedProduct.unit}
                 </p>
                 <p className="text-sm text-blue-600">{selectedProduct.description}</p>
               </div>
@@ -190,8 +190,8 @@ const StockMovementModal: React.FC<StockMovementModalProps> = ({ onClose }) => {
               </label>
               <input
                 type="number"
-                name="unit_price"
-                value={formData.unit_price}
+                name="unitprice"
+                value={formData.unitprice}
                 onChange={handleChange}
                 min="0"
                 step="0.01"
@@ -207,8 +207,8 @@ const StockMovementModal: React.FC<StockMovementModalProps> = ({ onClose }) => {
               Projeto (opcional)
             </label>
             <select
-              name="project_id"
-              value={formData.project_id}
+              name="projectid"
+              value={formData.projectid}
               onChange={handleChange}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
@@ -221,12 +221,12 @@ const StockMovementModal: React.FC<StockMovementModalProps> = ({ onClose }) => {
             </select>
           </div>
 
-          {formData.quantity && formData.unit_price && (
+          {formData.quantity && formData.unitprice && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <div className="flex justify-between items-center">
                 <span className="font-medium text-green-800">Valor Total:</span>
                 <span className="font-bold text-green-800">
-                  R$ {(parseFloat(formData.quantity) * parseFloat(formData.unit_price)).toFixed(2)}
+                  R$ {(parseFloat(formData.quantity) * parseFloat(formData.unitprice)).toFixed(2)}
                 </span>
               </div>
             </div>
