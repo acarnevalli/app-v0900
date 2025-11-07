@@ -6,14 +6,14 @@ import { useAuth } from '../contexts/AuthContext';
 
 export interface CompanyInfo {
   id?: string;
-  company_name: string;
+  companyname: string;
   cnpj: string;
   address: string;
   city: string;
   phone: string;
   email: string;
-  logo_url: string;
-  user_id?: string;
+  logourl: string;
+  userid?: string;
 }
 
 export const useCompanyInfo = () => {
@@ -30,22 +30,22 @@ export const useCompanyInfo = () => {
 
     try {
       const { data, error } = await supabase
-        .from('company_info')
+        .from('companyinfo')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('userid', user.id)
         .single();
 
       if (error) {
         // Se não existe, retornar dados padrão
         if (error.code === 'PGRST116') {
           setCompanyInfo({
-            company_name: 'Sua Empresa',
+            companyname: 'Sua Empresa',
             cnpj: '00.000.000/0000-00',
             address: 'Rua Exemplo, 123',
             city: 'Cidade',
             phone: '(00) 0000-0000',
             email: 'contato@empresa.com',
-            logo_url: '',
+            logourl: '',
           });
         } else {
           throw error;
@@ -69,24 +69,24 @@ export const useCompanyInfo = () => {
 
       // Verificar se já existe registro
       const { data: existing } = await supabase
-        .from('company_info')
+        .from('companyinfo')
         .select('id')
-        .eq('user_id', user.id)
+        .eq('userid', user.id)
         .single();
 
       if (existing) {
         // Update
         const { error } = await supabase
-          .from('company_info')
+          .from('companyinfo')
           .update(data)
-          .eq('user_id', user.id);
+          .eq('userid', user.id);
 
         if (error) throw error;
       } else {
         // Insert
         const { error } = await supabase
-          .from('company_info')
-          .insert([{ ...data, user_id: user.id }]);
+          .from('companyinfo')
+          .insert([{ ...data, userid: user.id }]);
 
         if (error) throw error;
       }
