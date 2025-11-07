@@ -54,7 +54,7 @@ export interface Product {
   name: string;
   description: string;
   category: string;
-  type: 'material_bruto' | 'parte_produto' | 'produto_pronto';
+  type: 'materialbruto' | 'parteproduto' | 'produtopronto';
   unit: string;
   components: ProductComponent[];
   costprice: number;
@@ -100,7 +100,7 @@ export interface Project {
   clientid: string;
   clientname?: string;
   description: string;
-  status: 'orcamento' | 'aprovado' | 'em_producao' | 'concluido' | 'entregue';
+  status: 'orcamento' | 'aprovado' | 'emproducao' | 'concluido' | 'entregue';
   type: 'orcamento' | 'venda';
   products: ProjectProduct[];
   budget: number;
@@ -118,7 +118,7 @@ export interface Project {
 
 export interface PaymentTerms {
   installments: number;
-  paymentmethod: 'dinheiro' | 'pix' | 'cartao_credito' | 'cartao_debito' | 'boleto' | 'transferencia';
+  paymentmethod: 'dinheiro' | 'pix' | 'cartaocredito' | 'cartaodebito' | 'boleto' | 'transferencia';
   discountpercentage: number;
   installmentvalue?: number;
   totalwithdiscount?: number;
@@ -242,7 +242,7 @@ export interface FinancialTransaction {
   duedate: string;
   paymentdate?: string;
   status: 'pending' | 'paid' | 'overdue' | 'cancelled' | 'partial';
-  paymentmethod?: 'dinheiro' | 'pix' | 'cartao_credito' | 'cartao_debito' | 'boleto' | 'transferencia' | 'cheque';
+  paymentmethod?: 'dinheiro' | 'pix' | 'cartaocredito' | 'cartaodebito' | 'boleto' | 'transferencia' | 'cheque';
   installmentnumber?: number;
   totalinstallments?: number;
   referencetype?: 'sale' | 'purchase' | 'project' | 'manual' | 'recurring';
@@ -297,7 +297,7 @@ export interface CostCenter {
 }
 
 export interface PaymentInfo {
-  paymentmethod: 'dinheiro' | 'pix' | 'cartao_credito' | 'cartao_debito' | 'boleto' | 'transferencia' | 'cheque';
+  paymentmethod: 'dinheiro' | 'pix' | 'cartaocredito' | 'cartaodebito' | 'boleto' | 'transferencia' | 'cheque';
   installments: number;
   installmentvalue: number;
   firstduedate: string;
@@ -507,10 +507,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       .eq('userid', user.id);
     if (prodErr) throw prodErr;
     const { data: componentsData, error: compErr } = await supabase
-      .from('product_components')
+      .from('productcomponents')
       .select(`
         *,
-        component:products!product_components_component_id_fkey(
+        component:products!productcomponentscomponentidfkey(
           id, name, unit, costprice
         )
       `);
@@ -538,21 +538,21 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     try {
       console.log('📊 Carregando transações financeiras...');
       const { data, error } = await supabase
-        .from('financial_transactions')
+        .from('financialtransactions')
         .select(`
           *,
-          clients!financial_transactions_clientid_fkey(name),
-          suppliers!financial_transactions_supplierid_fkey(name),
-          projects!financial_transactions_projectid_fkey(ordernumber),
-          bank_accounts!financial_transactions_accountid_fkey(name),
-          cost_centers!financial_transactions_costcenterid_fkey(name)
+          clients!financialtransactionsclientidfkey(name),
+          suppliers!financialtransactionssupplieridfkey(name),
+          projects!financialtransactionsprojectidfkey(ordernumber),
+          bankaccounts!financialtransactionsaccountidfkey(name),
+          costcenters!financialtransactionscostcenteridfkey(name)
         `)
         .eq('userid', user.id)
         .order('duedate', { ascending: false });
       if (error) {
         console.error('❌ Erro ao buscar transações com relacionamentos:', error);
         const { data: simpleData, error: simpleError } = await supabase
-          .from('financial_transactions')
+          .from('financialtransactions')
           .select('*')
           .eq('userid', user.id)
           .order('duedate', { ascending: false });
@@ -581,8 +581,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         clientname: t.clients?.name || null,
         suppliername: t.suppliers?.name || null,
         projectnumber: t.projects?.ordernumber || null,
-        accountname: t.bank_accounts?.name || null,
-        costcentername: t.cost_centers?.name || null
+        accountname: t.bankaccounts?.name || null,
+        costcentername: t.costcenters?.name || null
       }));
       console.log(`✅ ${merged.length} transações financeiras carregadas com sucesso`);
       setFinancialTransactions(merged);
@@ -596,7 +596,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (!user) return;
     console.log('🏦 Carregando contas bancárias...');
     const { data, error } = await supabase
-      .from('bank_accounts')
+      .from('bankaccounts')
       .select('*')
       .eq('userid', user.id)
       .order('name');
@@ -612,8 +612,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (!user) return;
     console.log('🎯 Carregando centros de custo...');
     const { data, error } = await supabase
-      .from('cost_centers')
-      .select(`*, parent:cost_centers!parentid(name)`)
+      .from('costcenters')
+      .select(`*, parent:costcenters!parentid(name)`)
       .eq('userid', user.id)
       .order('name');
     if (error) {
@@ -633,7 +633,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     console.log('🔄 [AppContext] Carregando projetos...');
     const { data, error } = await supabase
       .from('projects')
-      .select(`*, client:clients(name), products:project_products(*)`)
+      .select(`*, client:clients(name), products:projectproducts(*)`)
       .eq('userid', user.id)
       .order('createdat', { ascending: false });
     if (error) {
@@ -702,7 +702,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const loadStockMovements = useCallback(async () => {
     if (!user) return;
     const { data, error } = await supabase
-      .from('stock_movements')
+      .from('stockmovements')
       .select('*')
       .eq('userid', user.id)
       .order('date', { ascending: false });
@@ -725,7 +725,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (!user) return;
     const { data, error } = await supabase
       .from('sales')
-      .select(`*, client:clients(name), items:sale_items(*)`)
+      .select(`*, client:clients(name), items:saleitems(*)`)
       .eq('userid', user.id)
       .order('date', { ascending: false });
     if (error) throw error;
@@ -749,7 +749,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (!user) return;
     const { data, error } = await supabase
       .from('purchases')
-      .select(`*, supplier:suppliers(name), items:purchase_items(*)`)
+      .select(`*, supplier:suppliers(name), items:purchaseitems(*)`)
       .eq('userid', user.id)
       .order('date', { ascending: false });
     if (error) throw error;
@@ -890,7 +890,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const components = data.components
         .map(c => ({ productid: insertedProduct.id, componentid: c.componentid, quantity: parseFloat(c.quantity.toString()) || 0 }))
         .filter(c => c.quantity > 0);
-      const { error: compError } = await supabase.from('product_components').insert(components);
+      const { error: compError } = await supabase.from('productcomponents').insert(components);
       if (compError) throw compError;
     }
     await loadProducts();
@@ -917,10 +917,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       .eq('userid', user!.id);
     if (productError) throw productError;
     if (data.components) {
-      await supabase.from('product_components').delete().eq('productid', data.id);
+      await supabase.from('productcomponents').delete().eq('productid', data.id);
       if (data.components.length > 0) {
         const components = data.components.map(c => ({ productid: data.id, componentid: c.componentid, quantity: c.quantity }));
-        const { error: compError } = await supabase.from('product_components').insert(components);
+        const { error: compError } = await supabase.from('productcomponents').insert(components);
         if (compError) throw compError;
       }
     }
@@ -937,7 +937,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const updateBankAccountBalance = useCallback(async (accountId: string, amount: number, operation: 'add' | 'subtract') => {
     ensureUser();
     const { data: account, error: fetchError } = await supabase
-      .from('bank_accounts')
+      .from('bankaccounts')
       .select('currentbalance')
       .eq('id', accountId)
       .eq('userid', user!.id)
@@ -945,7 +945,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (fetchError || !account) return;
     const newBalance = operation === 'add' ? account.currentbalance + amount : account.currentbalance - amount;
     const { error } = await supabase
-      .from('bank_accounts')
+      .from('bankaccounts')
       .update({ currentbalance: newBalance, updatedat: new Date().toISOString() })
       .eq('id', accountId)
       .eq('userid', user!.id);
@@ -962,7 +962,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       createdat: new Date().toISOString(),
       updatedat: new Date().toISOString()
     };
-    const { error } = await supabase.from('bank_accounts').insert([newAccount]);
+    const { error } = await supabase.from('bankaccounts').insert([newAccount]);
     if (error) throw error;
     await loadBankAccounts();
   }, [user, loadBankAccounts]);
@@ -970,7 +970,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const updateBankAccount = useCallback(async (id: string, data: Partial<BankAccount>) => {
     ensureUser();
     const { error } = await supabase
-      .from('bank_accounts')
+      .from('bankaccounts')
       .update({ ...cleanUndefined(data), updatedat: new Date().toISOString() })
       .eq('id', id)
       .eq('userid', user!.id);
@@ -980,7 +980,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const deleteBankAccount = useCallback(async (id: string) => {
     ensureUser();
-    const { error } = await supabase.from('bank_accounts').delete().eq('id', id).eq('userid', user!.id);
+    const { error } = await supabase.from('bankaccounts').delete().eq('id', id).eq('userid', user!.id);
     if (error) throw error;
     await loadBankAccounts();
   }, [user, loadBankAccounts]);
@@ -1013,7 +1013,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       userid: user!.id
     };
     const { data: inserted, error } = await supabase
-      .from('financial_transactions')
+      .from('financialtransactions')
       .insert([newTransaction])
       .select()
       .single();
@@ -1049,14 +1049,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (data.supplierid !== undefined) updateData.supplierid = data.supplierid;
     if (data.installmentnumber !== undefined) updateData.installmentnumber = data.installmentnumber;
     if (data.totalinstallments !== undefined) updateData.totalinstallments = data.totalinstallments;
-    const { error } = await supabase.from('financial_transactions').update(updateData).eq('id', id);
+    const { error } = await supabase.from('financialtransactions').update(updateData).eq('id', id);
     if (error) throw error;
     await loadFinancialTransactions();
   }, [user, loadFinancialTransactions]);
 
   const deleteFinancialTransaction = useCallback(async (id: string) => {
     ensureUser();
-    const { error } = await supabase.from('financial_transactions').delete().eq('id', id);
+    const { error } = await supabase.from('financialtransactions').delete().eq('id', id);
     if (error) throw error;
     await loadFinancialTransactions();
   }, [user, loadFinancialTransactions]);
@@ -1064,7 +1064,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const payTransaction = useCallback(async (id: string, paymentData: PayTransactionData) => {
     ensureUser();
     const { data: transaction, error: fetchError } = await supabase
-      .from('financial_transactions')
+      .from('financialtransactions')
       .select('*')
       .eq('id', id)
       .single();
@@ -1075,7 +1075,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       paymentmethod: paymentData.paymentmethod || transaction.paymentmethod,
       description: paymentData.notes ? `${transaction.description || ''}\n${paymentData.notes}`.trim() : transaction.description
     };
-    const { error } = await supabase.from('financial_transactions').update(updateData).eq('id', id);
+    const { error } = await supabase.from('financialtransactions').update(updateData).eq('id', id);
     if (error) throw error;
     await loadFinancialTransactions();
   }, [user, loadFinancialTransactions]);
@@ -1088,7 +1088,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       createdat: new Date().toISOString(),
       updatedat: new Date().toISOString()
     };
-    const { error } = await supabase.from('cost_centers').insert([newCostCenter]);
+    const { error } = await supabase.from('costcenters').insert([newCostCenter]);
     if (error) throw error;
     await loadCostCenters();
   }, [user, loadCostCenters]);
@@ -1096,7 +1096,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const updateCostCenter = useCallback(async (id: string, data: Partial<CostCenter>) => {
     ensureUser();
     const { error } = await supabase
-      .from('cost_centers')
+      .from('costcenters')
       .update({ ...cleanUndefined(data), updatedat: new Date().toISOString() })
       .eq('id', id)
       .eq('userid', user!.id);
@@ -1106,7 +1106,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const deleteCostCenter = useCallback(async (id: string) => {
     ensureUser();
-    const { error } = await supabase.from('cost_centers').delete().eq('id', id).eq('userid', user!.id);
+    const { error } = await supabase.from('costcenters').delete().eq('id', id).eq('userid', user!.id);
     if (error) throw error;
     await loadCostCenters();
   }, [user, loadCostCenters]);
@@ -1237,7 +1237,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const newStock = data.movementtype === 'entrada' ? product.currentstock + data.quantity : product.currentstock - data.quantity;
     if (newStock < 0) throw new Error(`Estoque insuficiente`);
     const movementData = { ...data, userid: user!.id, createdat: new Date().toISOString() };
-    const { error } = await supabase.from('stock_movements').insert([movementData]);
+    const { error } = await supabase.from('stockmovements').insert([movementData]);
     if (error) throw error;
     await updateProduct({ ...product, currentstock: newStock });
     await loadStockMovements();
@@ -1301,7 +1301,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           total: item.total
         }))
         .filter(item => item.quantity > 0);
-      const { error: itemsError } = await supabase.from('sale_items').insert(saleItems);
+      const { error: itemsError } = await supabase.from('saleitems').insert(saleItems);
       if (itemsError) throw itemsError;
     }
     if (sale.items && sale.status === 'completed') await processProjectStockMovement(insertedSale.id, sale.items);
@@ -1364,7 +1364,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           total: item.total
         }))
         .filter(item => item.quantity > 0);
-      const { error: itemsError } = await supabase.from('purchase_items').insert(purchaseItems);
+      const { error: itemsError } = await supabase.from('purchaseitems').insert(purchaseItems);
       if (itemsError) throw itemsError;
     }
     if (purchase.status === 'received') {
@@ -1495,7 +1495,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         })
         .filter(p => p.quantity > 0);
       if (projectProducts.length > 0) {
-        const { error: prodError } = await supabase.from('project_products').insert(projectProducts).select();
+        const { error: prodError } = await supabase.from('projectproducts').insert(projectProducts).select();
         if (prodError) {
           alert(`Erro ao salvar produtos: ${prodError.message}`);
           throw prodError;
@@ -1532,7 +1532,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       .eq('userid', user!.id);
     if (error) throw error;
     if (data.products !== undefined) {
-      const { error: deleteError } = await supabase.from('project_products').delete().eq('projectid', id);
+      const { error: deleteError } = await supabase.from('projectproducts').delete().eq('projectid', id);
       if (deleteError) throw deleteError;
       if (data.products && data.products.length > 0) {
         const projectProducts = data.products
@@ -1557,7 +1557,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           })
           .filter(p => p.quantity > 0);
         if (projectProducts.length > 0) {
-          const { error: prodError } = await supabase.from('project_products').insert(projectProducts).select();
+          const { error: prodError } = await supabase.from('projectproducts').insert(projectProducts).select();
           if (prodError) {
             alert(`Erro ao salvar produtos: ${prodError.message}`);
             throw prodError;
@@ -1641,7 +1641,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         visited.add(id);
         const product = products.find(p => p.id === id);
         if (!product) return 0;
-        if (product.type === 'material_bruto') return product.costprice;
+        if (product.type === 'materialbruto') return product.costprice;
         let total = 0;
         for (const comp of product.components) {
           const componentCost = await calculate(comp.componentid);
@@ -1658,7 +1658,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const getDashboardStats = useCallback(() => {
     const totalClients = clients.length;
-    const activeProjects = projects.filter(p => ['em_producao', 'aprovado'].includes(p.status || '')).length;
+    const activeProjects = projects.filter(p => ['emproducao', 'aprovado'].includes(p.status || '')).length;
     const today = new Date();
     const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
@@ -1694,7 +1694,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const debugProject = useCallback(
     async (projectId: string) => {
       if (!user) return {};
-      const { data, error } = await supabase.from('projects').select('*, products:project_products(*)').eq('id', projectId).single();
+      const { data, error } = await supabase.from('projects').select('*, products:projectproducts(*)').eq('id', projectId).single();
       if (error) throw error;
       return data;
     },
@@ -1706,7 +1706,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       if (!user) return null;
       const { data, error } = await supabase
         .from('projects')
-        .select('*, client:clients(name), products:project_products(*)')
+        .select('*, client:clients(name), products:projectproducts(*)')
         .eq('id', projectId)
         .single();
       if (error) throw error;
