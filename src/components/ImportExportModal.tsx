@@ -73,20 +73,20 @@ const ImportExportModal: React.FC<ImportExportModalProps> = ({ isOpen, onClose }
 
     try {
       if (importType === 'clientes') {
-        // Adicionar user_id a cada cliente
+        // Adicionar userid a cada cliente
         const clientsWithUserId = result.map(client => ({
           ...client,
-          user_id: user.id,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          userid: user.id,
+          createdat: new Date().toISOString(),
+          updatedat: new Date().toISOString(),
           // Campos obrigatórios com defaults
           mobile: client.mobile || client.phone || '(00) 00000-0000',
           country: client.country || 'Brasil',
           state: client.state || 'N/A',
           city: client.city || 'N/A',
-          zip_code: client.zip_code || '00000-000',
+          zipcode: client.zipcode || '00000-000',
           neighborhood: client.neighborhood || 'N/A',
-          street_type: client.street_type || 'Rua',
+          streettype: client.streettype || 'Rua',
           street: client.street || 'N/A',
         }));
 
@@ -98,20 +98,20 @@ const ImportExportModal: React.FC<ImportExportModalProps> = ({ isOpen, onClose }
 
         setStatus(`✅ ${result.length} clientes importados com sucesso! ✔️`);
       } else {
-        // Produtos (sem user_id)
+        // Produtos (sem userid)
         const productsFormatted = result.map(product => ({
           name: product.name,
           description: product.description || '',
           category: product.category || 'Geral',
-          type: 'produto_pronto' as const,
+          type: 'produtopronto' as const,
           unit: product.unit || 'UN',
-          cost_price: product.cost || product.cost_price || 0,
-          sale_price: product.price || product.sale_price || 0,
-          current_stock: product.stock || product.current_stock || 0,
-          min_stock: product.min_stock || 0,
+          costprice: product.cost || product.costprice || 0,
+          saleprice: product.price || product.saleprice || 0,
+          currentstock: product.stock || product.currentstock || 0,
+          minstock: product.minstock || 0,
           supplier: product.supplier || '',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          createdat: new Date().toISOString(),
+          updatedat: new Date().toISOString(),
         }));
 
         const { error } = await supabase
@@ -156,7 +156,7 @@ const ImportExportModal: React.FC<ImportExportModalProps> = ({ isOpen, onClose }
         const { data, error } = await supabase
           .from('clients')
           .select('*')
-          .eq('user_id', user.id);
+          .eq('userid', user.id);
 
         if (error) throw error;
 
@@ -179,7 +179,7 @@ const ImportExportModal: React.FC<ImportExportModalProps> = ({ isOpen, onClose }
           c.cnpj || '',
           c.city,
           c.state,
-          c.zip_code,
+          c.zipcode,
           c.neighborhood,
           c.street
         ]);
@@ -193,7 +193,7 @@ const ImportExportModal: React.FC<ImportExportModalProps> = ({ isOpen, onClose }
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
-        link.download = `clientes_${new Date().toISOString().split('T')[0]}.csv`;
+        link.download = `clientes${new Date().toISOString().split('T')[0]}.csv`;
         link.click();
 
         setStatus(`✅ ${data.length} clientes exportados com sucesso!`);
@@ -215,7 +215,7 @@ const ImportExportModal: React.FC<ImportExportModalProps> = ({ isOpen, onClose }
         // Converter para CSV
         const headers = [
           'nome', 'codigo', 'categoria', 'tipo', 'unidade',
-          'custo', 'preco_venda', 'estoque_atual', 'estoque_minimo'
+          'custo', 'precovenda', 'estoqueatual', 'estoqueminimo'
         ];
         const rows = data.map(p => [
           p.name,
@@ -223,10 +223,10 @@ const ImportExportModal: React.FC<ImportExportModalProps> = ({ isOpen, onClose }
           p.category,
           p.type,
           p.unit,
-          p.cost_price,
-          p.sale_price || '',
-          p.current_stock,
-          p.min_stock
+          p.costprice,
+          p.saleprice || '',
+          p.currentstock,
+          p.minstock
         ]);
 
         const csv = [
@@ -238,7 +238,7 @@ const ImportExportModal: React.FC<ImportExportModalProps> = ({ isOpen, onClose }
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
-        link.download = `produtos_${new Date().toISOString().split('T')[0]}.csv`;
+        link.download = `produtos${new Date().toISOString().split('T')[0]}.csv`;
         link.click();
 
         setStatus(`✅ ${data.length} produtos exportados com sucesso!`);
@@ -259,15 +259,15 @@ const ImportExportModal: React.FC<ImportExportModalProps> = ({ isOpen, onClose }
         ? 'nome,email,telefone,cpf,cnpj,cidade,estado,cep,bairro,rua\n' +
           'João Silva,joao@email.com,(11) 98888-8888,123.456.789-00,,São Paulo,SP,01234-567,Centro,Rua A\n' +
           'Empresa LTDA,empresa@email.com,(11) 3333-3333,,12.345.678/0001-90,São Paulo,SP,04567-890,Jardins,Av B\n'
-        : 'nome,categoria,tipo,unidade,custo,preco_venda,estoque_atual,estoque_minimo\n' +
-          'Produto Exemplo,Geral,produto_pronto,UN,10.00,25.00,100,10\n' +
-          'Material Bruto,Materiais,material_bruto,KG,5.50,0,500,50\n';
+        : 'nome,categoria,tipo,unidade,custo,precovenda,estoqueatual,estoqueminimo\n' +
+          'Produto Exemplo,Geral,produtopronto,UN,10.00,25.00,100,10\n' +
+          'Material Bruto,Materiais,materialbruto,KG,5.50,0,500,50\n';
 
     const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download =
-      importType === 'clientes' ? 'modelo_clientes.csv' : 'modelo_produtos.csv';
+      importType === 'clientes' ? 'modeloclientes.csv' : 'modeloprodutos.csv';
     link.click();
 
     setStatus('✅ Modelo baixado com sucesso!');
