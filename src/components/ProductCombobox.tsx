@@ -34,24 +34,24 @@ const ProductCombobox: React.FC<ProductComboboxProps> = ({
 
   const getTypeColor = (type: string) => {
     const colors = {
-      material_bruto: 'bg-blue-100 text-blue-800',
-      parte_produto: 'bg-yellow-100 text-yellow-800',
-      produto_pronto: 'bg-green-100 text-green-800'
+      materialbruto: 'bg-blue-100 text-blue-800',
+      parteproduto: 'bg-yellow-100 text-yellow-800',
+      produtopronto: 'bg-green-100 text-green-800'
     };
     return colors[type as keyof typeof colors] || 'bg-gray-100 text-gray-800';
   };
 
   const getTypeText = (type: string) => {
     const texts = {
-      material_bruto: 'Material Bruto',
-      parte_produto: 'Parte de Produto',
-      produto_pronto: 'Produto Pronto'
+      materialbruto: 'Material Bruto',
+      parteproduto: 'Parte de Produto',
+      produtopronto: 'Produto Pronto'
     };
     return texts[type as keyof typeof texts] || type;
   };
 
   const isLowStock = (product: Product) => {
-    return product.current_stock <= product.min_stock;
+    return product.currentstock <= product.minstock;
   };
 
   return (
@@ -131,10 +131,10 @@ const ProductCombobox: React.FC<ProductComboboxProps> = ({
                             • {product.unit}
                           </span>
                           <span className={`text-xs font-medium ${lowStock ? 'text-red-600' : 'text-green-600'}`}>
-                            Estoque: {product.current_stock}
+                            Estoque: {product.currentstock}
                           </span>
                           <span className="text-xs text-gray-600">
-                            R$ {product.cost_price.toFixed(2)}
+                            R$ {product.costprice.toFixed(2)}
                           </span>
                         </div>
                         {product.description && (
