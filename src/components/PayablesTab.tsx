@@ -25,7 +25,7 @@ const PayablesTab: React.FC = () => {
 
     // Filtro por fornecedor
     if (selectedSupplier !== 'all') {
-      filtered = filtered.filter(t => t.supplier_id === selectedSupplier);
+      filtered = filtered.filter(t => t.supplierid === selectedSupplier);
     }
 
     // Filtro por status
@@ -35,7 +35,7 @@ const PayablesTab: React.FC = () => {
 
     // Filtro por centro de custo
     if (selectedCostCenter !== 'all') {
-      filtered = filtered.filter(t => t.cost_center_id === selectedCostCenter);
+      filtered = filtered.filter(t => t.costcenterid === selectedCostCenter);
     }
 
     // Filtro por data de vencimento
@@ -44,8 +44,8 @@ const PayablesTab: React.FC = () => {
       today.setHours(0, 0, 0, 0);
 
       filtered = filtered.filter(t => {
-        if (!t.due_date) return false;
-        const dueDate = new Date(t.due_date);
+        if (!t.duedate) return false;
+        const dueDate = new Date(t.duedate);
         dueDate.setHours(0, 0, 0, 0);
 
         switch (dueDateFilter) {
@@ -80,22 +80,22 @@ const PayablesTab: React.FC = () => {
     // Total a pagar (pendente + parcial)
     const totalPayable = expenseTransactions
       .filter(t => t.status === 'pending' || t.status === 'partial')
-      .reduce((sum, t) => sum + (t.amount - (t.paid_amount || 0)), 0);
+      .reduce((sum, t) => sum + (t.amount - (t.paidamount || 0)), 0);
 
     // Pago nos últimos 30 dias
     const paidLast30Days = expenseTransactions
       .filter(t => 
-        t.payment_date && 
-        new Date(t.payment_date) >= thirtyDaysAgo &&
+        t.paymentdate && 
+        new Date(t.paymentdate) >= thirtyDaysAgo &&
         (t.status === 'paid' || t.status === 'partial')
       )
-      .reduce((sum, t) => sum + (t.paid_amount || 0), 0);
+      .reduce((sum, t) => sum + (t.paidamount || 0), 0);
 
     // Total vencido
     const totalOverdue = expenseTransactions
       .filter(t => {
-        if (!t.due_date || t.status !== 'pending') return false;
-        const dueDate = new Date(t.due_date);
+        if (!t.duedate || t.status !== 'pending') return false;
+        const dueDate = new Date(t.duedate);
         dueDate.setHours(0, 0, 0, 0);
         return dueDate < today;
       })
@@ -104,8 +104,8 @@ const PayablesTab: React.FC = () => {
     // Próximos vencimentos (7 dias)
     const upcomingDue = expenseTransactions
       .filter(t => {
-        if (!t.due_date || t.status !== 'pending') return false;
-        const dueDate = new Date(t.due_date);
+        if (!t.duedate || t.status !== 'pending') return false;
+        const dueDate = new Date(t.duedate);
         dueDate.setHours(0, 0, 0, 0);
         return dueDate >= today && dueDate <= next7Days;
       })
@@ -122,9 +122,9 @@ const PayablesTab: React.FC = () => {
   // Top 5 fornecedores
   const topSuppliers = useMemo(() => {
     const supplierTotals = expenseTransactions
-      .filter(t => t.supplier_id)
+      .filter(t => t.supplierid)
       .reduce((acc, t) => {
-        const supplierId = t.supplier_id!;
+        const supplierId = t.supplierid!;
         if (!acc[supplierId]) {
           acc[supplierId] = { total: 0, count: 0 };
         }
@@ -145,9 +145,9 @@ const PayablesTab: React.FC = () => {
   // Top 5 centros de custo
   const topCostCenters = useMemo(() => {
     const costCenterTotals = expenseTransactions
-      .filter(t => t.cost_center_id)
+      .filter(t => t.costcenterid)
       .reduce((acc, t) => {
-        const costCenterId = t.cost_center_id!;
+        const costCenterId = t.costcenterid!;
         if (!acc[costCenterId]) {
           acc[costCenterId] = { total: 0, count: 0 };
         }
