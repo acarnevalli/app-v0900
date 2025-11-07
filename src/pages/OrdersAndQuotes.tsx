@@ -39,7 +39,7 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ project, onCl
     const colors = {
       orcamento: 'bg-blue-100 text-blue-800 border-blue-200',
       aprovado: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      em_producao: 'bg-orange-100 text-orange-800 border-orange-200',
+      emproducao: 'bg-orange-100 text-orange-800 border-orange-200',
       concluido: 'bg-green-100 text-green-800 border-green-200',
       entregue: 'bg-purple-100 text-purple-800 border-purple-200'
     };
@@ -50,7 +50,7 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ project, onCl
     const texts = {
       orcamento: 'Orçamento',
       aprovado: 'Aprovado',
-      em_producao: 'Em Produção',
+      emproducao: 'Em Produção',
       concluido: 'Concluído',
       entregue: 'Entregue'
     };
@@ -62,13 +62,13 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ project, onCl
   };
 
   const safeCompanyData = companyData || {
-    company_name: 'Empresa não configurada',
+    companyname: 'Empresa não configurada',
     cnpj: '',
     address: '',
     city: '',
     phone: '',
     email: '',
-    logo_url: ''
+    logourl: ''
   };
 
   return (
@@ -77,7 +77,7 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ project, onCl
         <div className="sticky top-0 bg-gradient-to-r from-amber-600 to-amber-700 px-8 py-6 flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold text-white">
-              {project.type === 'orcamento' ? 'Orçamento' : 'Venda'} #{project.order_number}
+              {project.type === 'orcamento' ? 'Orçamento' : 'Venda'} #{project.ordernumber}
             </h2>
             <p className="text-amber-100 text-sm mt-1">Detalhes completos do pedido</p>
           </div>
@@ -95,7 +95,7 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ project, onCl
               <User size={18} />
               Cliente
             </h3>
-            <p className="text-gray-900 font-medium">{project.client_name || 'Não identificado'}</p>
+            <p className="text-gray-900 font-medium">{project.clientname || 'Não identificado'}</p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -114,11 +114,11 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ project, onCl
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-orange-50 p-4 rounded-lg border border-orange-100">
               <span className="text-sm text-gray-600 block mb-1">Data de Início:</span>
-              <p className="font-medium text-orange-900">{formatDate(project.start_date)}</p>
+              <p className="font-medium text-orange-900">{formatDate(project.startdate)}</p>
             </div>
             <div className="bg-purple-50 p-4 rounded-lg border border-purple-100">
               <span className="text-sm text-gray-600 block mb-1">Data de Entrega:</span>
-              <p className="font-medium text-purple-900">{formatDate(project.end_date)}</p>
+              <p className="font-medium text-purple-900">{formatDate(project.enddate)}</p>
             </div>
           </div>
 
@@ -127,7 +127,7 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ project, onCl
               <Clock className="h-5 w-5" />
               Prazo de Entrega
             </h3>
-            <p className="text-lg font-bold text-amber-900">{project.delivery_deadline_days} dias</p>
+            <p className="text-lg font-bold text-amber-900">{project.deliverydeadlinedays} dias</p>
           </div>
 
           {project.description && (
@@ -147,12 +147,12 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ project, onCl
                 {project.products.map((item, idx) => (
                   <div key={idx} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg hover:bg-gray-100 transition-colors">
                     <div className="flex-1">
-                      <p className="font-medium text-gray-900">{item.product_name}</p>
+                      <p className="font-medium text-gray-900">{item.productname}</p>
                       <p className="text-sm text-gray-600">
-                        {item.item_type === 'produto' ? '📦 Produto' : '🔧 Serviço'} - Quantidade: {item.quantity}
+                        {item.itemtype === 'produto' ? '📦 Produto' : '🔧 Serviço'} - Quantidade: {item.quantity}
                       </p>
                     </div>
-                    <p className="font-bold text-lg text-amber-600">{formatCurrency(item.unit_price || 0)}</p>
+                    <p className="font-bold text-lg text-amber-600">{formatCurrency(item.unitprice || 0)}</p>
                   </div>
                 ))}
               </div>
@@ -166,24 +166,24 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ project, onCl
             </div>
           </div>
 
-          {project.payment_terms?.discount_percentage && project.payment_terms.discount_percentage > 0 && (
+          {project.paymentterms?.discountpercentage && project.paymentterms.discountpercentage > 0 && (
             <>
               <div className="flex justify-between text-green-700 bg-green-50 p-4 rounded-lg">
-                <span>Desconto ({project.payment_terms.discount_percentage}%):</span>
+                <span>Desconto ({project.paymentterms.discountpercentage}%):</span>
                 <span className="font-bold">
-                  -{formatCurrency((project.budget * project.payment_terms.discount_percentage) / 100)}
+                  -{formatCurrency((project.budget * project.paymentterms.discountpercentage) / 100)}
                 </span>
               </div>
               <div className="border-t border-green-200 pt-2 flex justify-between bg-green-50 p-4 rounded-lg">
                 <span className="font-bold">Total com Desconto:</span>
                 <span className="font-bold text-green-700">
-                  {formatCurrency(project.payment_terms.total_with_discount || 0)}
+                  {formatCurrency(project.paymentterms.totalwithdiscount || 0)}
                 </span>
               </div>
             </>
           )}
 
-          {project.payment_terms && (
+          {project.paymentterms && (
             <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
               <h3 className="font-semibold text-gray-700 mb-3 flex items-center gap-2">
                 <DollarSign size={18} />
@@ -192,19 +192,19 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ project, onCl
               <div className="space-y-2 text-sm">
                 <p className="flex justify-between">
                   <span className="text-gray-600">Parcelas:</span>
-                  <span className="font-medium">{project.payment_terms.installments}x</span>
+                  <span className="font-medium">{project.paymentterms.installments}x</span>
                 </p>
                 <p className="flex justify-between">
                   <span className="text-gray-600">Valor por Parcela:</span>
                   <span className="font-medium">
-                    {formatCurrency(project.payment_terms.installment_value || 0)}
+                    {formatCurrency(project.paymentterms.installmentvalue || 0)}
                   </span>
                 </p>
-                {project.payment_terms.payment_method && (
+                {project.paymentterms.paymentmethod && (
                   <p className="flex justify-between">
                     <span className="text-gray-600">Método:</span>
                     <span className="font-medium capitalize">
-                      {project.payment_terms.payment_method.replace(/_/g, ' ')}
+                      {project.paymentterms.paymentmethod.replace(/_/g, ' ')}
                     </span>
                   </p>
                 )}
@@ -230,7 +230,7 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ project, onCl
         <div className="sticky bottom-0 bg-gray-100 px-8 py-4 flex justify-between items-center border-t">
           <PDFDownloadLink
             document={<OrderPDFDocument companyData={safeCompanyData} orderData={project} />}
-            fileName={`${project.type}-${project.order_number}-${Date.now()}.pdf`}
+            fileName={`${project.type}-${project.ordernumber}-${Date.now()}.pdf`}
             className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
           >
             {({ loading }) =>
@@ -286,7 +286,7 @@ const OrdersAndQuotes: React.FC = () => {
     const colors = {
       orcamento: 'bg-blue-100 text-blue-800 border-blue-200',
       aprovado: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      em_producao: 'bg-orange-100 text-orange-800 border-orange-200',
+      emproducao: 'bg-orange-100 text-orange-800 border-orange-200',
       concluido: 'bg-green-100 text-green-800 border-green-200',
       entregue: 'bg-purple-100 text-purple-800 border-purple-200'
     };
@@ -297,7 +297,7 @@ const OrdersAndQuotes: React.FC = () => {
     const texts = {
       orcamento: 'Orçamento',
       aprovado: 'Aprovado',
-      em_producao: 'Em Produção',
+      emproducao: 'Em Produção',
       concluido: 'Concluído',
       entregue: 'Entregue'
     };
@@ -432,7 +432,7 @@ const OrdersAndQuotes: React.FC = () => {
 
     if (dateRange) {
       filteredByDate = projects.filter(p => {
-        const projectDate = new Date(p.start_date);
+        const projectDate = new Date(p.startdate);
         return projectDate >= dateRange.startDate && projectDate <= dateRange.endDate;
       });
     }
@@ -442,7 +442,7 @@ const OrdersAndQuotes: React.FC = () => {
 
     const vendasAprovadas = filteredByDate.filter(p =>
       p.type === 'venda' &&
-      (p.status === 'aprovado' || p.status === 'em_producao')
+      (p.status === 'aprovado' || p.status === 'emproducao')
     ).length;
 
     const valorTotalVendas = filteredByDate
@@ -463,7 +463,7 @@ const OrdersAndQuotes: React.FC = () => {
     const dateRange = getDateRange();
     if (dateRange) {
       filtered = filtered.filter(p => {
-        const projectDate = new Date(p.start_date);
+        const projectDate = new Date(p.startdate);
         return projectDate >= dateRange.startDate && projectDate <= dateRange.endDate;
       });
     }
@@ -471,10 +471,10 @@ const OrdersAndQuotes: React.FC = () => {
     if (searchTerm.trim()) {
       const search = searchTerm.toLowerCase();
       filtered = filtered.filter(p =>
-        p.order_number?.toLowerCase().includes(search) ||
+        p.ordernumber?.toLowerCase().includes(search) ||
         p.description?.toLowerCase().includes(search) ||
-        p.client_name?.toLowerCase().includes(search) ||
-        p.products?.some(prod => prod.product_name.toLowerCase().includes(search))
+        p.clientname?.toLowerCase().includes(search) ||
+        p.products?.some(prod => prod.productname.toLowerCase().includes(search))
       );
     }
 
@@ -499,20 +499,20 @@ const OrdersAndQuotes: React.FC = () => {
       if (projectData.type === 'venda' && !editingProject) {
         const saleItems = projectData.products?.map((item: any) => ({
           productid: item.productid,
-          productname: item.product_name || item.productname,
+          productname: item.productname || item.productname,
           quantity: item.quantity,
-          unitprice: item.unit_price,
-          total: (item.unit_price || 0) * item.quantity
+          unitprice: item.unitprice,
+          total: (item.unitprice || 0) * item.quantity
         })) || [];
 
         await addSale({
-          date: projectData.start_date,
+          date: projectData.startdate,
           clientid: projectData.clientid,
-          clientname: projectData.client_name || '',
+          clientname: projectData.clientname || '',
           items: saleItems,
           total: projectData.budget || 0,
           status: 'completed',
-          paymentmethod: projectData.payment_terms?.payment_method || '',
+          paymentmethod: projectData.paymentterms?.paymentmethod || '',
           notes: projectData.notes || ''
         });
       } else if (editingProject) {
@@ -721,7 +721,7 @@ const OrdersAndQuotes: React.FC = () => {
             <option value="all">Todos os Status</option>
             <option value="orcamento">Orçamento</option>
             <option value="aprovado">Aprovado</option>
-            <option value="em_producao">Em Produção</option>
+            <option value="emproducao">Em Produção</option>
             <option value="concluido">Concluído</option>
             <option value="entregue">Entregue</option>
           </select>
@@ -779,17 +779,17 @@ const OrdersAndQuotes: React.FC = () => {
                     className="hover:bg-amber-50 transition-colors cursor-pointer"
                   >
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatDate(project.start_date)}
+                      {formatDate(project.startdate)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="px-3 py-1 inline-flex items-center space-x-1 rounded-full text-sm font-bold text-amber-700 bg-amber-50 border border-amber-200">
-                        {project.order_number}
+                        {project.ordernumber}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
                       <div className="flex items-center space-x-2">
                         <User className="h-4 w-4 text-gray-400" />
-                        <span>{project.client_name || 'Cliente não identificado'}</span>
+                        <span>{project.clientname || 'Cliente não identificado'}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
