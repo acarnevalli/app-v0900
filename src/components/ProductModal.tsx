@@ -11,12 +11,12 @@ interface ProductModalProps {
     name: string;
     description: string;
     category: string;
-    type: 'material_bruto' | 'parte_produto' | 'produto_pronto';
+    type: 'materialbruto' | 'parteproduto' | 'produtopronto';
     unit: string;
-    cost_price: number;
-    sale_price: number;
-    current_stock: number;
-    min_stock: number;
+    costprice: number;
+    saleprice: number;
+    currentstock: number;
+    minstock: number;
     supplier?: string;
   } | null;
   onSuccess?: (product: any) => void;
@@ -29,13 +29,13 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, o
     name: '',
     description: '',
     category: '',
-    type: 'material_bruto' as const,
+    type: 'materialbruto' as const,
     unit: 'un',
-    cost_price: '',
-    profit_margin: '30',
-    sale_price: '',
-    min_stock: '0',
-    current_stock: '0',
+    costprice: '',
+    profitmargin: '30',
+    saleprice: '',
+    minstock: '0',
+    currentstock: '0',
     supplier: '',
   });
 
@@ -78,21 +78,21 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, o
   // Preenche dados se for edição
   useEffect(() => {
     if (product) {
-      const margin = product.sale_price && product.sale_price > 0
-        ? (((product.sale_price - product.cost_price) / product.sale_price) * 100).toFixed(2)
+      const margin = product.saleprice && product.saleprice > 0
+        ? (((product.saleprice - product.costprice) / product.saleprice) * 100).toFixed(2)
         : '30';
 
       setFormData({
         name: product.name || '',
         description: product.description || '',
         category: product.category || '',
-        type: product.type || 'material_bruto',
+        type: product.type || 'materialbruto',
         unit: product.unit || 'un',
-        cost_price: product.cost_price?.toString() || '',
-        profit_margin: margin,
-        sale_price: product.sale_price?.toFixed(2) || '',
-        min_stock: product.min_stock?.toString() || '0',
-        current_stock: product.current_stock?.toString() || '0',
+        costprice: product.costprice?.toString() || '',
+        profitmargin: margin,
+        saleprice: product.saleprice?.toFixed(2) || '',
+        minstock: product.minstock?.toString() || '0',
+        currentstock: product.currentstock?.toString() || '0',
         supplier: product.supplier || '',
       });
       setSupplierSearchQuery(product.supplier || '');
@@ -107,13 +107,13 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, o
       name: '',
       description: '',
       category: '',
-      type: 'material_bruto',
+      type: 'materialbruto',
       unit: 'un',
-      cost_price: '',
-      profit_margin: '30',
-      sale_price: '',
-      min_stock: '0',
-      current_stock: '0',
+      costprice: '',
+      profitmargin: '30',
+      saleprice: '',
+      minstock: '0',
+      currentstock: '0',
       supplier: '',
     });
     setSupplierSearchQuery('');
@@ -128,21 +128,21 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, o
 
   // Atualiza preço de venda ao mudar custo ou margem
   useEffect(() => {
-    const cost = parseFloat(formData.cost_price) || 0;
-    const margin = parseFloat(formData.profit_margin) || 0;
+    const cost = parseFloat(formData.costprice) || 0;
+    const margin = parseFloat(formData.profitmargin) || 0;
     const salePrice = calculateSalePrice(cost, margin);
     setFormData(prev => ({
       ...prev,
-      sale_price: isNaN(salePrice) ? '' : salePrice.toFixed(2)
+      saleprice: isNaN(salePrice) ? '' : salePrice.toFixed(2)
     }));
-  }, [formData.cost_price, formData.profit_margin]);
+  }, [formData.costprice, formData.profitmargin]);
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
     if (!formData.name.trim()) newErrors.name = 'Nome é obrigatório';
     if (!formData.category) newErrors.category = 'Categoria é obrigatória';
-    if (!formData.cost_price || isNaN(parseFloat(formData.cost_price)))
-      newErrors.cost_price = 'Preço de custo inválido';
+    if (!formData.costprice || isNaN(parseFloat(formData.costprice)))
+      newErrors.costprice = 'Preço de custo inválido';
     if (!formData.unit.trim()) newErrors.unit = 'Unidade é obrigatória';
 
     setErrors(newErrors);
@@ -154,7 +154,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, o
     setFormData(prev => ({ ...prev, [name]: value }));
     if (errors[name]) {
       setErrors(prev => {
-        const { [name]: _, ...rest } = prev;
+        const { [name]: , ...rest } = prev;
         return rest;
       });
     }
@@ -171,10 +171,10 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, o
         category: formData.category,
         type: formData.type,
         unit: formData.unit.trim(),
-        cost_price: parseFloat(formData.cost_price),
-        sale_price: parseFloat(formData.sale_price),
-        min_stock: parseInt(formData.min_stock, 10) || 0,
-        current_stock: parseInt(formData.current_stock, 10) || 0,
+        costprice: parseFloat(formData.costprice),
+        saleprice: parseFloat(formData.saleprice),
+        minstock: parseInt(formData.minstock, 10) || 0,
+        currentstock: parseInt(formData.currentstock, 10) || 0,
         supplier: formData.supplier.trim() || null,
       };
 
@@ -365,9 +365,9 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, o
               onChange={handleChange}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
             >
-              <option value="material_bruto">Matéria-prima</option>
-              <option value="parte_produto">Componente</option>
-              <option value="produto_pronto">Produto Final</option>
+              <option value="materialbruto">Matéria-prima</option>
+              <option value="parteproduto">Componente</option>
+              <option value="produtopronto">Produto Final</option>
             </select>
           </div>
 
@@ -379,15 +379,15 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, o
                 type="number"
                 step="0.01"
                 min="0"
-                name="cost_price"
-                value={formData.cost_price}
+                name="costprice"
+                value={formData.costprice}
                 onChange={handleChange}
                 className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 ${
-                  errors.cost_price ? 'border-red-300' : 'border-gray-300'
+                  errors.costprice ? 'border-red-300' : 'border-gray-300'
                 }`}
                 placeholder="0.00"
               />
-              {errors.cost_price && <p className="mt-1 text-sm text-red-600">{errors.cost_price}</p>}
+              {errors.costprice && <p className="mt-1 text-sm text-red-600">{errors.costprice}</p>}
             </div>
 
             <div>
@@ -397,8 +397,8 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, o
                 step="0.01"
                 min="0"
                 max="99"
-                name="profit_margin"
-                value={formData.profit_margin}
+                name="profitmargin"
+                value={formData.profitmargin}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
                 placeholder="30"
@@ -409,7 +409,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, o
               <label className="block text-sm font-medium text-gray-700 mb-1">Venda (R$)</label>
               <input
                 type="text"
-                value={`R$ ${parseFloat(formData.sale_price || '0').toFixed(2)}`}
+                value={`R$ ${parseFloat(formData.saleprice || '0').toFixed(2)}`}
                 readOnly
                 className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-700 cursor-not-allowed"
               />
@@ -423,8 +423,8 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, o
               <input
                 type="number"
                 min="0"
-                name="current_stock"
-                value={formData.current_stock}
+                name="currentstock"
+                value={formData.currentstock}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
               />
@@ -434,8 +434,8 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, o
               <input
                 type="number"
                 min="0"
-                name="min_stock"
-                value={formData.min_stock}
+                name="minstock"
+                value={formData.minstock}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
               />
@@ -560,3 +560,4 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, o
 };
 
 export default ProductModal;
+
