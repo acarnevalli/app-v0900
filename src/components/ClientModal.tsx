@@ -14,11 +14,11 @@ interface ClientModalProps {
 // Formatação de telefone com parênteses e traços
 const formatPhone = (value: string): string => {
   const clean = value.replace(/\D/g, '');
-  
+
   if (clean.length === 0) return '';
   if (clean.length <= 2) return `(${clean}`;
   if (clean.length <= 6) return `(${clean.slice(0, 2)}) ${clean.slice(2)}`;
-  if (clean.length <= 10) return `(${clean.slice(0, 2)}) ${clean.slice(2, 6)}-${clean.slice(6)}`;
+  if (clean.length <= 10) return `(${clean.slice(0, 2)}) ${clean.slice(2, clean.length - 4)}-${clean.slice(clean.length - 4)}`;
   return `(${clean.slice(0, 2)}) ${clean.slice(2, 7)}-${clean.slice(7, 11)}`;
 };
 
@@ -158,8 +158,8 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) =>
     }
 
     // Telefones obrigatórios
-    if (!formData.phone.trim()) newErrors.phone = 'Telefone é obrigatório';
-    if (!formData.mobile.trim()) newErrors.mobile = 'Celular é obrigatório';
+    //if (!formData.phone.trim()) newErrors.phone = 'Telefone é obrigatório';
+    //if (!formData.mobile.trim()) newErrors.mobile = 'Celular é obrigatório';
 
     // Validações específicas por tipo
     if (formData.type === 'pf') {
