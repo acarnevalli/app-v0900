@@ -317,9 +317,9 @@ export function CompanySettings() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
               >
                 <option value="">Selecione...</option>
-                <option value="simples_nacional">Simples Nacional</option>
-                <option value="lucro_presumido">Lucro Presumido</option>
-                <option value="lucro_real">Lucro Real</option>
+                <option value="simplesnacional">Simples Nacional</option>
+                <option value="lucropresumido">Lucro Presumido</option>
+                <option value="lucroreal">Lucro Real</option>
               </select>
             </div>
             <div>
