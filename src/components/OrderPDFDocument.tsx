@@ -181,16 +181,16 @@ export function OrderPDFDocument({ companyData, orderData }: OrderPDFDocumentPro
           <View style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between' }}>
             <View>
               <Text style={styles.text}>
-                <Text style={{ fontWeight: 'bold' }}>Nº:</Text> {orderData?.order_number || '-'}
+                <Text style={{ fontWeight: 'bold' }}>Nº:</Text> {orderData?.ordernumber || '-'}
               </Text>
               <Text style={styles.text}>
                 <Text style={{ fontWeight: 'bold' }}>Data:</Text>{' '}
-                {new Date(orderData?.start_date).toLocaleDateString('pt-BR')}
+                {new Date(orderData?.startdate).toLocaleDateString('pt-BR')}
               </Text>
             </View>
             <View>
               <Text style={styles.text}>
-                <Text style={{ fontWeight: 'bold' }}>Cliente:</Text> {orderData?.client_name || '-'}
+                <Text style={{ fontWeight: 'bold' }}>Cliente:</Text> {orderData?.clientname || '-'}
               </Text>
             </View>
           </View>
@@ -225,16 +225,16 @@ export function OrderPDFDocument({ companyData, orderData }: OrderPDFDocumentPro
               {orderData.products.map((product: any, idx: number) => (
                 <View key={idx} style={styles.tableRow}>
                   <View style={[styles.tableCell, { width: '50%' }]}>
-                    <Text>{product.product_name}</Text>
+                    <Text>{product.productname}</Text>
                   </View>
                   <View style={[styles.tableCell, { width: '15%' }]}>
                     <Text>{product.quantity}</Text>
                   </View>
                   <View style={[styles.tableCell, { width: '17.5%' }]}>
-                    <Text>R$ {(product.unit_price || 0).toFixed(2)}</Text>
+                    <Text>R$ {(product.unitprice || 0).toFixed(2)}</Text>
                   </View>
                   <View style={[styles.tableCell, { width: '17.5%' }]}>
-                    <Text>R$ {((product.quantity || 0) * (product.unit_price || 0)).toFixed(2)}</Text>
+                    <Text>R$ {((product.quantity || 0) * (product.unitprice || 0)).toFixed(2)}</Text>
                   </View>
                 </View>
               ))}
@@ -255,14 +255,14 @@ export function OrderPDFDocument({ companyData, orderData }: OrderPDFDocumentPro
               </Text>
             </View>
 
-            {orderData?.payment_terms?.discount_percentage && orderData.payment_terms.discount_percentage > 0 && (
+            {orderData?.paymentterms?.discountpercentage && orderData.paymentterms.discountpercentage > 0 && (
               <>
                 <View style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
                   <Text style={styles.text}>
-                    <Text style={{ fontWeight: 'bold' }}>Desconto ({orderData.payment_terms.discount_percentage}%):</Text>
+                    <Text style={{ fontWeight: 'bold' }}>Desconto ({orderData.paymentterms.discountpercentage}%):</Text>
                   </Text>
                   <Text style={styles.text}>
-                    -R$ {(((orderData.budget || 0) * orderData.payment_terms.discount_percentage) / 100).toFixed(2)}
+                    -R$ {(((orderData.budget || 0) * orderData.paymentterms.discountpercentage) / 100).toFixed(2)}
                   </Text>
                 </View>
 
@@ -278,7 +278,7 @@ export function OrderPDFDocument({ companyData, orderData }: OrderPDFDocumentPro
                 >
                   <Text style={{ ...styles.text, fontWeight: 'bold' }}>Total com Desconto:</Text>
                   <Text style={{ ...styles.text, fontWeight: 'bold', color: '#22C55E' }}>
-                    R$ {(orderData.payment_terms.total_with_discount || 0).toFixed(2)}
+                    R$ {(orderData.paymentterms.totalwithdiscount || 0).toFixed(2)}
                   </Text>
                 </View>
               </>
@@ -287,19 +287,19 @@ export function OrderPDFDocument({ companyData, orderData }: OrderPDFDocumentPro
         </View>
 
         {/* Condições de Pagamento */}
-        {orderData?.payment_terms && (
+        {orderData?.paymentterms && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Condições de Pagamento</Text>
             <Text style={styles.text}>
-              <Text style={{ fontWeight: 'bold' }}>Parcelas:</Text> {orderData.payment_terms.installments}x
+              <Text style={{ fontWeight: 'bold' }}>Parcelas:</Text> {orderData.paymentterms.installments}x
             </Text>
             <Text style={styles.text}>
               <Text style={{ fontWeight: 'bold' }}>Valor por Parcela:</Text> R${' '}
-              {(orderData.payment_terms.installment_value || 0).toFixed(2)}
+              {(orderData.paymentterms.installmentvalue || 0).toFixed(2)}
             </Text>
-            {orderData.payment_terms.payment_method && (
+            {orderData.paymentterms.paymentmethod && (
               <Text style={styles.text}>
-                <Text style={{ fontWeight: 'bold' }}>Método:</Text> {orderData.payment_terms.payment_method}
+                <Text style={{ fontWeight: 'bold' }}>Método:</Text> {orderData.paymentterms.paymentmethod}
               </Text>
             )}
           </View>
