@@ -91,9 +91,9 @@ const CompanySettingsModal: React.FC<CompanySettingsModalProps> = ({ isOpen, onC
   ];
 
   const taxRegimeOptions = [
-    { value: 'simples_nacional', label: 'Simples Nacional' },
-    { value: 'lucro_presumido', label: 'Lucro Presumido' },
-    { value: 'lucro_real', label: 'Lucro Real' },
+    { value: 'simplesnacional', label: 'Simples Nacional' },
+    { value: 'lucropresumido', label: 'Lucro Presumido' },
+    { value: 'lucroreal', label: 'Lucro Real' },
     { value: 'mei', label: 'MEI - Microempreendedor Individual' }
   ];
 
