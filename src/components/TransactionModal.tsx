@@ -55,7 +55,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
     }
 
     // 🆕 VALIDAÇÃO 3: Conta Bancária obrigatória
-    if (!formState.account_id) {
+    if (!formState.accountid) {
       alert('❌ Selecione uma conta bancária para a transação');
       return;
     }
@@ -73,13 +73,13 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
     }
 
     // Validação 6: Se status for 'paid', deve ter data de pagamento
-    if (formState.status === 'paid' && !formState.payment_date) {
+    if (formState.status === 'paid' && !formState.paymentdate) {
       alert('❌ Informe a data do pagamento');
       return;
     }
 
     // Validação 7: Data de vencimento não pode ser anterior à data da transação
-    if (formState.due_date && formState.date && formState.due_date < formState.date) {
+    if (formState.duedate && formState.date && formState.duedate < formState.date) {
       const confirm = window.confirm('⚠️ A data de vencimento é anterior à data da transação. Deseja continuar?');
       if (!confirm) return;
     }
@@ -188,8 +188,8 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
               </div>
             ) : (
               <select
-                name="account_id"
-                value={formState.account_id || ''}
+                name="accountid"
+                value={formState.accountid || ''}
                 onChange={handleInputChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
                 required
@@ -198,9 +198,9 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                 {activeAccounts.map(acc => (
                   <option key={acc.id} value={acc.id}>
                     {acc.name}
-                    {acc.bank_name && ` (${acc.bank_name})`}
+                    {acc.bankname && ` (${acc.bankname})`}
                     {' - Saldo: '}
-                    {formatCurrency(acc.current_balance)}
+                    {formatCurrency(acc.currentbalance)}
                   </option>
                 ))}
               </select>
@@ -255,8 +255,8 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                 </label>
                 <input
                   type="date"
-                  name="payment_date"
-                  value={formState.payment_date || ''}
+                  name="paymentdate"
+                  value={formState.paymentdate || ''}
                   onChange={handleInputChange}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
                   required
@@ -290,8 +290,8 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
               </label>
               <input
                 type="date"
-                name="due_date"
-                value={formState.due_date}
+                name="duedate"
+                value={formState.duedate}
                 onChange={handleInputChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               />
@@ -304,16 +304,16 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
               💳 Método de Pagamento
             </label>
             <select
-              name="payment_method"
-              value={formState.payment_method || ''}
+              name="paymentmethod"
+              value={formState.paymentmethod || ''}
               onChange={handleInputChange}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
             >
               <option value="">Selecione...</option>
               <option value="dinheiro">💵 Dinheiro</option>
               <option value="pix">📱 PIX</option>
-              <option value="cartao_credito">💳 Cartão de Crédito</option>
-              <option value="cartao_debito">💳 Cartão de Débito</option>
+              <option value="cartaocredito">💳 Cartão de Crédito</option>
+              <option value="cartaodebito">💳 Cartão de Débito</option>
               <option value="boleto">📄 Boleto</option>
               <option value="transferencia">🏦 Transferência</option>
               <option value="cheque">📝 Cheque</option>
@@ -327,8 +327,8 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                 {formState.type === 'income' ? '👤 Cliente' : '🏢 Fornecedor'}
               </label>
               <select
-                name={formState.type === 'income' ? 'client_id' : 'supplier_id'}
-                value={formState.type === 'income' ? (formState.client_id || '') : (formState.supplier_id || '')}
+                name={formState.type === 'income' ? 'clientid' : 'supplierid'}
+                value={formState.type === 'income' ? (formState.clientid || '') : (formState.supplierid || '')}
                 onChange={handleInputChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
               >
@@ -346,8 +346,8 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                 🎯 Centro de Custo
               </label>
               <select
-                name="cost_center_id"
-                value={formState.cost_center_id || ''}
+                name="costcenterid"
+                value={formState.costcenterid || ''}
                 onChange={handleInputChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
               >
