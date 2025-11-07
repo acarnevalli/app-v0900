@@ -24,32 +24,32 @@ import SupplierModal from '../components/SupplierModal';
 // ====== INTERFACES ======
 
 interface PaymentInfo {
-  payment_method: 'dinheiro' | 'pix' | 'cartao_credito' | 'cartao_debito' | 'boleto' | 'transferencia' | 'cheque';
+  paymentmethod: 'dinheiro' | 'pix' | 'cartaocredito' | 'cartaodebito' | 'boleto' | 'transferencia' | 'cheque';
   installments: number;
-  installment_value: number;
-  first_due_date: string;
-  has_shipping: boolean;
-  shipping_cost: number;
-  shipping_type?: string;
+  installmentvalue: number;
+  firstduedate: string;
+  hasshipping: boolean;
+  shippingcost: number;
+  shippingtype?: string;
   paid: boolean;
-  paid_date?: string;
+  paiddate?: string;
 }
 
 interface FormData {
-  supplier_id: string;
+  supplierid: string;
   date: string;
-  invoice_number: string;
+  invoicenumber: string;
   status: 'pending' | 'received' | 'cancelled';
   notes: string;
-  payment_info: PaymentInfo;
+  paymentinfo: PaymentInfo;
 }
 
 interface PurchaseItem {
   id: string;
-  product_id: string;
-  product_name: string;
+  productid: string;
+  productname: string;
   quantity: number;
-  unit_cost: number;
+  unitcost: number;
   total: number;
 }
 
@@ -87,19 +87,19 @@ const Purchases: React.FC = () => {
   
   // Estado do formulário
   const [formData, setFormData] = useState<FormData>({
-    supplier_id: '',
+    supplierid: '',
     date: getCurrentDate(),
-    invoice_number: '',
+    invoicenumber: '',
     status: 'pending',
     notes: '',
-    payment_info: {
-      payment_method: 'boleto',
+    paymentinfo: {
+      paymentmethod: 'boleto',
       installments: 1,
-      installment_value: 0,
-      first_due_date: getCurrentDate(),
-      has_shipping: false,
-      shipping_cost: 0,
-      shipping_type: '',
+      installmentvalue: 0,
+      firstduedate: getCurrentDate(),
+      hasshipping: false,
+      shippingcost: 0,
+      shippingtype: '',
       paid: false
     }
   });
@@ -136,13 +136,13 @@ const Purchases: React.FC = () => {
 
     const monthlyTotal = monthlyPurchases.reduce((sum, p) => {
       const purchaseTotal = p.total || 0;
-      const shipping = p.payment_info?.shipping_cost || 0;
+      const shipping = p.paymentinfo?.shippingcost || 0;
       return sum + purchaseTotal + shipping;
     }, 0);
 
     const pendingPurchases = purchases.filter(p => p.status === 'pending').length;
     const activeSuppliers = suppliers.filter(s => s.active).length;
-    const lowStockItems = products.filter(p => p.current_stock <= p.min_stock).length;
+    const lowStockItems = products.filter(p => p.currentstock <= p.minstock).length;
 
     return {
       monthlyTotal,
@@ -158,9 +158,9 @@ const Purchases: React.FC = () => {
     
     const search = searchTerm.toLowerCase();
     return purchases.filter(p => 
-      p.supplier_name?.toLowerCase().includes(search) ||
-      p.invoice_number?.toLowerCase().includes(search) ||
-      p.items?.some(item => item.product_name?.toLowerCase().includes(search))
+      p.suppliername?.toLowerCase().includes(search) ||
+      p.invoicenumber?.toLowerCase().includes(search) ||
+      p.items?.some(item => item.productname?.toLowerCase().includes(search))
     );
   }, [purchases, searchTerm]);
 
@@ -183,31 +183,31 @@ const Purchases: React.FC = () => {
 
   // ✅ Calcular total (com frete)
   const purchaseTotal = useMemo(() => {
-    const shipping = formData.payment_info.has_shipping ? formData.payment_info.shipping_cost : 0;
+    const shipping = formData.paymentinfo.hasshipping ? formData.paymentinfo.shippingcost : 0;
     return purchaseSubtotal + shipping;
-  }, [purchaseSubtotal, formData.payment_info.has_shipping, formData.payment_info.shipping_cost]);
+  }, [purchaseSubtotal, formData.paymentinfo.hasshipping, formData.paymentinfo.shippingcost]);
 
   // ✅ Atualizar valor das parcelas quando total muda
   useEffect(() => {
-    if (formData.payment_info.installments > 0) {
-      const installmentValue = purchaseTotal / formData.payment_info.installments;
+    if (formData.paymentinfo.installments > 0) {
+      const installmentValue = purchaseTotal / formData.paymentinfo.installments;
       setFormData(prev => ({
         ...prev,
-        payment_info: {
-          ...prev.payment_info,
-          installment_value: installmentValue
+        paymentinfo: {
+          ...prev.paymentinfo,
+          installmentvalue: installmentValue
         }
       }));
     }
-  }, [purchaseTotal, formData.payment_info.installments]);
+  }, [purchaseTotal, formData.paymentinfo.installments]);
 
   // ====== VALIDAÇÃO ======
   
   const validateForm = useCallback((): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.supplier_id) {
-      newErrors.supplier_id = 'Selecione um fornecedor';
+    if (!formData.supplierid) {
+      newErrors.supplierid = 'Selecione um fornecedor';
     }
     
     if (!formData.date) {
@@ -218,29 +218,29 @@ const Purchases: React.FC = () => {
       newErrors.items = 'Adicione pelo menos um produto';
     }
     
-    if (!formData.invoice_number || formData.invoice_number.trim() === '') {
-      newErrors.invoice_number = 'Número da NF é obrigatório';
+    if (!formData.invoicenumber || formData.invoicenumber.trim() === '') {
+      newErrors.invoicenumber = 'Número da NF é obrigatório';
     }
 
     // Validação de itens com valores inválidos
     const hasInvalidItems = purchaseItems.some(
-      item => item.quantity <= 0 || item.unit_cost < 0
+      item => item.quantity <= 0 || item.unitcost < 0
     );
     if (hasInvalidItems) {
       newErrors.items = 'Verifique as quantidades e custos dos produtos';
     }
 
     // ✅ Validação de pagamento
-    if (formData.payment_info.installments < 1) {
+    if (formData.paymentinfo.installments < 1) {
       newErrors.installments = 'Número de parcelas deve ser maior que zero';
     }
 
-    if (!formData.payment_info.first_due_date) {
-      newErrors.first_due_date = 'Data de vencimento é obrigatória';
+    if (!formData.paymentinfo.firstduedate) {
+      newErrors.firstduedate = 'Data de vencimento é obrigatória';
     }
 
-    if (formData.payment_info.has_shipping && formData.payment_info.shipping_cost < 0) {
-      newErrors.shipping_cost = 'Valor do frete inválido';
+    if (formData.paymentinfo.hasshipping && formData.paymentinfo.shippingcost < 0) {
+      newErrors.shippingcost = 'Valor do frete inválido';
     }
 
     setErrors(newErrors);
@@ -256,26 +256,26 @@ const Purchases: React.FC = () => {
       return;
     }
     
-    const existingItem = purchaseItems.find(item => item.product_id === productId);
+    const existingItem = purchaseItems.find(item => item.productid === productId);
     
     if (existingItem) {
       setPurchaseItems(prev => prev.map(item => 
-        item.product_id === productId 
+        item.productid === productId 
           ? { 
               ...item, 
               quantity: item.quantity + 1, 
-              total: (item.quantity + 1) * item.unit_cost 
+              total: (item.quantity + 1) * item.unitcost 
             }
           : item
       ));
     } else {
-      const unitCost = product.cost_price || 0;
+      const unitCost = product.costprice || 0;
       setPurchaseItems(prev => [...prev, {
         id: generateUniqueId(),
-        product_id: productId,
-        product_name: product.name,
+        productid: productId,
+        productname: product.name,
         quantity: 1,
-        unit_cost: unitCost,
+        unitcost: unitCost,
         total: unitCost
       }]);
     }
@@ -297,7 +297,7 @@ const Purchases: React.FC = () => {
         return {
           ...item,
           quantity: newQuantity,
-          total: newQuantity * item.unit_cost
+          total: newQuantity * item.unitcost
         };
       }
       return item;
@@ -315,7 +315,7 @@ const Purchases: React.FC = () => {
         return {
           ...item,
           quantity: newQuantity,
-          total: newQuantity * item.unit_cost
+          total: newQuantity * item.unitcost
         };
       }
       return item;
@@ -333,7 +333,7 @@ const Purchases: React.FC = () => {
       if (item.id === itemId) {
         return {
           ...item,
-          unit_cost: newCost,
+          unitcost: newCost,
           total: item.quantity * newCost
         };
       }
@@ -349,19 +349,19 @@ const Purchases: React.FC = () => {
   // Limpar formulário
   const resetForm = useCallback(() => {
     setFormData({
-      supplier_id: '',
+      supplierid: '',
       date: getCurrentDate(),
-      invoice_number: '',
+      invoicenumber: '',
       status: 'pending',
       notes: '',
-      payment_info: {
-        payment_method: 'boleto',
+      paymentinfo: {
+        paymentmethod: 'boleto',
         installments: 1,
-        installment_value: 0,
-        first_due_date: getCurrentDate(),
-        has_shipping: false,
-        shipping_cost: 0,
-        shipping_type: '',
+        installmentvalue: 0,
+        firstduedate: getCurrentDate(),
+        hasshipping: false,
+        shippingcost: 0,
+        shippingtype: '',
         paid: false
       }
     });
@@ -372,52 +372,52 @@ const Purchases: React.FC = () => {
   
   // ✅ NOVO: Função para criar transações financeiras (contas a pagar)
   const createFinancialTransactions = useCallback(async (purchaseId: string, purchaseData: any) => {
-    const supplier = suppliers.find(s => s.id === purchaseData.supplier_id);
-    const { payment_info } = purchaseData;
+    const supplier = suppliers.find(s => s.id === purchaseData.supplierid);
+    const { paymentinfo } = purchaseData;
     
     // Criar uma transação para cada parcela
     const transactions = [];
     
-    for (let i = 0; i < payment_info.installments; i++) {
+    for (let i = 0; i < paymentinfo.installments; i++) {
       // Calcular data de vencimento de cada parcela
-      const dueDate = new Date(payment_info.first_due_date);
+      const dueDate = new Date(paymentinfo.firstduedate);
       dueDate.setMonth(dueDate.getMonth() + i);
       
       const transaction = {
         type: 'expense' as const, // Compra = Despesa (A PAGAR)
         category: 'compras',
-        description: `Compra NF ${purchaseData.invoice_number} - ${supplier?.name || 'Fornecedor'} - Parcela ${i + 1}/${payment_info.installments}`,
-        amount: payment_info.installment_value,
+        description: `Compra NF ${purchaseData.invoicenumber} - ${supplier?.name || 'Fornecedor'} - Parcela ${i + 1}/${paymentinfo.installments}`,
+        amount: paymentinfo.installmentvalue,
         date: dueDate.toISOString().split('T')[0],
-        due_date: dueDate.toISOString().split('T')[0],
-        status: payment_info.paid ? 'paid' : 'pending',
-        payment_method: payment_info.payment_method,
-        reference_id: purchaseId,
-        reference_type: 'purchase',
-        supplier_id: purchaseData.supplier_id,
-        supplier_name: supplier?.name,
-        installment_number: i + 1,
-        total_installments: payment_info.installments
+        duedate: dueDate.toISOString().split('T')[0],
+        status: paymentinfo.paid ? 'paid' : 'pending',
+        paymentmethod: paymentinfo.paymentmethod,
+        referenceid: purchaseId,
+        referencetype: 'purchase',
+        supplierid: purchaseData.supplierid,
+        suppliername: supplier?.name,
+        installmentnumber: i + 1,
+        totalinstallments: paymentinfo.installments
       };
       
       transactions.push(transaction);
     }
     
     // Adicionar frete como transação separada se houver
-    if (payment_info.has_shipping && payment_info.shipping_cost > 0) {
+    if (paymentinfo.hasshipping && paymentinfo.shippingcost > 0) {
       const shippingTransaction = {
         type: 'expense' as const,
         category: 'frete',
-        description: `Frete - Compra NF ${purchaseData.invoice_number} - ${payment_info.shipping_type || 'Entrega'}`,
-        amount: payment_info.shipping_cost,
+        description: `Frete - Compra NF ${purchaseData.invoicenumber} - ${paymentinfo.shippingtype || 'Entrega'}`,
+        amount: paymentinfo.shippingcost,
         date: purchaseData.date,
-        due_date: payment_info.first_due_date,
-        status: payment_info.paid ? 'paid' : 'pending',
-        payment_method: payment_info.payment_method,
-        reference_id: purchaseId,
-        reference_type: 'purchase_shipping',
-        supplier_id: purchaseData.supplier_id,
-        supplier_name: supplier?.name
+        duedate: paymentinfo.firstduedate,
+        status: paymentinfo.paid ? 'paid' : 'pending',
+        paymentmethod: paymentinfo.paymentmethod,
+        referenceid: purchaseId,
+        referencetype: 'purchaseshipping',
+        supplierid: purchaseData.supplierid,
+        suppliername: supplier?.name
       };
       
       transactions.push(shippingTransaction);
@@ -441,24 +441,24 @@ const Purchases: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      const supplier = suppliers.find(s => s.id === formData.supplier_id);
+      const supplier = suppliers.find(s => s.id === formData.supplierid);
       
       const purchaseData = {
         date: formData.date,
-        supplier_id: formData.supplier_id,
-        supplier_name: supplier?.name || '',
+        supplierid: formData.supplierid,
+        suppliername: supplier?.name || '',
         items: purchaseItems.map(item => ({
-          product_id: item.product_id,
-          product_name: item.product_name,
+          productid: item.productid,
+          productname: item.productname,
           quantity: item.quantity,
-          unit_cost: item.unit_cost,
+          unitcost: item.unitcost,
           total: item.total
         })),
         total: purchaseTotal,
         status: formData.status,
-        invoice_number: formData.invoice_number,
+        invoicenumber: formData.invoicenumber,
         notes: formData.notes,
-        payment_info: formData.payment_info
+        paymentinfo: formData.paymentinfo
       };
 
       // Adicionar compra
@@ -496,7 +496,7 @@ const Purchases: React.FC = () => {
       
       setTimeout(() => {
         setErrors(prev => {
-          const { delete: _, ...rest } = prev;
+          const { delete: , ...rest } = prev;
           return rest;
         });
       }, 5000);
@@ -692,21 +692,21 @@ const Purchases: React.FC = () => {
                     <tbody>
                       {filteredPurchases.map((purchase) => (
                         <tr key={purchase.id} className="border-b border-gray-100 hover:bg-gray-50">
-                          <td className="py-3 px-4 text-sm">{purchase.invoice_number || '-'}</td>
+                          <td className="py-3 px-4 text-sm">{purchase.invoicenumber || '-'}</td>
                           <td className="py-3 px-4 text-sm">{formatDate(purchase.date)}</td>
-                          <td className="py-3 px-4 text-sm">{purchase.supplier_name || 'N/A'}</td>
+                          <td className="py-3 px-4 text-sm">{purchase.suppliername || 'N/A'}</td>
                           <td className="py-3 px-4 text-sm">
                             {purchase.items?.length || 0} {purchase.items?.length === 1 ? 'item' : 'itens'}
                           </td>
                           <td className="py-3 px-4 text-sm font-medium">{formatCurrency(purchase.total)}</td>
                           <td className="py-3 px-4 text-sm">
-                            {purchase.payment_info ? (
+                            {purchase.paymentinfo ? (
                               <div className="flex flex-col">
                                 <span className="text-xs text-gray-600">
-                                  {purchase.payment_info.installments}x de {formatCurrency(purchase.payment_info.installment_value)}
+                                  {purchase.paymentinfo.installments}x de {formatCurrency(purchase.paymentinfo.installmentvalue)}
                                 </span>
                                 <span className="text-xs text-gray-500 capitalize">
-                                  {purchase.payment_info.payment_method.replace('_', ' ')}
+                                  {purchase.paymentinfo.paymentmethod.replace('', ' ')}
                                 </span>
                               </div>
                             ) : '-'}
@@ -768,18 +768,18 @@ const Purchases: React.FC = () => {
                   Fornecedor *
                 </label>
                 <select 
-                  value={formData.supplier_id}
+                  value={formData.supplierid}
                   onChange={(e) => {
-                    setFormData(prev => ({ ...prev, supplier_id: e.target.value }));
-                    if (errors.supplier_id) {
+                    setFormData(prev => ({ ...prev, supplierid: e.target.value }));
+                    if (errors.supplierid) {
                       setErrors(prev => {
-                        const { supplier_id, ...rest } = prev;
+                        const { supplierid, ...rest } = prev;
                         return rest;
                       });
                     }
                   }}
                   className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
-                    errors.supplier_id ? 'border-red-300' : 'border-gray-200'
+                    errors.supplierid ? 'border-red-300' : 'border-gray-200'
                   }`}
                 >
                   <option value="">Selecione um fornecedor</option>
@@ -787,8 +787,8 @@ const Purchases: React.FC = () => {
                     <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
                   ))}
                 </select>
-                {errors.supplier_id && (
-                  <p className="mt-1 text-sm text-red-600">{errors.supplier_id}</p>
+                {errors.supplierid && (
+                  <p className="mt-1 text-sm text-red-600">{errors.supplierid}</p>
                 )}
               </div>
               
@@ -824,22 +824,22 @@ const Purchases: React.FC = () => {
                 <input
                   type="text"
                   placeholder="Número da nota fiscal"
-                  value={formData.invoice_number}
+                  value={formData.invoicenumber}
                   onChange={(e) => {
-                    setFormData(prev => ({ ...prev, invoice_number: e.target.value }));
-                    if (errors.invoice_number) {
+                    setFormData(prev => ({ ...prev, invoicenumber: e.target.value }));
+                    if (errors.invoicenumber) {
                       setErrors(prev => {
-                        const { invoice_number, ...rest } = prev;
+                        const { invoicenumber, ...rest } = prev;
                         return rest;
                       });
                     }
                   }}
                   className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
-                    errors.invoice_number ? 'border-red-300' : 'border-gray-200'
+                    errors.invoicenumber ? 'border-red-300' : 'border-gray-200'
                   }`}
                 />
-                {errors.invoice_number && (
-                  <p className="mt-1 text-sm text-red-600">{errors.invoice_number}</p>
+                {errors.invoicenumber && (
+                  <p className="mt-1 text-sm text-red-600">{errors.invoicenumber}</p>
                 )}
               </div>
               
@@ -911,7 +911,7 @@ const Purchases: React.FC = () => {
                         {purchaseItems.map((item) => (
                           <tr key={item.id}>
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-800">
-                              {item.product_name}
+                              {item.productname}
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-800">
                               <div className="flex items-center space-x-2">
@@ -952,7 +952,7 @@ const Purchases: React.FC = () => {
                                   type="number"
                                   step="0.01"
                                   min="0"
-                                  value={item.unit_cost}
+                                  value={item.unitcost}
                                   onChange={(e) => updateItemCost(item.id, parseFloat(e.target.value) || 0)}
                                   className="w-24 px-2 py-1 border border-gray-200 rounded-md focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
                                 />
@@ -1005,20 +1005,20 @@ const Purchases: React.FC = () => {
                     Forma de Pagamento *
                   </label>
                   <select
-                    value={formData.payment_info.payment_method}
+                    value={formData.paymentinfo.paymentmethod}
                     onChange={(e) => setFormData(prev => ({
                       ...prev,
-                      payment_info: {
-                        ...prev.payment_info,
-                        payment_method: e.target.value as any
+                      paymentinfo: {
+                        ...prev.paymentinfo,
+                        paymentmethod: e.target.value as any
                       }
                     }))}
                     className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                   >
                     <option value="dinheiro">Dinheiro</option>
                     <option value="pix">PIX</option>
-                    <option value="cartao_credito">Cartão de Crédito</option>
-                    <option value="cartao_debito">Cartão de Débito</option>
+                    <option value="cartaocredito">Cartão de Crédito</option>
+                    <option value="cartaodebito">Cartão de Débito</option>
                     <option value="boleto">Boleto</option>
                     <option value="transferencia">Transferência</option>
                     <option value="cheque">Cheque</option>
@@ -1034,13 +1034,13 @@ const Purchases: React.FC = () => {
                     type="number"
                     min="1"
                     max="60"
-                    value={formData.payment_info.installments}
+                    value={formData.paymentinfo.installments}
                     onChange={(e) => {
                       const installments = parseInt(e.target.value) || 1;
                       setFormData(prev => ({
                         ...prev,
-                        payment_info: {
-                          ...prev.payment_info,
+                        paymentinfo: {
+                          ...prev.paymentinfo,
                           installments
                         }
                       }));
@@ -1067,7 +1067,7 @@ const Purchases: React.FC = () => {
                   </label>
                   <input
                     type="text"
-                    value={formatCurrency(formData.payment_info.installment_value)}
+                    value={formatCurrency(formData.paymentinfo.installmentvalue)}
                     disabled
                     className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700"
                   />
@@ -1083,30 +1083,30 @@ const Purchases: React.FC = () => {
                   </label>
                   <input
                     type="date"
-                    value={formData.payment_info.first_due_date}
+                    value={formData.paymentinfo.firstduedate}
                     onChange={(e) => {
                       setFormData(prev => ({
                         ...prev,
-                        payment_info: {
-                          ...prev.payment_info,
-                          first_due_date: e.target.value
+                        paymentinfo: {
+                          ...prev.paymentinfo,
+                          firstduedate: e.target.value
                         }
                       }));
-                      if (errors.first_due_date) {
+                      if (errors.firstduedate) {
                         setErrors(prev => {
-                          const { first_due_date, ...rest } = prev;
+                          const { firstduedate, ...rest } = prev;
                           return rest;
                         });
                       }
                     }}
                     className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
-                      errors.first_due_date ? 'border-red-300' : 'border-gray-200'
+                      errors.firstduedate ? 'border-red-300' : 'border-gray-200'
                     }`}
                   />
-                  {errors.first_due_date && (
-                    <p className="mt-1 text-sm text-red-600">{errors.first_due_date}</p>
+                  {errors.firstduedate && (
+                    <p className="mt-1 text-sm text-red-600">{errors.firstduedate}</p>
                   )}
-                  {formData.payment_info.installments > 1 && (
+                  {formData.paymentinfo.installments > 1 && (
                     <p className="mt-1 text-xs text-gray-500">
                       As demais parcelas vencerão mensalmente
                     </p>
@@ -1117,13 +1117,13 @@ const Purchases: React.FC = () => {
                 <div className="flex items-center md:col-span-2">
                   <input
                     type="checkbox"
-                    checked={formData.payment_info.paid}
+                    checked={formData.paymentinfo.paid}
                     onChange={(e) => setFormData(prev => ({
                       ...prev,
-                      payment_info: {
-                        ...prev.payment_info,
+                      paymentinfo: {
+                        ...prev.paymentinfo,
                         paid: e.target.checked,
-                        paid_date: e.target.checked ? getCurrentDate() : undefined
+                        paiddate: e.target.checked ? getCurrentDate() : undefined
                       }
                     }))}
                     className="w-4 h-4 text-amber-600 rounded focus:ring-amber-500"
@@ -1144,13 +1144,13 @@ const Purchases: React.FC = () => {
                 <div className="flex items-center mb-4">
                   <input
                     type="checkbox"
-                    checked={formData.payment_info.has_shipping}
+                    checked={formData.paymentinfo.hasshipping}
                     onChange={(e) => setFormData(prev => ({
                       ...prev,
-                      payment_info: {
-                        ...prev.payment_info,
-                        has_shipping: e.target.checked,
-                        shipping_cost: e.target.checked ? prev.payment_info.shipping_cost : 0
+                      paymentinfo: {
+                        ...prev.paymentinfo,
+                        hasshipping: e.target.checked,
+                        shippingcost: e.target.checked ? prev.paymentinfo.shippingcost : 0
                       }
                     }))}
                     className="w-4 h-4 text-amber-600 rounded focus:ring-amber-500"
@@ -1160,7 +1160,7 @@ const Purchases: React.FC = () => {
                   </label>
                 </div>
 
-                {formData.payment_info.has_shipping && (
+                {formData.paymentinfo.hasshipping && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1174,29 +1174,29 @@ const Purchases: React.FC = () => {
                           type="number"
                           step="0.01"
                           min="0"
-                          value={formData.payment_info.shipping_cost}
+                          value={formData.paymentinfo.shippingcost}
                           onChange={(e) => {
                             setFormData(prev => ({
                               ...prev,
-                              payment_info: {
-                                ...prev.payment_info,
-                                shipping_cost: parseFloat(e.target.value) || 0
+                              paymentinfo: {
+                                ...prev.paymentinfo,
+                                shippingcost: parseFloat(e.target.value) || 0
                               }
                             }));
-                            if (errors.shipping_cost) {
+                            if (errors.shippingcost) {
                               setErrors(prev => {
-                                const { shipping_cost, ...rest } = prev;
+                                const { shippingcost, ...rest } = prev;
                                 return rest;
                               });
                             }
                           }}
                           className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
-                            errors.shipping_cost ? 'border-red-300' : 'border-gray-200'
+                            errors.shippingcost ? 'border-red-300' : 'border-gray-200'
                           }`}
                         />
                       </div>
-                      {errors.shipping_cost && (
-                        <p className="mt-1 text-sm text-red-600">{errors.shipping_cost}</p>
+                      {errors.shippingcost && (
+                        <p className="mt-1 text-sm text-red-600">{errors.shippingcost}</p>
                       )}
                     </div>
 
@@ -1207,12 +1207,12 @@ const Purchases: React.FC = () => {
                       <input
                         type="text"
                         placeholder="Ex: CIF, FOB, Transportadora"
-                        value={formData.payment_info.shipping_type || ''}
+                        value={formData.paymentinfo.shippingtype || ''}
                         onChange={(e) => setFormData(prev => ({
                           ...prev,
-                          payment_info: {
-                            ...prev.payment_info,
-                            shipping_type: e.target.value
+                          paymentinfo: {
+                            ...prev.paymentinfo,
+                            shippingtype: e.target.value
                           }
                         }))}
                         className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
@@ -1233,21 +1233,21 @@ const Purchases: React.FC = () => {
                     <span className="text-gray-700">Subtotal dos Produtos:</span>
                     <span className="font-medium text-gray-900">{formatCurrency(purchaseSubtotal)}</span>
                   </div>
-                  {formData.payment_info.has_shipping && (
+                  {formData.paymentinfo.hasshipping && (
                     <div className="flex justify-between">
                       <span className="text-gray-700">Frete:</span>
-                      <span className="font-medium text-gray-900">{formatCurrency(formData.payment_info.shipping_cost)}</span>
+                      <span className="font-medium text-gray-900">{formatCurrency(formData.paymentinfo.shippingcost)}</span>
                     </div>
                   )}
                   <div className="flex justify-between pt-2 border-t border-amber-300">
                     <span className="font-semibold text-gray-900">Total da Compra:</span>
                     <span className="font-bold text-amber-900 text-lg">{formatCurrency(purchaseTotal)}</span>
                   </div>
-                  {formData.payment_info.installments > 1 && (
+                  {formData.paymentinfo.installments > 1 && (
                     <div className="flex justify-between text-xs text-gray-600 pt-2">
                       <span>Parcelamento:</span>
                       <span>
-                        {formData.payment_info.installments}x de {formatCurrency(formData.payment_info.installment_value)}
+                        {formData.paymentinfo.installments}x de {formatCurrency(formData.paymentinfo.installmentvalue)}
                       </span>
                     </div>
                   )}
@@ -1348,11 +1348,11 @@ const Purchases: React.FC = () => {
                           )}
                           <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
                             <span>Categoria: {product.category || 'Sem categoria'}</span>
-                            <span>Estoque: {product.current_stock} {product.unit}</span>
+                            <span>Estoque: {product.currentstock} {product.unit}</span>
                           </div>
                         </div>
                         <div className="text-right ml-4">
-                          <p className="font-medium text-amber-600">{formatCurrency(product.cost_price || 0)}</p>
+                          <p className="font-medium text-amber-600">{formatCurrency(product.costprice || 0)}</p>
                           <p className="text-xs text-gray-500 mt-1">Custo unitário</p>
                         </div>
                       </div>
@@ -1500,13 +1500,13 @@ const Purchases: React.FC = () => {
                   </thead>
                   <tbody>
                     {products.map(product => {
-                      const stockStatus = product.current_stock > product.min_stock 
+                      const stockStatus = product.currentstock > product.minstock 
                         ? 'normal' 
-                        : product.current_stock === 0
+                        : product.currentstock === 0
                         ? 'empty'
                         : 'low';
                         
-                      const stockValue = product.current_stock * (product.cost_price || 0);
+                      const stockValue = product.currentstock * (product.costprice || 0);
                       
                       return (
                         <tr key={product.id} className="border-b border-gray-100 hover:bg-gray-50">
@@ -1514,9 +1514,9 @@ const Purchases: React.FC = () => {
                           <td className="py-3 px-4 text-sm">{product.category || '-'}</td>
                           <td className="py-3 px-4 text-sm">
                             <span className="capitalize">
-                              {product.type === 'material_bruto' 
+                              {product.type === 'materialbruto' 
                                 ? 'Material Bruto' 
-                                : product.type === 'parte_produto'
+                                : product.type === 'parteproduto'
                                 ? 'Parte de Produto'
                                 : 'Produto Pronto'}
                             </span>
@@ -1526,10 +1526,10 @@ const Purchases: React.FC = () => {
                               stockStatus === 'empty' ? 'text-red-600' : 
                               stockStatus === 'low' ? 'text-yellow-600' : ''
                             }`}>
-                              {product.current_stock} {product.unit}
+                              {product.currentstock} {product.unit}
                             </span>
                           </td>
-                          <td className="py-3 px-4 text-sm">{product.min_stock} {product.unit}</td>
+                          <td className="py-3 px-4 text-sm">{product.minstock} {product.unit}</td>
                           <td className="py-3 px-4">
                             <span className={`inline-flex px-2 py-1 text-xs rounded-full ${
                               stockStatus === 'normal'
@@ -1559,7 +1559,7 @@ const Purchases: React.FC = () => {
                       </td>
                       <td className="py-3 px-4 text-sm font-bold">
                         {formatCurrency(
-                          products.reduce((sum, p) => sum + (p.current_stock * (p.cost_price || 0)), 0)
+                          products.reduce((sum, p) => sum + (p.currentstock * (p.costprice || 0)), 0)
                         )}
                       </td>
                     </tr>
@@ -1577,7 +1577,7 @@ const Purchases: React.FC = () => {
                   <div>
                     <p className="text-sm font-medium text-red-800">Sem Estoque</p>
                     <p className="text-2xl font-bold text-red-900 mt-1">
-                      {products.filter(p => p.current_stock === 0).length}
+                      {products.filter(p => p.currentstock === 0).length}
                     </p>
                   </div>
                   <AlertCircle className="h-8 w-8 text-red-500" />
@@ -1589,7 +1589,7 @@ const Purchases: React.FC = () => {
                   <div>
                     <p className="text-sm font-medium text-yellow-800">Estoque Baixo</p>
                     <p className="text-2xl font-bold text-yellow-900 mt-1">
-                      {products.filter(p => p.current_stock > 0 && p.current_stock <= p.min_stock).length}
+                      {products.filter(p => p.currentstock > 0 && p.currentstock <= p.minstock).length}
                     </p>
                   </div>
                   <Package className="h-8 w-8 text-yellow-500" />
@@ -1601,7 +1601,7 @@ const Purchases: React.FC = () => {
                   <div>
                     <p className="text-sm font-medium text-green-800">Estoque Adequado</p>
                     <p className="text-2xl font-bold text-green-900 mt-1">
-                      {products.filter(p => p.current_stock > p.min_stock).length}
+                      {products.filter(p => p.currentstock > p.minstock).length}
                     </p>
                   </div>
                   <Check className="h-8 w-8 text-green-500" />
