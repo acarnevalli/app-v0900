@@ -8,7 +8,7 @@ interface UserProfile {
   email: string;
   name: string;
   role: 'admin' | 'manager' | 'user';
-  created_at: string;
+  createdat: string;
 }
 
 const Users: React.FC = () => {
@@ -28,9 +28,9 @@ const Users: React.FC = () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('user_profiles')
+        .from('userprofiles')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('createdat', { ascending: false });
 
       if (error) throw error;
       setUsers(data || []);
@@ -44,7 +44,7 @@ const Users: React.FC = () => {
   const handleUpdateUser = async (userId: string) => {
     try {
       const { error } = await supabase
-        .from('user_profiles')
+        .from('userprofiles')
         .update({
           name: editName,
           role: editRole,
@@ -225,7 +225,7 @@ const Users: React.FC = () => {
                           <div className="flex items-center text-gray-600">
                             <Calendar className="h-4 w-4 mr-2" />
                             <span className="text-sm">
-                              {new Date(user.created_at).toLocaleDateString('pt-BR')}
+                              {new Date(user.createdat).toLocaleDateString('pt-BR')}
                             </span>
                           </div>
                         </td>
@@ -279,7 +279,7 @@ const Users: React.FC = () => {
                           <div className="flex items-center text-gray-600">
                             <Calendar className="h-4 w-4 mr-2" />
                             <span className="text-sm">
-                              {new Date(user.created_at).toLocaleDateString('pt-BR')}
+                              {new Date(user.createdat).toLocaleDateString('pt-BR')}
                             </span>
                           </div>
                         </td>
