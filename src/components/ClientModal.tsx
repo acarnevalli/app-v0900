@@ -287,7 +287,7 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) =>
     // Limpar erro do campo alterado
     if (errors[name]) {
       setErrors(prev => {
-        const { [name]: , ...rest } = prev;
+        const { [name]: _, ...rest } = prev;
         return rest;
       });
     }
