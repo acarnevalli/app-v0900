@@ -13,12 +13,12 @@ import {
 import { useApp } from '../contexts/AppContext';
 import { formatCurrency } from '../lib/utils';
 
-type PeriodFilter = 'current_month' | 'last_3_months' | 'last_6_months' | 'last_12_months' | 'custom';
+type PeriodFilter = 'currentmonth' | 'last3months' | 'last6months' | 'last12months' | 'custom';
 
 const CashFlowTab: React.FC = () => {
   const { financialTransactions, bankAccounts, costCenters } = useApp();
   
-  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('last_6_months');
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('last6months');
   const [customStartDate, setCustomStartDate] = useState<string>('');
   const [customEndDate, setCustomEndDate] = useState<string>('');
 
@@ -29,16 +29,16 @@ const CashFlowTab: React.FC = () => {
     let end = new Date(now);
 
     switch (periodFilter) {
-      case 'current_month':
+      case 'currentmonth':
         start = new Date(now.getFullYear(), now.getMonth(), 1);
         break;
-      case 'last_3_months':
+      case 'last3months':
         start = new Date(now.getFullYear(), now.getMonth() - 3, 1);
         break;
-      case 'last_6_months':
+      case 'last6months':
         start = new Date(now.getFullYear(), now.getMonth() - 6, 1);
         break;
-      case 'last_12_months':
+      case 'last12months':
         start = new Date(now.getFullYear(), now.getMonth() - 12, 1);
         break;
       case 'custom':
@@ -64,11 +64,11 @@ const CashFlowTab: React.FC = () => {
   const totals = useMemo(() => {
     const income = periodTransactions
       .filter(t => t.type === 'income' && (t.status === 'paid' || t.status === 'partial'))
-      .reduce((sum, t) => sum + (t.paid_amount || 0), 0);
+      .reduce((sum, t) => sum + (t.paidamount || 0), 0);
 
     const expense = periodTransactions
       .filter(t => t.type === 'expense' && (t.status === 'paid' || t.status === 'partial'))
-      .reduce((sum, t) => sum + (t.paid_amount || 0), 0);
+      .reduce((sum, t) => sum + (t.paidamount || 0), 0);
 
     const result = income - expense;
     const margin = income > 0 ? (result / income) * 100 : 0;
@@ -80,18 +80,18 @@ const CashFlowTab: React.FC = () => {
   const totalBankBalance = useMemo(() => {
     return bankAccounts
       .filter(ba => ba.active)
-      .reduce((sum, ba) => sum + ba.current_balance, 0);
+      .reduce((sum, ba) => sum + ba.currentbalance, 0);
   }, [bankAccounts]);
 
   // Calcular projeção (pendentes)
   const projection = useMemo(() => {
     const pendingIncome = financialTransactions
       .filter(t => t.type === 'income' && (t.status === 'pending' || t.status === 'partial'))
-      .reduce((sum, t) => sum + (t.amount - (t.paid_amount || 0)), 0);
+      .reduce((sum, t) => sum + (t.amount - (t.paidamount || 0)), 0);
 
     const pendingExpense = financialTransactions
       .filter(t => t.type === 'expense' && (t.status === 'pending' || t.status === 'partial'))
-      .reduce((sum, t) => sum + (t.amount - (t.paid_amount || 0)), 0);
+      .reduce((sum, t) => sum + (t.amount - (t.paidamount || 0)), 0);
 
     const projectedBalance = totalBankBalance + pendingIncome - pendingExpense;
 
@@ -115,11 +115,11 @@ const CashFlowTab: React.FC = () => {
 
       const income = monthTransactions
         .filter(t => t.type === 'income' && (t.status === 'paid' || t.status === 'partial'))
-        .reduce((sum, t) => sum + (t.paid_amount || 0), 0);
+        .reduce((sum, t) => sum + (t.paidamount || 0), 0);
 
       const expense = monthTransactions
         .filter(t => t.type === 'expense' && (t.status === 'paid' || t.status === 'partial'))
-        .reduce((sum, t) => sum + (t.paid_amount || 0), 0);
+        .reduce((sum, t) => sum + (t.paidamount || 0), 0);
 
       months.push({
         month: monthDate.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }),
@@ -137,10 +137,10 @@ const CashFlowTab: React.FC = () => {
     const totals: Record<string, number> = {};
 
     periodTransactions
-      .filter(t => t.type === 'expense' && t.cost_center_id && (t.status === 'paid' || t.status === 'partial'))
+      .filter(t => t.type === 'expense' && t.costcenterid && (t.status === 'paid' || t.status === 'partial'))
       .forEach(t => {
-        const ccId = t.cost_center_id!;
-        totals[ccId] = (totals[ccId] || 0) + (t.paid_amount || 0);
+        const ccId = t.costcenterid!;
+        totals[ccId] = (totals[ccId] || 0) + (t.paidamount || 0);
       });
 
     return Object.entries(totals)
@@ -181,10 +181,10 @@ const CashFlowTab: React.FC = () => {
               onChange={(e) => setPeriodFilter(e.target.value as PeriodFilter)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             >
-              <option value="current_month">Mês Atual</option>
-              <option value="last_3_months">Últimos 3 Meses</option>
-              <option value="last_6_months">Últimos 6 Meses</option>
-              <option value="last_12_months">Últimos 12 Meses</option>
+              <option value="currentmonth">Mês Atual</option>
+              <option value="last3months">Últimos 3 Meses</option>
+              <option value="last6months">Últimos 6 Meses</option>
+              <option value="last12months">Últimos 12 Meses</option>
               <option value="custom">Personalizado</option>
             </select>
           </div>
