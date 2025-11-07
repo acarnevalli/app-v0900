@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Plus, Search, Edit, Trash2, Phone, Mail, MapPin } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
@@ -59,8 +58,8 @@ const Clients: React.FC = () => {
       parts.push(` - ${client.state}`);
     }
     
-    if (client.zip_code) {
-      parts.push(` - CEP: ${client.zip_code}`);
+    if (client.zipcode) {
+      parts.push(` - CEP: ${client.zipcode}`);
     }
     
     return parts.length > 0 ? parts.join('') : 'Endereço não informado';
