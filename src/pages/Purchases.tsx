@@ -496,7 +496,7 @@ const Purchases: React.FC = () => {
       
       setTimeout(() => {
         setErrors(prev => {
-          const { delete: , ...rest } = prev;
+          const { delete: _, ...rest } = prev;
           return rest;
         });
       }, 5000);
