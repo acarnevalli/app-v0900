@@ -160,9 +160,9 @@ const Products: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
           {filteredProducts.map((product) => {
             const typeInfo = getTypeInfo(product.type);
-            const isLowStock = product.current_stock <= product.min_stock;
-            const profitMargin = product.sale_price && product.cost_price
-              ? ((product.sale_price - product.cost_price) / product.sale_price * 100)
+            const isLowStock = product.currentstock <= product.minstock;
+            const profitMargin = product.saleprice && product.costprice
+              ? ((product.saleprice - product.costprice) / product.saleprice * 100)
               : 0;
 
             return (
@@ -224,7 +224,7 @@ const Products: React.FC = () => {
                       <span className="text-gray-600">Estoque Atual:</span>
                       <div className="flex items-center space-x-2">
                         <span className={`font-bold ${isLowStock ? 'text-red-600' : 'text-green-600'}`}>
-                          {product.current_stock} {product.unit}
+                          {product.currentstock} {product.unit}
                         </span>
                         {isLowStock && <AlertTriangle className="h-4 w-4 text-red-500" />}
                       </div>
@@ -234,7 +234,7 @@ const Products: React.FC = () => {
                       <div className="bg-red-50 border border-red-200 rounded-lg p-2">
                         <p className="text-xs text-red-700 flex items-center">
                           <AlertTriangle className="h-3 w-3 mr-1" />
-                          Estoque abaixo do mínimo ({product.min_stock})
+                          Estoque abaixo do mínimo ({product.minstock})
                         </p>
                       </div>
                     )}
@@ -243,16 +243,16 @@ const Products: React.FC = () => {
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-gray-600">Custo:</span>
                         <span className="font-medium text-red-600">
-                          R$ {product.cost_price.toFixed(2)}
+                          R$ {product.costprice.toFixed(2)}
                         </span>
                       </div>
 
-                      {product.sale_price && (
+                      {product.saleprice && (
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-gray-600">Venda:</span>
                           <div className="text-right">
                             <span className="font-medium text-green-600">
-                              R$ {product.sale_price.toFixed(2)}
+                              R$ {product.saleprice.toFixed(2)}
                             </span>
                             {profitMargin > 0 && (
                               <div className="flex items-center justify-end text-xs text-green-600">
@@ -275,7 +275,7 @@ const Products: React.FC = () => {
                         <div className="space-y-1 max-h-16 overflow-y-auto">
                           {product.components.slice(0, 3).map((component, index) => (
                             <div key={index} className="text-xs text-gray-500 flex justify-between">
-                              <span className="truncate">{component.product_name}</span>
+                              <span className="truncate">{component.productname}</span>
                               <span className="ml-2">{component.quantity} {component.unit}</span>
                             </div>
                           ))}
