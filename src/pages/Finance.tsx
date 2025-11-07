@@ -46,11 +46,11 @@ interface AccountModalProps {
   accountForm: {
     name: string;
     type: 'checking' | 'savings' | 'cash' | 'investment';
-    bank_name: string;
+    bankname: string;
     agency: string;
-    account_number: string;
-    initial_balance: number;
-    current_balance: number;
+    accountnumber: string;
+    initialbalance: number;
+    currentbalance: number;
     active: boolean;
   };
   setAccountForm: React.Dispatch<React.SetStateAction<any>>;
@@ -161,8 +161,8 @@ const AccountModal: React.FC<AccountModalProps> = ({
               </label>
               <input
                 type="text"
-                value={accountForm.bank_name}
-                onChange={(e) => setAccountForm({ ...accountForm, bank_name: e.target.value })}
+                value={accountForm.bankname}
+                onChange={(e) => setAccountForm({ ...accountForm, bankname: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Ex: Banco do Brasil, Nubank, Inter..."
               />
@@ -191,8 +191,8 @@ const AccountModal: React.FC<AccountModalProps> = ({
                 </label>
                 <input
                   type="text"
-                  value={accountForm.account_number}
-                  onChange={(e) => setAccountForm({ ...accountForm, account_number: e.target.value })}
+                  value={accountForm.accountnumber}
+                  onChange={(e) => setAccountForm({ ...accountForm, accountnumber: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Ex: 12345-6"
                 />
@@ -209,10 +209,10 @@ const AccountModal: React.FC<AccountModalProps> = ({
               <input
                 type="number"
                 step="0.01"
-                value={accountForm.initial_balance}
+                value={accountForm.initialbalance}
                 onChange={(e) => setAccountForm({ 
                   ...accountForm, 
-                  initial_balance: parseFloat(e.target.value) || 0 
+                  initialbalance: parseFloat(e.target.value) || 0 
                 })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="0,00"
@@ -231,7 +231,7 @@ const AccountModal: React.FC<AccountModalProps> = ({
               </label>
               <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg">
                 <p className="text-2xl font-bold text-gray-800">
-                  {formatCurrency(accountForm.current_balance)}
+                  {formatCurrency(accountForm.currentbalance)}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
                   O saldo é atualizado automaticamente pelas transações
@@ -367,20 +367,20 @@ const AccountsTabContent: React.FC<{
                     {account.name}
                   </h4>
                   
-                  {account.bank_name && (
+                  {account.bankname && (
                     <p className="text-sm text-gray-600 mb-3">
-                      {account.bank_name}
+                      {account.bankname}
                       {account.agency && ` • Ag: ${account.agency}`}
-                      {account.account_number && ` • CC: ${account.account_number}`}
+                      {account.accountnumber && ` • CC: ${account.accountnumber}`}
                     </p>
                   )}
 
                   <div className="mt-4 pt-4 border-t border-gray-200">
                     <p className="text-xs text-gray-500 mb-1">Saldo Atual</p>
                     <p className={`text-2xl font-bold ${
-                      account.current_balance >= 0 ? 'text-green-600' : 'text-red-600'
+                      account.currentbalance >= 0 ? 'text-green-600' : 'text-red-600'
                     }`}>
-                      {formatCurrency(account.current_balance)}
+                      {formatCurrency(account.currentbalance)}
                     </p>
                   </div>
 
@@ -527,11 +527,11 @@ const Finance: React.FC = () => {
   const [accountForm, setAccountForm] = useState({
     name: '',
     type: 'checking' as 'checking' | 'savings' | 'cash' | 'investment',
-    bank_name: '',
+    bankname: '',
     agency: '',
-    account_number: '',
-    initial_balance: 0,
-    current_balance: 0,
+    accountnumber: '',
+    initialbalance: 0,
+    currentbalance: 0,
     active: true,
   });
 
@@ -547,7 +547,7 @@ const Finance: React.FC = () => {
   due_date: new Date().toISOString().split('T')[0],
   status: 'pending' as 'pending' | 'paid' | 'cancelled',
   payment_date: '',
-  payment_method: undefined, // 🆕 ADICIONADO
+  paymentmethod: undefined, // 🆕 ADICIONADO
   account_id: '', // 🆕 CAMPO OBRIGATÓRIO (substitui bank_account_id)
   client_id: null,
   supplier_id: null,
@@ -648,7 +648,7 @@ const Finance: React.FC = () => {
   const totalBankBalance = useMemo(() =>
     (bankAccounts || [])
       .filter(acc => acc.active)
-      .reduce((sum, acc) => sum + acc.current_balance, 0),
+      .reduce((sum, acc) => sum + acc.currentbalance, 0),
     [bankAccounts]
   );
 
@@ -691,7 +691,7 @@ const Finance: React.FC = () => {
       const search = searchTerm.toLowerCase();
       items = items.filter(t =>
         t.description.toLowerCase().includes(search) ||
-        t.client_name?.toLowerCase().includes(search) ||
+        t.clientname?.toLowerCase().includes(search) ||
         t.supplier_name?.toLowerCase().includes(search)
       );
     }
@@ -711,11 +711,11 @@ const Finance: React.FC = () => {
       setAccountForm({
         name: account.name,
         type: account.type,
-        bank_name: account.bank_name || '',
+        bankname: account.bankname || '',
         agency: account.agency || '',
-        account_number: account.account_number || '',
-        initial_balance: account.initial_balance,
-        current_balance: account.current_balance,
+        accountnumber: account.accountnumber || '',
+        initialbalance: account.initialbalance,
+        currentbalance: account.currentbalance,
         active: account.active,
       });
     } else {
@@ -723,11 +723,11 @@ const Finance: React.FC = () => {
       setAccountForm({
         name: '',
         type: 'checking',
-        bank_name: '',
+        bankname: '',
         agency: '',
-        account_number: '',
-        initial_balance: 0,
-        current_balance: 0,
+        accountnumber: '',
+        initialbalance: 0,
+        currentbalance: 0,
         active: true,
       });
     }
@@ -740,11 +740,11 @@ const Finance: React.FC = () => {
     setAccountForm({
       name: '',
       type: 'checking',
-      bank_name: '',
+      bankname: '',
       agency: '',
-      account_number: '',
-      initial_balance: 0,
-      current_balance: 0,
+      accountnumber: '',
+      initialbalance: 0,
+      currentbalance: 0,
       active: true,
     });
   };
@@ -770,7 +770,7 @@ const Finance: React.FC = () => {
         console.log('➕ Criando nova conta');
         const newAccount = {
           ...accountForm,
-          current_balance: accountForm.initial_balance,
+          currentbalance: accountForm.initialbalance,
         };
         console.log('📦 Dados da nova conta:', newAccount);
         await addBankAccount(newAccount);
@@ -845,7 +845,7 @@ const Finance: React.FC = () => {
       due_date: transaction.due_date ? new Date(transaction.due_date).toISOString().split('T')[0] : today,
       status: transaction.status || 'pending',
       payment_date: transaction.payment_date ? new Date(transaction.payment_date).toISOString().split('T')[0] : '',
-      payment_method: transaction.payment_method || undefined, // 🆕 ADICIONADO
+      paymentmethod: transaction.paymentmethod || undefined, // 🆕 ADICIONADO
       account_id: transaction.account_id || '', // 🆕 CAMPO OBRIGATÓRIO
       client_id: transaction.client_id || null,
       supplier_id: transaction.supplier_id || null,
@@ -863,7 +863,7 @@ const Finance: React.FC = () => {
       due_date: today,
       status: 'pending',
       payment_date: '',
-      payment_method: undefined, // 🆕 ADICIONADO
+      paymentmethod: undefined, // 🆕 ADICIONADO
       account_id: '', // 🆕 CAMPO OBRIGATÓRIO
       client_id: null,
       supplier_id: null,
@@ -915,7 +915,7 @@ const Finance: React.FC = () => {
     if (!dataToSave.supplier_id) delete dataToSave.supplier_id;
     if (!dataToSave.cost_center_id) delete dataToSave.cost_center_id;
     if (!dataToSave.payment_date) delete dataToSave.payment_date;
-    if (!dataToSave.payment_method) delete dataToSave.payment_method;
+    if (!dataToSave.paymentmethod) delete dataToSave.paymentmethod;
     if (!dataToSave.notes) delete dataToSave.notes;
 
     console.log('💾 Salvando transação:', dataToSave); // 🆕 LOG PARA DEBUG
