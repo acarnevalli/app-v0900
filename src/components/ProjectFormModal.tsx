@@ -290,7 +290,7 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
     }));
 
     const projectData = {
-      client_id: formData.client_id,
+      clientid: formData.client_id,
       description: formData.description,
       status: formData.status,
       type: formData.type,
@@ -319,7 +319,7 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
         await updateProject(project.id, projectData);
         console.log('✅ Projeto atualizado com sucesso!');
       } else {
-        console.log('🔄 NOVO: Chamando addProject (válido para orçamentos E vendas)');
+        console.log('🔄 NOVO: Chamando addProject (para orçamentos E vendas)');
         await addProject(projectData);
         console.log('✅ Projeto/Venda criado com sucesso!');
       }
