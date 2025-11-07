@@ -160,7 +160,7 @@ const ProjectPDFDocument: React.FC<ProjectPDFDocumentProps> = ({ project, settin
 
         {/* Título */}
         <Text style={styles.title}>{settings.documentTitle}</Text>
-        <Text style={styles.orderNumber}>Nº {project.order_number}</Text>
+        <Text style={styles.orderNumber}>Nº {project.ordernumber}</Text>
 
         {/* Informações do Cliente */}
         {settings.showClientDetails && (
@@ -168,16 +168,16 @@ const ProjectPDFDocument: React.FC<ProjectPDFDocumentProps> = ({ project, settin
             <Text style={styles.sectionTitle}>Informações do Cliente</Text>
             <View style={styles.row}>
               <Text style={styles.label}>Cliente:</Text>
-              <Text style={styles.value}>{project.client_name}</Text>
+              <Text style={styles.value}>{project.clientname}</Text>
             </View>
             <View style={styles.row}>
               <Text style={styles.label}>Data:</Text>
-              <Text style={styles.value}>{formatDate(project.start_date)}</Text>
+              <Text style={styles.value}>{formatDate(project.startdate)}</Text>
             </View>
             <View style={styles.row}>
               <Text style={styles.label}>Prazo de Entrega:</Text>
               <Text style={styles.value}>
-                {project.delivery_deadline_days} dias - até {formatDate(project.end_date)}
+                {project.deliverydeadlinedays} dias - até {formatDate(project.enddate)}
               </Text>
             </View>
           </View>
@@ -201,10 +201,10 @@ const ProjectPDFDocument: React.FC<ProjectPDFDocumentProps> = ({ project, settin
               </View>
               {project.products.map((product, index) => (
                 <View key={index} style={styles.tableRow}>
-                  <Text style={styles.tableCol1}>{product.product_name}</Text>
+                  <Text style={styles.tableCol1}>{product.productname}</Text>
                   <Text style={styles.tableCol2}>{product.quantity}</Text>
                   <Text style={styles.tableCol3}>
-                    {product.item_type === 'produto' ? 'Produto' : 'Serviço'}
+                    {product.itemtype === 'produto' ? 'Produto' : 'Serviço'}
                   </Text>
                 </View>
               ))}
@@ -218,18 +218,18 @@ const ProjectPDFDocument: React.FC<ProjectPDFDocumentProps> = ({ project, settin
             <Text style={styles.totalLabel}>Valor Total:</Text>
             <Text style={styles.totalValue}>{formatCurrency(project.budget)}</Text>
           </View>
-          {project.payment_terms?.discount_percentage && project.payment_terms.discount_percentage > 0 && (
+          {project.paymentterms?.discountpercentage && project.paymentterms.discountpercentage > 0 && (
             <>
               <View style={styles.totalRow}>
-                <Text style={{ fontSize: 10 }}>Desconto ({project.payment_terms.discount_percentage}%):</Text>
+                <Text style={{ fontSize: 10 }}>Desconto ({project.paymentterms.discountpercentage}%):</Text>
                 <Text style={{ fontSize: 10, color: 'green' }}>
-                  -{formatCurrency((project.budget * project.payment_terms.discount_percentage) / 100)}
+                  -{formatCurrency((project.budget * project.paymentterms.discountpercentage) / 100)}
                 </Text>
               </View>
               <View style={styles.totalRow}>
                 <Text style={styles.totalLabel}>Total com Desconto:</Text>
                 <Text style={styles.totalValue}>
-                  {formatCurrency(project.payment_terms.total_with_discount || 0)}
+                  {formatCurrency(project.paymentterms.totalwithdiscount || 0)}
                 </Text>
               </View>
             </>
@@ -237,19 +237,19 @@ const ProjectPDFDocument: React.FC<ProjectPDFDocumentProps> = ({ project, settin
         </View>
 
         {/* Condições de Pagamento */}
-        {settings.showPaymentTerms && project.payment_terms && (
+        {settings.showPaymentTerms && project.paymentterms && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Condições de Pagamento</Text>
             <View style={styles.row}>
               <Text style={styles.label}>Forma de Pagamento:</Text>
               <Text style={styles.value}>
-                {project.payment_terms.installments}x de {formatCurrency(project.payment_terms.installment_value || 0)}
+                {project.paymentterms.installments}x de {formatCurrency(project.paymentterms.installmentvalue || 0)}
               </Text>
             </View>
-            {project.payment_terms.payment_method && (
+            {project.paymentterms.paymentmethod && (
               <View style={styles.row}>
                 <Text style={styles.label}>Método:</Text>
-                <Text style={styles.value}>{project.payment_terms.payment_method}</Text>
+                <Text style={styles.value}>{project.paymentterms.paymentmethod}</Text>
               </View>
             )}
           </View>
@@ -266,7 +266,7 @@ const ProjectPDFDocument: React.FC<ProjectPDFDocumentProps> = ({ project, settin
         {/* Assinatura */}
         {settings.showSignature && (
           <View style={styles.signature}>
-            <Text>_________________________________________</Text>
+            <Text></Text>
             <Text style={{ marginTop: 5 }}>Assinatura do Cliente</Text>
           </View>
         )}
