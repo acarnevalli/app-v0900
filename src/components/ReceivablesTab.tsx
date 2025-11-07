@@ -24,7 +24,7 @@ const ReceivablesTab: React.FC = () => {
 
     // Filtro por cliente
     if (selectedClient !== 'all') {
-      filtered = filtered.filter(t => t.client_id === selectedClient);
+      filtered = filtered.filter(t => t.clientid === selectedClient);
     }
 
     // Filtro por status
@@ -38,8 +38,8 @@ const ReceivablesTab: React.FC = () => {
       today.setHours(0, 0, 0, 0);
 
       filtered = filtered.filter(t => {
-        if (!t.due_date) return false;
-        const dueDate = new Date(t.due_date);
+        if (!t.duedate) return false;
+        const dueDate = new Date(t.duedate);
         dueDate.setHours(0, 0, 0, 0);
 
         switch (dueDateFilter) {
@@ -70,22 +70,22 @@ const ReceivablesTab: React.FC = () => {
     // Total a receber (pendente + parcial)
     const totalReceivable = incomeTransactions
       .filter(t => t.status === 'pending' || t.status === 'partial')
-      .reduce((sum, t) => sum + (t.amount - (t.paid_amount || 0)), 0);
+      .reduce((sum, t) => sum + (t.amount - (t.paidamount || 0)), 0);
 
     // Recebido nos últimos 30 dias
     const receivedLast30Days = incomeTransactions
       .filter(t => 
-        t.payment_date && 
-        new Date(t.payment_date) >= thirtyDaysAgo &&
+        t.paymentdate && 
+        new Date(t.paymentdate) >= thirtyDaysAgo &&
         (t.status === 'paid' || t.status === 'partial')
       )
-      .reduce((sum, t) => sum + (t.paid_amount || 0), 0);
+      .reduce((sum, t) => sum + (t.paidamount || 0), 0);
 
     // Total vencido
     const totalOverdue = incomeTransactions
       .filter(t => {
-        if (!t.due_date || t.status !== 'pending') return false;
-        const dueDate = new Date(t.due_date);
+        if (!t.duedate || t.status !== 'pending') return false;
+        const dueDate = new Date(t.duedate);
         dueDate.setHours(0, 0, 0, 0);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -96,8 +96,8 @@ const ReceivablesTab: React.FC = () => {
     // Taxa de recebimento (últimos 30 dias)
     const totalDueLast30Days = incomeTransactions
       .filter(t => {
-        if (!t.due_date) return false;
-        const dueDate = new Date(t.due_date);
+        if (!t.duedate) return false;
+        const dueDate = new Date(t.duedate);
         return dueDate >= thirtyDaysAgo && dueDate <= now;
       })
       .reduce((sum, t) => sum + t.amount, 0);
@@ -117,9 +117,9 @@ const ReceivablesTab: React.FC = () => {
   // Top 5 clientes
   const topClients = useMemo(() => {
     const clientTotals = incomeTransactions
-      .filter(t => t.client_id)
+      .filter(t => t.clientid)
       .reduce((acc, t) => {
-        const clientId = t.client_id!;
+        const clientId = t.clientid!;
         if (!acc[clientId]) {
           acc[clientId] = { total: 0, count: 0 };
         }
