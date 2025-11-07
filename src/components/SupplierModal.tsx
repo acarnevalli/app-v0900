@@ -105,8 +105,8 @@ const SupplierModal: React.FC<SupplierModalProps> = ({
             ...cleanData,
             id: Date.now().toString(), // ID temporário
             active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
+            createdat: new Date().toISOString(),
+            updatedat: new Date().toISOString(),
           });
         }
       }
