@@ -94,7 +94,7 @@ const Settings: React.FC = () => {
           {companyError && <span className="text-xs text-red-600">{companyError}</span>}
           {companyInfo && (
             <div className="mt-2 text-xs text-gray-500">
-              <div>Razão Social: {companyInfo.company_name}</div>
+              <div>Razão Social: {companyInfo.companyname}</div>
               <div>CNPJ: {companyInfo.cnpj}</div>
               <div>Cidade: {companyInfo.city}</div>
               <div>Email: {companyInfo.email}</div>
