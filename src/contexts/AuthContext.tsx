@@ -17,7 +17,7 @@ export interface User {
   email: string;
   name: string;
   role: 'admin' | 'manager' | 'user';
-  created_at: string;
+  createdat: string;
 }
 
 // Interface para UserProfile do banco
@@ -26,7 +26,7 @@ interface UserProfile {
   email: string;
   name: string;
   role: 'admin' | 'manager' | 'user';
-  created_at?: string;
+  createdat?: string;
 }
 
 interface AuthContextType {
@@ -83,7 +83,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       console.log('[AuthContext] Buscando perfil para usuário:', sbUser.id, sbUser.email);
 
       const { data: profile, error } = await supabase
-        .from('user_profiles')
+        .from('userprofiles')
         .select('*')
         .eq('id', sbUser.id)
         .maybeSingle();
@@ -101,7 +101,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
           setUserProfile(fallbackProfile);
           return {
             ...fallbackProfile,
-            created_at: sbUser.created_at ?? new Date().toISOString(),
+            createdat: sbUser.createdat ?? new Date().toISOString(),
           };
         }
         console.error('[AuthContext] Erro ao buscar perfil:', error);
@@ -119,7 +119,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         };
 
         const { data: createdProfile, error: createError } = await supabase
-          .from('user_profiles')
+          .from('userprofiles')
           .insert([newProfile])
           .select()
           .maybeSingle();
@@ -130,7 +130,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
           setUserProfile(newProfile);
           return {
             ...newProfile,
-            created_at: sbUser.created_at ?? new Date().toISOString(),
+            createdat: sbUser.createdat ?? new Date().toISOString(),
           };
         }
 
@@ -138,7 +138,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
           setUserProfile(createdProfile as UserProfile);
           return {
             ...createdProfile,
-            created_at: createdProfile.created_at || new Date().toISOString(),
+            createdat: createdProfile.createdat || new Date().toISOString(),
           };
         }
       }
@@ -151,7 +151,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         email: sbUser.email ?? "",
         name: profile?.name ?? sbUser.email?.split('@')[0] ?? "",
         role: profile?.role ?? 'user',
-        created_at: sbUser.created_at ?? new Date().toISOString(),
+        createdat: sbUser.createdat ?? new Date().toISOString(),
       };
 
       console.log('[AuthContext] Usuário mapeado:', user);
@@ -168,7 +168,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       setUserProfile(fallbackProfile);
       return {
         ...fallbackProfile,
-        created_at: sbUser.created_at ?? new Date().toISOString(),
+        createdat: sbUser.createdat ?? new Date().toISOString(),
       };
     }
   };
@@ -197,7 +197,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       }
 
       // Escuta mudanças (login, logout, refresh, etc.)
-      const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
         await handleSessionChange(session);
       });
 
@@ -317,7 +317,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         };
 
         const { error: profileError } = await supabase
-          .from('user_profiles')
+          .from('userprofiles')
           .insert([newProfile]);
 
         if (profileError) {
