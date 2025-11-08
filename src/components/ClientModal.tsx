@@ -151,9 +151,10 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) =>
     }
 
     // Email obrigatório e válido
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email é obrigatório';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+    //if (!formData.email.trim()) {
+    //  newErrors.email = 'Email é obrigatório';
+    //} else 
+    if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'Email inválido';
     }
 
@@ -522,7 +523,7 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) =>
           {/* Dados de Contato */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <input
@@ -540,7 +541,7 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) =>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Telefone Fixo *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Telefone Fixo</label>
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <input
@@ -559,7 +560,7 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) =>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Celular *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Celular</label>
               <div className="relative">
                 <Smartphone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <input
