@@ -318,7 +318,7 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
     description: formData.description.trim(),
     status: formData.status,
     type: formData.type, // ✅ Isso já funciona corretamente
-    products: processedProducts, // ✅ Usar produtos processados
+    products: validatedProducts, // ✅ Usar produtos processados
     budget: formData.budget,
     start_date: formData.start_date,
     delivery_deadline_days: formData.delivery_deadline_days,
