@@ -63,6 +63,7 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [selectedClientName, setSelectedClientName] = useState('');
   const [itemTypeToAdd, setItemTypeToAdd] = useState<ItemType>('produto');
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     console.log('🔄 useEffect PRINCIPAL disparado:', { 
