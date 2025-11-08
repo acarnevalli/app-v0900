@@ -1384,11 +1384,67 @@ useEffect(() => {
   }, [user, loadProjects]);
 
   const deleteProject = useCallback(async (id: string) => {
-    ensureUser();
-    const { error } = await supabase.from("projects").delete().eq("id", id).eq("user_id", user!.id);
+  ensureUser();
+  
+  try {
+    // 1. Buscar o projeto para verificar se é uma venda
+    const { data: project, error: fetchError } = await supabase
+      .from('projects')
+      .select('type, order_number')
+      .eq('id', id)
+      .eq('user_id', user!.id)
+      .single();
+    
+    if (fetchError) throw fetchError;
+    
+    // 2. Se for uma venda, deletar as transações financeiras associadas
+    if (project && project.type === 'venda') {
+      console.log(`🗑️ Deletando transações financeiras do projeto ${project.order_number}...`);
+      
+      const { error: transError } = await supabase
+        .from('financial_transactions')
+        .delete()
+        .eq('reference_type', 'project')
+        .eq('reference_id', id);
+      
+      if (transError) {
+        console.error('Erro ao deletar transações:', transError);
+        // Não bloqueia a exclusão do projeto
+      } else {
+        console.log('✅ Transações financeiras deletadas com sucesso');
+      }
+    }
+    
+    // 3. Deletar os produtos do projeto
+    const { error: productsError } = await supabase
+      .from('project_products')
+      .delete()
+      .eq('project_id', id);
+    
+    if (productsError) {
+      console.error('Erro ao deletar produtos do projeto:', productsError);
+    }
+    
+    // 4. Deletar o projeto
+    const { error } = await supabase
+      .from('projects')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user!.id);
+    
     if (error) throw error;
+    
+    console.log('✅ Projeto deletado com sucesso');
+    
+    // 5. Recarregar dados
     await loadProjects();
-  }, [user, loadProjects]);
+    await loadFinancialTransactions();
+    
+  } catch (error: any) {
+    console.error('❌ Erro ao deletar projeto:', error);
+    throw error;
+  }
+}, [user, loadProjects, loadFinancialTransactions]);
 
   // ============================================
   // MÉTODOS DE RELATÓRIOS E UTILITÁRIOS
