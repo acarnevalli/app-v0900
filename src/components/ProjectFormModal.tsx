@@ -348,6 +348,30 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
   } finally {
     setIsSaving(false);
   }
+
+    if (!formData.client_id) {
+      alert('Por favor, selecione um cliente');
+      return;
+    }
+
+    if (!formData.description.trim()) {
+      alert('Por favor, adicione uma descrição');
+      return;
+    }
+
+    // ✅ VALIDAÇÃO: Verificar se há pelo menos 1 produto/serviço
+    if (!projectProducts || projectProducts.length === 0) {
+      alert('❌ Adicione pelo menos um produto ou serviço ao pedido!');
+      return;
+    }
+
+    const budget = calculateBudget();
+    
+    // ✅ VALIDAÇÃO: Garantir que o budget seja válido
+    if (!budget || budget <= 0 || isNaN(budget)) {
+      alert('❌ O valor total do pedido deve ser maior que zero. Verifique os produtos e custos adicionados.');
+      return;
+    
 };
 
 
