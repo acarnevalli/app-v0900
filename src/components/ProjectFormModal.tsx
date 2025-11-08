@@ -277,70 +277,59 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
       return;
     }
 
-    // 🔧 ADICIONE ESTA VALIDAÇÃO ANTES DE SALVAR:
-  if (!formData.products || formData.products.length === 0) {
-    alert('⚠️ Adicione pelo menos um produto ou serviço!');
-    return;
-  }
+    const budget = calculateBudget();
+    const discountAmount = budget * (paymentTerms.discount_percentage / 100);
+    const finalValue = budget - discountAmount;
+    const installmentValue = finalValue / paymentTerms.installments;
 
-  // Validar cada produto
-  const invalidProducts = formData.products.filter(p => 
-    !p.product_name || 
-    !p.quantity || p.quantity <= 0 || 
-    !p.unit_price || p.unit_price <= 0
-  );
+    const validatedProducts = projectProducts.map(p => ({
+      ...p,
+      quantity: Number(p.quantity) || 1,
+      unit_price: Number(p.unit_price) || 0,
+      total_price: Number(p.total_price) || 0
+    }));
 
-  if (invalidProducts.length > 0) {
-    alert('⚠️ Verifique se todos os produtos têm nome, quantidade e preço válidos!');
-    return;
-  }
+    const projectData = {
+      client_id: formData.client_id,
+      description: formData.description,
+      status: formData.status,
+      type: formData.type,
+      products: validatedProducts,
+      budget,
+      start_date: formData.start_date,
+      end_date: formData.end_date,
+      delivery_deadline_days: formData.delivery_deadline_days,
+      materials_cost: parseFloat(formData.materials_cost) || 0,
+      labor_cost: parseFloat(formData.labor_cost) || 0,
+      profit_margin: parseFloat(formData.profit_margin) || 20,
+      payment_terms: {
+        installments: paymentTerms.installments,
+        payment_method: paymentTerms.payment_method,
+        discount_percentage: paymentTerms.discount_percentage,
+        installment_value: installmentValue,
+        total_with_discount: finalValue
+      }
+    };
 
-  // Processar produtos garantindo que estão no formato correto
-  const processedProducts = formData.products.map(p => ({
-    product_id: p.product_id || null,
-    product_name: p.product_name?.trim() || 'Produto sem nome',
-    quantity: Number(p.quantity) || 0,
-    unit_price: Number(p.unit_price) || 0,
-    total_price: Number(p.total_price) || (Number(p.quantity) * Number(p.unit_price)),
-    item_type: p.item_type || 'produto',
-    item_description: p.item_description || '',
-    service_hours: p.item_type === 'servico' ? Number(p.service_hours) : undefined,
-    hourly_rate: p.item_type === 'servico' ? Number(p.hourly_rate) : undefined,
-  }));
+    console.log('💾 Dados para salvar:', projectData);
 
-  const projectData = {
-    client_id: formData.client_id,
-    description: formData.description.trim(),
-    status: formData.status,
-    type: formData.type, // ✅ Isso já funciona corretamente
-    products: processedProducts, // ✅ Usar produtos processados
-    budget: formData.budget,
-    start_date: formData.start_date,
-    delivery_deadline_days: formData.delivery_deadline_days,
-    materials_cost: formData.materials_cost || 0,
-    labor_cost: formData.labor_cost || 0,
-    profit_margin: formData.profit_margin || 0,
-    payment_terms: formData.payment_terms,
-  };
-
-  try {
-    setIsSaving(true);
-    
-    if (project) {
-      await updateProject(project.id, projectData);
-    } else {
-      await addProject(projectData);
+    try {
+      if (project) {
+        console.log('🔄 EDIÇÃO: Chamando updateProject');
+        await updateProject(project.id, projectData);
+        console.log('✅ Projeto atualizado com sucesso!');
+      } else {
+        console.log('🔄 NOVO: Chamando addProject (válido para orçamentos E vendas)');
+        await addProject(projectData);
+        console.log('✅ Projeto/Venda criado com sucesso!');
+      }
+      
+      onClose();
+    } catch (error) {
+      console.error('❌ ERRO ao salvar:', error);
+      alert('Erro ao salvar pedido/venda: ' + (error as any)?.message);
     }
-    
-    onClose();
-  } catch (error: any) {
-    console.error('❌ Erro ao salvar:', error);
-    alert(`Erro ao salvar: ${error.message}`);
-  } finally {
-    setIsSaving(false);
-  }
-};
-
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setFormData(prev => ({
