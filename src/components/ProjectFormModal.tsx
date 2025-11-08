@@ -277,36 +277,85 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
       return;
     }
 
-    // 🔧 ADICIONE ESTA VALIDAÇÃO ANTES DE SALVAR:
-  if (!formData.products || formData.products.length === 0) {
-    alert('⚠️ Adicione pelo menos um produto ou serviço!');
-    return;
-  }
+    // ✅ VALIDAÇÃO CORRIGIDA - Permite salvar com ou sem produtos
+    const safeProducts = Array.isArray(projectProducts) ? projectProducts : [];
+    
+    console.log('🔍 DEBUG handleSubmit - Estado de produtos:', {
+      projectProducts,
+      safeProducts,
+      length: safeProducts.length,
+      isArray: Array.isArray(projectProducts)
+    });
+    
+    // Validar produtos apenas se houver algum
+    if (safeProducts.length > 0) {
+      const invalidProducts = safeProducts.filter(p => 
+        !p.product_name || 
+        !p.quantity || p.quantity <= 0 || 
+        !p.unit_price || p.unit_price <= 0
+      );
 
-  // Validar cada produto
-  const invalidProducts = formData.products.filter(p => 
-    !p.product_name || 
-    !p.quantity || p.quantity <= 0 || 
-    !p.unit_price || p.unit_price <= 0
-  );
+      if (invalidProducts.length > 0) {
+        alert('⚠️ Verifique se todos os produtos têm nome, quantidade e preço válidos!');
+        console.error('❌ Produtos inválidos:', invalidProducts);
+        return;
+      }
+    }
 
-  if (invalidProducts.length > 0) {
-    alert('⚠️ Verifique se todos os produtos têm nome, quantidade e preço válidos!');
-    return;
-  }
+    const budget = calculateBudget();
+    const discountAmount = budget * (paymentTerms.discount_percentage / 100);
+    const finalValue = budget - discountAmount;
+    const installmentValue = finalValue / paymentTerms.installments;
 
-  // Processar produtos garantindo que estão no formato correto
-  const processedProducts = formData.products.map(p => ({
-    product_id: p.product_id || null,
-    product_name: p.product_name?.trim() || 'Produto sem nome',
-    quantity: Number(p.quantity) || 0,
-    unit_price: Number(p.unit_price) || 0,
-    total_price: Number(p.total_price) || (Number(p.quantity) * Number(p.unit_price)),
-    item_type: p.item_type || 'produto',
-    item_description: p.item_description || '',
-    service_hours: p.item_type === 'servico' ? Number(p.service_hours) : undefined,
-    hourly_rate: p.item_type === 'servico' ? Number(p.hourly_rate) : undefined,
-  }));
+    // Processar produtos com segurança
+    const validatedProducts = safeProducts.map(p => ({
+      ...p,
+      quantity: Number(p.quantity) || 1,
+      unit_price: Number(p.unit_price) || 0,
+      total_price: Number(p.total_price) || 0
+    }));
+
+    console.log('💾 Produtos validados:', validatedProducts);
+
+    // ✅ VALIDAÇÃO CORRIGIDA - Permite salvar com ou sem produtos
+    const safeProducts = Array.isArray(projectProducts) ? projectProducts : [];
+    
+    console.log('🔍 DEBUG handleSubmit - Estado de produtos:', {
+      projectProducts,
+      safeProducts,
+      length: safeProducts.length,
+      isArray: Array.isArray(projectProducts)
+    });
+    
+    // Validar produtos apenas se houver algum
+    if (safeProducts.length > 0) {
+      const invalidProducts = safeProducts.filter(p => 
+        !p.product_name || 
+        !p.quantity || p.quantity <= 0 || 
+        !p.unit_price || p.unit_price <= 0
+      );
+
+      if (invalidProducts.length > 0) {
+        alert('⚠️ Verifique se todos os produtos têm nome, quantidade e preço válidos!');
+        console.error('❌ Produtos inválidos:', invalidProducts);
+        return;
+      }
+    }
+
+    const budget = calculateBudget();
+    const discountAmount = budget * (paymentTerms.discount_percentage / 100);
+    const finalValue = budget - discountAmount;
+    const installmentValue = finalValue / paymentTerms.installments;
+
+    // Processar produtos com segurança
+    const validatedProducts = safeProducts.map(p => ({
+      ...p,
+      quantity: Number(p.quantity) || 1,
+      unit_price: Number(p.unit_price) || 0,
+      total_price: Number(p.total_price) || 0
+    }));
+
+    console.log('💾 Produtos validados:', validatedProducts);
 
   const projectData = {
     client_id: formData.client_id,
