@@ -301,10 +301,18 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
       }
     }
 
-    const budget = calculateBudget();
-    const discountAmount = budget * (paymentTerms.discount_percentage / 100);
-    const finalValue = budget - discountAmount;
-    const installmentValue = finalValue / paymentTerms.installments;
+    const calculatedBudget = calculateBudget();
+const budget = Number(calculatedBudget) || 0; // ✅ Garantir que nunca seja null/undefined
+const discountAmount = budget * (paymentTerms.discount_percentage / 100);
+const finalValue = budget - discountAmount;
+const installmentValue = finalValue / paymentTerms.installments;
+
+console.log('💰 Budget calculado:', {
+  calculatedBudget,
+  budget,
+  discountAmount,
+  finalValue
+});
 
     const validatedProducts = safeProducts.map(p => ({
       ...p,
