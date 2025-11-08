@@ -277,11 +277,22 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
       return;
     }
 
-    // 🔧 ADICIONE ESTA VALIDAÇÃO ANTES DE SALVAR:
-  if (!formData.products || formData.products.length === 0) {
-    alert('⚠️ Adicione pelo menos um produto ou serviço!');
+   // Garantir que produtos seja sempre um array válido
+const safeProducts = projectProducts || [];
+
+// Validar produtos apenas se houver algum
+if (safeProducts.length > 0) {
+  const invalidProducts = safeProducts.filter(p => 
+    !p.product_name || 
+    !p.quantity || p.quantity <= 0 || 
+    !p.unit_price || p.unit_price <= 0
+  );
+
+  if (invalidProducts.length > 0) {
+    alert('⚠️ Verifique se todos os produtos têm nome, quantidade e preço válidos!');
     return;
   }
+}
 
   // Validar cada produto
   const invalidProducts = formData.products.filter(p => 
