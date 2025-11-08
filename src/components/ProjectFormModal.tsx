@@ -341,66 +341,6 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
   }
 };
 
-    const budget = calculateBudget();
-    const discountAmount = budget * (paymentTerms.discount_percentage / 100);
-    const finalValue = budget - discountAmount;
-    const installmentValue = finalValue / paymentTerms.installments;
-
-    const validatedProducts = projectProducts.map(p => ({
-      ...p,
-      quantity: Number(p.quantity) || 1,
-      unit_price: Number(p.unit_price) || 0,
-      total_price: Number(p.total_price) || 0
-    }));
-
-    const projectData = {
-      client_id: formData.client_id,
-      description: formData.description,
-      status: formData.status,
-      type: formData.type,
-      products: validatedProducts,
-      budget,
-      start_date: formData.start_date,
-      end_date: formData.end_date,
-      delivery_deadline_days: formData.delivery_deadline_days,
-      materials_cost: parseFloat(formData.materials_cost) || 0,
-      labor_cost: parseFloat(formData.labor_cost) || 0,
-      profit_margin: parseFloat(formData.profit_margin) || 20,
-      payment_terms: {
-        installments: paymentTerms.installments,
-        payment_method: paymentTerms.payment_method,
-        discount_percentage: paymentTerms.discount_percentage,
-        installment_value: installmentValue,
-        total_with_discount: finalValue
-      }
-    };
-
-    console.log('💾 Dados para salvar:', projectData);
-
-    try {
-      if (project) {
-  console.log('🔄 EDIÇÃO: Chamando updateProject');
-  await updateProject(project.id, projectData);
-  console.log('✅ Projeto atualizado com sucesso!');
-} else {
-  if (formData.type === 'venda') {
-    console.log('🔄 NOVO: Criando VENDA - Chamando addOrder');
-    // Assumindo que existe uma função addOrder no contexto
-    // Se não existir, você precisa criá-la no AppContext.tsx
-    await addProject({ ...projectData, type: 'venda' });
-  } else {
-    console.log('🔄 NOVO: Criando ORÇAMENTO - Chamando addProject');
-    await addProject(projectData);
-  }
-  console.log('✅ Pedido/Venda criado com sucesso!');
-}
-      
-      onClose();
-    } catch (error) {
-      console.error('❌ ERRO ao salvar:', error);
-      alert('Erro ao salvar pedido/venda: ' + (error as any)?.message);
-    }
-  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setFormData(prev => ({
