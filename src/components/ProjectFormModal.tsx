@@ -277,6 +277,70 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
       return;
     }
 
+    // 🔧 ADICIONE ESTA VALIDAÇÃO ANTES DE SALVAR:
+  if (!formData.products || formData.products.length === 0) {
+    alert('⚠️ Adicione pelo menos um produto ou serviço!');
+    return;
+  }
+
+  // Validar cada produto
+  const invalidProducts = formData.products.filter(p => 
+    !p.product_name || 
+    !p.quantity || p.quantity <= 0 || 
+    !p.unit_price || p.unit_price <= 0
+  );
+
+  if (invalidProducts.length > 0) {
+    alert('⚠️ Verifique se todos os produtos têm nome, quantidade e preço válidos!');
+    return;
+  }
+
+  // Processar produtos garantindo que estão no formato correto
+  const processedProducts = formData.products.map(p => ({
+    product_id: p.product_id || null,
+    product_name: p.product_name?.trim() || 'Produto sem nome',
+    quantity: Number(p.quantity) || 0,
+    unit_price: Number(p.unit_price) || 0,
+    total_price: Number(p.total_price) || (Number(p.quantity) * Number(p.unit_price)),
+    item_type: p.item_type || 'produto',
+    item_description: p.item_description || '',
+    service_hours: p.item_type === 'servico' ? Number(p.service_hours) : undefined,
+    hourly_rate: p.item_type === 'servico' ? Number(p.hourly_rate) : undefined,
+  }));
+
+  const projectData = {
+    client_id: formData.client_id,
+    description: formData.description.trim(),
+    status: formData.status,
+    type: formData.type, // ✅ Isso já funciona corretamente
+    products: processedProducts, // ✅ Usar produtos processados
+    budget: formData.budget,
+    start_date: formData.start_date,
+    delivery_deadline_days: formData.delivery_deadline_days,
+    materials_cost: formData.materials_cost || 0,
+    labor_cost: formData.labor_cost || 0,
+    profit_margin: formData.profit_margin || 0,
+    payment_terms: formData.payment_terms,
+  };
+
+  try {
+    setIsSaving(true);
+    
+    if (project) {
+      await updateProject(project.id, projectData);
+    } else {
+      await addProject(projectData);
+    }
+    
+    onClose();
+  } catch (error: any) {
+    console.error('❌ Erro ao salvar:', error);
+    alert(`Erro ao salvar: ${error.message}`);
+  } finally {
+    setIsSaving(false);
+  }
+};
+
     const budget = calculateBudget();
     const discountAmount = budget * (paymentTerms.discount_percentage / 100);
     const finalValue = budget - discountAmount;
@@ -315,14 +379,21 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
 
     try {
       if (project) {
-        console.log('🔄 EDIÇÃO: Chamando updateProject');
-        await updateProject(project.id, projectData);
-        console.log('✅ Projeto atualizado com sucesso!');
-      } else {
-        console.log('🔄 NOVO: Chamando addProject (válido para orçamentos E vendas)');
-        await addProject(projectData);
-        console.log('✅ Projeto/Venda criado com sucesso!');
-      }
+  console.log('🔄 EDIÇÃO: Chamando updateProject');
+  await updateProject(project.id, projectData);
+  console.log('✅ Projeto atualizado com sucesso!');
+} else {
+  if (formData.type === 'venda') {
+    console.log('🔄 NOVO: Criando VENDA - Chamando addOrder');
+    // Assumindo que existe uma função addOrder no contexto
+    // Se não existir, você precisa criá-la no AppContext.tsx
+    await addProject({ ...projectData, type: 'venda' });
+  } else {
+    console.log('🔄 NOVO: Criando ORÇAMENTO - Chamando addProject');
+    await addProject(projectData);
+  }
+  console.log('✅ Pedido/Venda criado com sucesso!');
+}
       
       onClose();
     } catch (error) {
