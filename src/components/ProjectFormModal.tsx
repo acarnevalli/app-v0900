@@ -278,6 +278,11 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
       return;
     }
 
+     if (!projectProducts || projectProducts.length === 0) {
+      alert('❌ Adicione pelo menos um produto ou serviço ao pedido!');
+      return;
+    }
+
 
     // ✅ VALIDAÇÃO E PREPARAÇÃO DOS DADOS
     const safeProducts = Array.isArray(projectProducts) ? projectProducts : [];
@@ -304,10 +309,15 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
 
     // Calcular budget com segurança
     const calculatedBudget = calculateBudget();
+       if (!budget || budget <= 0 || isNaN(budget)) {
+      alert('❌ O valor total do pedido deve ser maior que zero. Verifique os produtos e custos adicionados.');
+      return;
+    }
     const budget = Number(calculatedBudget) || 0;
     const discountAmount = budget * (paymentTerms.discount_percentage / 100);
     const finalValue = budget - discountAmount;
     const installmentValue = finalValue / paymentTerms.installments;
+    
 
     // Validar produtos
     const validatedProducts = safeProducts.map(p => ({
