@@ -278,7 +278,8 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
       return;
     }
 
-    // ✅ VALIDAÇÃO CORRIGIDA
+
+    // ✅ VALIDAÇÃO E PREPARAÇÃO DOS DADOS
     const safeProducts = Array.isArray(projectProducts) ? projectProducts : [];
     
     console.log('🔍 DEBUG handleSubmit:', {
@@ -287,6 +288,7 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
       length: safeProducts.length
     });
     
+    // Validar apenas se houver produtos
     if (safeProducts.length > 0) {
       const invalidProducts = safeProducts.filter(p => 
         !p.product_name || 
@@ -295,17 +297,19 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
       );
 
       if (invalidProducts.length > 0) {
-        alert('⚠️ Produtos inválidos!');
+        alert('⚠️ Produtos inválidos! Verifique nome, quantidade e preço.');
         return;
       }
     }
 
+    // Calcular budget com segurança
     const calculatedBudget = calculateBudget();
     const budget = Number(calculatedBudget) || 0;
     const discountAmount = budget * (paymentTerms.discount_percentage / 100);
     const finalValue = budget - discountAmount;
     const installmentValue = finalValue / paymentTerms.installments;
 
+    // Validar produtos
     const validatedProducts = safeProducts.map(p => ({
       ...p,
       quantity: Number(p.quantity) || 1,
@@ -313,73 +317,7 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
       total_price: Number(p.total_price) || 0
     }));
 
-  const projectData = {
-    // ✅ VALIDAÇÃO CORRIGIDA
-    const safeProducts = Array.isArray(projectProducts) ? projectProducts : [];
-    
-    console.log('🔍 DEBUG handleSubmit:', {
-      projectProducts,
-      safeProducts,
-      length: safeProducts.length
-    });
-    
-    if (safeProducts.length > 0) {
-      const invalidProducts = safeProducts.filter(p => 
-        !p.product_name || 
-        !p.quantity || p.quantity <= 0 || 
-        !p.unit_price || p.unit_price <= 0
-      );
-
-      if (invalidProducts.length > 0) {
-        alert('⚠️ Produtos inválidos!');
-        return;
-      }
-    }
-
-    const calculatedBudget = calculateBudget();
-    const budget = Number(calculatedBudget) || 0;
-    const discountAmount = budget * (paymentTerms.discount_percentage / 100);
-    const finalValue = budget - discountAmount;
-    const installmentValue = finalValue / paymentTerms.installments;
-
-    const validatedProducts = safeProducts.map(p => ({
-      ...p,
-      quantity: Number(p.quantity) || 1,
-      unit_price: Number(p.unit_price) || 0,
-      total_price: Number(p.total_price) || 0
-    }));
-
-  const projectData = {
-    alert('⚠️ Adicione pelo menos um produto ou serviço!');
-    return;
-  }
-
-  // Validar cada produto
-  const invalidProducts = formData.products.filter(p => 
-    !p.product_name || 
-    !p.quantity || p.quantity <= 0 || 
-    !p.unit_price || p.unit_price <= 0
-  );
-
-  if (invalidProducts.length > 0) {
-    alert('⚠️ Verifique se todos os produtos têm nome, quantidade e preço válidos!');
-    return;
-  }
-
-  // Processar produtos garantindo que estão no formato correto
-  const processedProducts = formData.products.map(p => ({
-    product_id: p.product_id || null,
-    product_name: p.product_name?.trim() || 'Produto sem nome',
-    quantity: Number(p.quantity) || 0,
-    unit_price: Number(p.unit_price) || 0,
-    total_price: Number(p.total_price) || (Number(p.quantity) * Number(p.unit_price)),
-    item_type: p.item_type || 'produto',
-    item_description: p.item_description || '',
-    service_hours: p.item_type === 'servico' ? Number(p.service_hours) : undefined,
-    hourly_rate: p.item_type === 'servico' ? Number(p.hourly_rate) : undefined,
-  }));
-
-  const projectData = {
+    const projectData = {
     client_id: formData.client_id,
     description: formData.description.trim(),
     status: formData.status,
