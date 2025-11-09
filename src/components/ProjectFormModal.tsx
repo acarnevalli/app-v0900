@@ -1092,25 +1092,6 @@ useEffect(() => {
                 />
               </div>
 
-              {paymentTerms.installments > 1 && (
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Intervalo entre Parcelas
-                  </label>
-                  <select
-                    value={paymentTerms.installment_interval_days}
-                    onChange={(e) => setPaymentTerms({ ...paymentTerms, installment_interval_days: parseInt(e.target.value) })}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  >
-                    <option value={7}>Semanal (7 dias)</option>
-                    <option value={15}>Quinzenal (15 dias)</option>
-                    <option value={30}>Mensal (30 dias)</option>
-                    <option value={60}>Bimestral (60 dias)</option>
-                    <option value={90}>Trimestral (90 dias)</option>
-                  </select>
-                </div>
-              )}
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Desconto (%)
@@ -1169,14 +1150,6 @@ useEffect(() => {
             </button>
           </div>
         </form>
-
-      {showClientModal && (
-        <ClientModal
-          onClose={() => {
-            setShowClientModal(false);
-          }}
-        />
-      )}
 
         {showProductSearch && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60 p-4">
