@@ -28,6 +28,8 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
 
   const hasLoadedData = useRef(false);
   const isInitialized = useRef(false);
+  // ✅ ADICIONADO: Ref para rastrear o estado real dos produtos
+  const projectProductsRef = useRef<ProjectProduct[]>([]);
 
   console.log("🔥 PROPS RECEBIDAS NO MODAL:", { 
     projectId: project?.id,
@@ -63,6 +65,7 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [selectedClientName, setSelectedClientName] = useState('');
   const [itemTypeToAdd, setItemTypeToAdd] = useState<ItemType>('produto');
+  const [isSaving, setIsSaving] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -268,6 +271,17 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    console.log('🚀 [SUBMIT] Iniciando validação...');
+    console.log('📦 [SUBMIT] projectProducts (state):', projectProducts);
+    console.log('📦 [SUBMIT] projectProductsRef (ref):', projectProductsRef.current);
+
+    // ✅ USAR REF EM VEZ DE STATE DIRETO
+    const currentProducts = projectProductsRef.current.length > 0 
+      ? projectProductsRef.current 
+      : projectProducts;
+
+    console.log('📊 [SUBMIT] Usando produtos:', currentProducts);
+
     if (!formData.client_id) {
       alert('Por favor, selecione um cliente');
       return;
@@ -280,7 +294,7 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
 
 
     // ✅ VALIDAÇÃO E PREPARAÇÃO DOS DADOS
-    const safeProducts = Array.isArray(projectProducts) ? projectProducts : [];
+    const safeProducts = Array.isArray(currentProducts) ? currentProducts : [];
     
     console.log('🔍 DEBUG handleSubmit:', {
       projectProducts,
