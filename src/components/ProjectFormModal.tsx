@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';  // ✅ Adicionei useRef
 import {
   X,
   Briefcase,
@@ -24,19 +24,16 @@ interface ProjectFormModalProps {
 }
 
 const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose }) => {
-  const { clients, products, addProject, updateProject, loading } = useApp();
+  const { clients, products, addProject, updateProject } = useApp();
 
   const hasLoadedData = useRef(false);
   const isInitialized = useRef(false);
-  // ✅ ADICIONADO: Ref para rastrear o estado real dos produtos
-  const projectProductsRef = useRef<ProjectProduct[]>([]);
 
   console.log("🔥 PROPS RECEBIDAS NO MODAL:", { 
     projectId: project?.id,
     clientId: project?.client_id,
     hasProducts: project?.products?.length || 0,
-    productsType: Array.isArray(project?.products) ? 'array' : typeof project?.products,
-    loading
+    productsType: Array.isArray(project?.products) ? 'array' : typeof project?.products
   });
 
   const [formData, setFormData] = useState({
@@ -65,21 +62,13 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [selectedClientName, setSelectedClientName] = useState('');
   const [itemTypeToAdd, setItemTypeToAdd] = useState<ItemType>('produto');
-  const [isSaving, setIsSaving] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     console.log('🔄 useEffect PRINCIPAL disparado:', { 
       hasProject: !!project,
       projectId: project?.id,
-      loading,
       isInitialized: isInitialized.current
     });
-
-    if (loading) {
-      console.log('⏳ Aguardando carregamento dos dados do contexto...');
-      return;
-    }
 
     if (!clients.length && !products.length) {
       console.log('⏳ Aguardando clients e products carregarem...');
@@ -108,7 +97,7 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
     loadProjectData(project);
     isInitialized.current = true;
 
-  }, [project, clients, products, loading]);
+  }, [project, clients]);  // ✅ CORRIGIDO: Depende do project completo e clients
 
   const resetForm = () => {
     setFormData({
@@ -243,6 +232,19 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
     });
   }, [projectProducts]);
 
+// ✅ NOVO: Efeito para DEBUG - Monitorar mudanças em projectProducts
+useEffect(() => {
+  console.log('🔔 [DEBUG] projectProducts mudou:', {
+    length: projectProducts.length,
+    items: projectProducts.map(p => ({
+      id: p.id,
+      name: p.product_name,
+      type: p.item_type,
+      quantity: p.quantity
+    }))
+  });
+}, [projectProducts]);
+
   useEffect(() => {
     if (formData.start_date && formData.delivery_deadline_days) {
       const startDate = new Date(formData.start_date);
@@ -271,17 +273,6 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    console.log('🚀 [SUBMIT] Iniciando validação...');
-    console.log('📦 [SUBMIT] projectProducts (state):', projectProducts);
-    console.log('📦 [SUBMIT] projectProductsRef (ref):', projectProductsRef.current);
-
-    // ✅ USAR REF EM VEZ DE STATE DIRETO
-    const currentProducts = projectProductsRef.current.length > 0 
-      ? projectProductsRef.current 
-      : projectProducts;
-
-    console.log('📊 [SUBMIT] Usando produtos:', currentProducts);
-
     if (!formData.client_id) {
       alert('Por favor, selecione um cliente');
       return;
@@ -292,39 +283,12 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
       return;
     }
 
-
-    // ✅ VALIDAÇÃO E PREPARAÇÃO DOS DADOS
-    const safeProducts = Array.isArray(currentProducts) ? currentProducts : [];
-    
-    console.log('🔍 DEBUG handleSubmit:', {
-      projectProducts,
-      safeProducts,
-      length: safeProducts.length
-    });
-    
-    // Validar apenas se houver produtos
-    if (safeProducts.length > 0) {
-      const invalidProducts = safeProducts.filter(p => 
-        !p.product_name || 
-        !p.quantity || p.quantity <= 0 || 
-        !p.unit_price || p.unit_price <= 0
-      );
-
-      if (invalidProducts.length > 0) {
-        alert('⚠️ Produtos inválidos! Verifique nome, quantidade e preço.');
-        return;
-      }
-    }
-
-    // Calcular budget com segurança
-    const calculatedBudget = calculateBudget();
-    const budget = Number(calculatedBudget) || 0;
+    const budget = calculateBudget();
     const discountAmount = budget * (paymentTerms.discount_percentage / 100);
     const finalValue = budget - discountAmount;
     const installmentValue = finalValue / paymentTerms.installments;
 
-    // Validar produtos
-    const validatedProducts = safeProducts.map(p => ({
+    const validatedProducts = projectProducts.map(p => ({
       ...p,
       quantity: Number(p.quantity) || 1,
       unit_price: Number(p.unit_price) || 0,
@@ -332,38 +296,46 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
     }));
 
     const projectData = {
-    client_id: formData.client_id,
-    description: formData.description.trim(),
-    status: formData.status,
-    type: formData.type, // ✅ Isso já funciona corretamente
-    products: validatedProducts, // ✅ Usar produtos processados
-    budget: formData.budget,
-    start_date: formData.start_date,
-    delivery_deadline_days: formData.delivery_deadline_days,
-    materials_cost: formData.materials_cost || 0,
-    labor_cost: formData.labor_cost || 0,
-    profit_margin: formData.profit_margin || 0,
-    payment_terms: formData.payment_terms,
-  };
+      client_id: formData.client_id,
+      description: formData.description,
+      status: formData.status,
+      type: formData.type,
+      products: validatedProducts,
+      budget,
+      start_date: formData.start_date,
+      end_date: formData.end_date,
+      delivery_deadline_days: formData.delivery_deadline_days,
+      materials_cost: parseFloat(formData.materials_cost) || 0,
+      labor_cost: parseFloat(formData.labor_cost) || 0,
+      profit_margin: parseFloat(formData.profit_margin) || 20,
+      payment_terms: {
+        installments: paymentTerms.installments,
+        payment_method: paymentTerms.payment_method,
+        discount_percentage: paymentTerms.discount_percentage,
+        installment_value: installmentValue,
+        total_with_discount: finalValue
+      }
+    };
 
-  try {
-    setIsSaving(true);
-    
-    if (project) {
-      await updateProject(project.id, projectData);
-    } else {
-      await addProject(projectData);
+    console.log('💾 Dados para salvar:', projectData);
+
+    try {
+      if (project) {
+        console.log('🔄 EDIÇÃO: Chamando updateProject');
+        await updateProject(project.id, projectData);
+        console.log('✅ Projeto atualizado com sucesso!');
+      } else {
+        console.log('🔄 NOVO: Chamando addProject (válido para orçamentos E vendas)');
+        await addProject(projectData);
+        console.log('✅ Projeto/Venda criado com sucesso!');
+      }
+      
+      onClose();
+    } catch (error) {
+      console.error('❌ ERRO ao salvar:', error);
+      alert('Erro ao salvar pedido/venda: ' + (error as any)?.message);
     }
-    
-    onClose();
-  } catch (error: any) {
-    console.error('❌ Erro ao salvar:', error);
-    alert(`Erro ao salvar: ${error.message}`);
-  } finally {
-    setIsSaving(false);
-  }
-};
-
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setFormData(prev => ({
