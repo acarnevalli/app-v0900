@@ -1,422 +1,332 @@
-// src/components/CashFlowTab.tsx
-import React, { useMemo, useState } from 'react';
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  DollarSign, 
-  PieChart, 
-  BarChart3,
+import React, { useState, useMemo } from 'react';
+import {
+  TrendingUp,
+  TrendingDown,
   Calendar,
-  ArrowUpRight,
-  ArrowDownRight
+  DollarSign,
+  ArrowUpCircle,
+  ArrowDownCircle,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  Download
 } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
-import { formatCurrency } from '../lib/utils';
-
-type PeriodFilter = 'current_month' | 'last_3_months' | 'last_6_months' | 'last_12_months' | 'custom';
+import { formatCurrency, formatDate } from '../lib/utils';
 
 const CashFlowTab: React.FC = () => {
-  const { financialTransactions, bankAccounts, costCenters } = useApp();
+  const { financialTransactions } = useApp();
   
-  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('last_6_months');
-  const [customStartDate, setCustomStartDate] = useState<string>('');
-  const [customEndDate, setCustomEndDate] = useState<string>('');
+  const [dateFilterType, setDateFilterType] = useState<'day' | 'week' | 'month'>('month');
+  const [currentDate, setCurrentDate] = useState(new Date());
 
   // Calcular período baseado no filtro
-  const { startDate, endDate } = useMemo(() => {
-    const now = new Date();
-    let start = new Date();
-    let end = new Date(now);
+  const getDateRange = () => {
+    const date = new Date(currentDate);
+    let startDate: Date, endDate: Date;
 
-    switch (periodFilter) {
-      case 'current_month':
-        start = new Date(now.getFullYear(), now.getMonth(), 1);
+    switch (dateFilterType) {
+      case 'day':
+        startDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0);
+        endDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59);
         break;
-      case 'last_3_months':
-        start = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+
+      case 'week':
+        const dayOfWeek = date.getDay();
+        startDate = new Date(date);
+        startDate.setDate(date.getDate() - dayOfWeek);
+        startDate.setHours(0, 0, 0, 0);
+        endDate = new Date(startDate);
+        endDate.setDate(startDate.getDate() + 6);
+        endDate.setHours(23, 59, 59, 999);
         break;
-      case 'last_6_months':
-        start = new Date(now.getFullYear(), now.getMonth() - 6, 1);
-        break;
-      case 'last_12_months':
-        start = new Date(now.getFullYear(), now.getMonth() - 12, 1);
-        break;
-      case 'custom':
-        if (customStartDate && customEndDate) {
-          start = new Date(customStartDate);
-          end = new Date(customEndDate);
-        }
+
+      case 'month':
+      default:
+        startDate = new Date(date.getFullYear(), date.getMonth(), 1);
+        endDate = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
         break;
     }
 
-    return { startDate: start, endDate: end };
-  }, [periodFilter, customStartDate, customEndDate]);
+    return { startDate, endDate };
+  };
 
-  // Filtrar transações pelo período
+  // Label do período
+  const getDateRangeLabel = () => {
+    const date = new Date(currentDate);
+    const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+    switch (dateFilterType) {
+      case 'day':
+        return date.toLocaleDateString('pt-BR');
+
+      case 'week':
+        const range = getDateRange();
+        return `${range.startDate.getDate()}/${range.startDate.getMonth() + 1} - ${range.endDate.getDate()}/${range.endDate.getMonth() + 1}/${range.endDate.getFullYear()}`;
+
+      case 'month':
+      default:
+        return `${months[date.getMonth()]} ${date.getFullYear()}`;
+    }
+  };
+
+  // Navegar entre períodos
+  const navigateDate = (direction: 'prev' | 'next') => {
+    const newDate = new Date(currentDate);
+
+    switch (dateFilterType) {
+      case 'day':
+        newDate.setDate(newDate.getDate() + (direction === 'next' ? 1 : -1));
+        break;
+
+      case 'week':
+        newDate.setDate(newDate.getDate() + (direction === 'next' ? 7 : -7));
+        break;
+
+      case 'month':
+      default:
+        newDate.setMonth(newDate.getMonth() + (direction === 'next' ? 1 : -1));
+        break;
+    }
+
+    setCurrentDate(newDate);
+  };
+
+  // Filtrar transações do período
   const periodTransactions = useMemo(() => {
+    const { startDate, endDate } = getDateRange();
+    
     return financialTransactions.filter(t => {
-      const transactionDate = new Date(t.date);
-      return transactionDate >= startDate && transactionDate <= endDate;
-    });
-  }, [financialTransactions, startDate, endDate]);
+      const transDate = new Date(t.date);
+      return transDate >= startDate && transDate <= endDate;
+    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [financialTransactions, currentDate, dateFilterType]);
 
   // Calcular totais
   const totals = useMemo(() => {
     const income = periodTransactions
-      .filter(t => t.type === 'income' && (t.status === 'paid' || t.status === 'partial'))
-      .reduce((sum, t) => sum + (t.paid_amount || 0), 0);
-
+      .filter(t => t.type === 'income')
+      .reduce((sum, t) => sum + t.amount, 0);
+    
     const expense = periodTransactions
-      .filter(t => t.type === 'expense' && (t.status === 'paid' || t.status === 'partial'))
-      .reduce((sum, t) => sum + (t.paid_amount || 0), 0);
-
-    const result = income - expense;
-    const margin = income > 0 ? (result / income) * 100 : 0;
-
-    return { income, expense, result, margin };
+      .filter(t => t.type === 'expense')
+      .reduce((sum, t) => sum + t.amount, 0);
+    
+    return {
+      income,
+      expense,
+      balance: income - expense
+    };
   }, [periodTransactions]);
 
-  // Calcular saldo total das contas bancárias
-  const totalBankBalance = useMemo(() => {
-    return bankAccounts
-      .filter(ba => ba.active)
-      .reduce((sum, ba) => sum + ba.current_balance, 0);
-  }, [bankAccounts]);
+  // Status Badge
+  const getStatusBadge = (status: string) => {
+    const badges = {
+      pending: { label: 'Pendente', color: 'bg-yellow-100 text-yellow-800' },
+      paid: { label: 'Pago', color: 'bg-green-100 text-green-800' },
+      overdue: { label: 'Vencido', color: 'bg-red-100 text-red-800' },
+      cancelled: { label: 'Cancelado', color: 'bg-gray-100 text-gray-800' }
+    };
 
-  // Calcular projeção (pendentes)
-  const projection = useMemo(() => {
-    const pendingIncome = financialTransactions
-      .filter(t => t.type === 'income' && (t.status === 'pending' || t.status === 'partial'))
-      .reduce((sum, t) => sum + (t.amount - (t.paid_amount || 0)), 0);
+    const badge = badges[status as keyof typeof badges] || badges.pending;
 
-    const pendingExpense = financialTransactions
-      .filter(t => t.type === 'expense' && (t.status === 'pending' || t.status === 'partial'))
-      .reduce((sum, t) => sum + (t.amount - (t.paid_amount || 0)), 0);
-
-    const projectedBalance = totalBankBalance + pendingIncome - pendingExpense;
-
-    return { pendingIncome, pendingExpense, projectedBalance };
-  }, [financialTransactions, totalBankBalance]);
-
-  // Evolução mensal (últimos 6 meses)
-  const monthlyEvolution = useMemo(() => {
-    const months: { month: string; income: number; expense: number; result: number }[] = [];
-    const now = new Date();
-
-    for (let i = 5; i >= 0; i--) {
-      const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
-      const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
-
-      const monthTransactions = financialTransactions.filter(t => {
-        const tDate = new Date(t.date);
-        return tDate >= monthStart && tDate <= monthEnd;
-      });
-
-      const income = monthTransactions
-        .filter(t => t.type === 'income' && (t.status === 'paid' || t.status === 'partial'))
-        .reduce((sum, t) => sum + (t.paid_amount || 0), 0);
-
-      const expense = monthTransactions
-        .filter(t => t.type === 'expense' && (t.status === 'paid' || t.status === 'partial'))
-        .reduce((sum, t) => sum + (t.paid_amount || 0), 0);
-
-      months.push({
-        month: monthDate.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }),
-        income,
-        expense,
-        result: income - expense
-      });
-    }
-
-    return months;
-  }, [financialTransactions]);
-
-  // Despesas por Centro de Custo
-  const expensesByCostCenter = useMemo(() => {
-    const totals: Record<string, number> = {};
-
-    periodTransactions
-      .filter(t => t.type === 'expense' && t.cost_center_id && (t.status === 'paid' || t.status === 'partial'))
-      .forEach(t => {
-        const ccId = t.cost_center_id!;
-        totals[ccId] = (totals[ccId] || 0) + (t.paid_amount || 0);
-      });
-
-    return Object.entries(totals)
-      .map(([ccId, total]) => ({
-        costCenter: costCenters.find(cc => cc.id === ccId),
-        total
-      }))
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 5);
-  }, [periodTransactions, costCenters]);
-
-  // Calcular porcentagem máxima para gráficos
-  const maxMonthlyValue = useMemo(() => {
-    return Math.max(...monthlyEvolution.map(m => Math.max(m.income, m.expense)));
-  }, [monthlyEvolution]);
-
-  const maxCostCenterValue = useMemo(() => {
-    return expensesByCostCenter.length > 0 
-      ? Math.max(...expensesByCostCenter.map(e => e.total))
-      : 1;
-  }, [expensesByCostCenter]);
+    return (
+      <span className={`px-2 py-1 text-xs font-medium rounded-full ${badge.color}`}>
+        {badge.label}
+      </span>
+    );
+  };
 
   return (
     <div className="space-y-6">
-      {/* Filtro de Período */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Calendar className="h-5 w-5 text-gray-600" />
-          <h3 className="text-lg font-semibold text-gray-900">Período de Análise</h3>
+      {/* Filtros de Período */}
+      <div className="bg-white rounded-xl shadow-lg p-6">
+        <div className="flex items-center space-x-2 mb-4">
+          <Filter className="h-5 w-5 text-gray-500" />
+          <span className="font-medium text-gray-700">Filtro de Período:</span>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Período
-            </label>
-            <select
-              value={periodFilter}
-              onChange={(e) => setPeriodFilter(e.target.value as PeriodFilter)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <select
+            value={dateFilterType}
+            onChange={(e) => setDateFilterType(e.target.value as any)}
+            className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="day">Diário</option>
+            <option value="week">Semanal</option>
+            <option value="month">Mensal</option>
+          </select>
+
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => navigateDate('prev')}
+              className="p-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
             >
-              <option value="current_month">Mês Atual</option>
-              <option value="last_3_months">Últimos 3 Meses</option>
-              <option value="last_6_months">Últimos 6 Meses</option>
-              <option value="last_12_months">Últimos 12 Meses</option>
-              <option value="custom">Personalizado</option>
-            </select>
+              <ChevronLeft className="h-5 w-5 text-gray-600" />
+            </button>
+            <div className="flex-1 text-center font-medium text-gray-800 bg-blue-50 py-3 rounded-lg border border-blue-200">
+              {getDateRangeLabel()}
+            </div>
+            <button
+              onClick={() => navigateDate('next')}
+              className="p-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <ChevronRight className="h-5 w-5 text-gray-600" />
+            </button>
           </div>
-
-          {periodFilter === 'custom' && (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Data Inicial
-                </label>
-                <input
-                  type="date"
-                  value={customStartDate}
-                  onChange={(e) => setCustomStartDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Data Final
-                </label>
-                <input
-                  type="date"
-                  value={customEndDate}
-                  onChange={(e) => setCustomEndDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </>
-          )}
         </div>
       </div>
 
-      {/* DRE - Demonstração de Resultados */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-6">
-          Demonstração de Resultados (DRE)
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* Receitas */}
-          <div className="border-l-4 border-green-500 pl-4">
-            <p className="text-sm text-gray-600 mb-1">Receitas Totais</p>
-            <p className="text-2xl font-bold text-green-600">
-              {formatCurrency(totals.income)}
-            </p>
-            <div className="flex items-center gap-1 mt-2 text-sm text-green-600">
-              <ArrowUpRight className="h-4 w-4" />
-              <span>Entradas</span>
+      {/* Resumo do Período */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-green-500">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 mb-1">Receitas</p>
+              <p className="text-2xl font-bold text-green-600">
+                {formatCurrency(totals.income)}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                {periodTransactions.filter(t => t.type === 'income').length} transação(ões)
+              </p>
             </div>
+            <ArrowUpCircle className="h-10 w-10 text-green-500" />
           </div>
+        </div>
 
-          {/* Despesas */}
-          <div className="border-l-4 border-red-500 pl-4">
-            <p className="text-sm text-gray-600 mb-1">Despesas Totais</p>
-            <p className="text-2xl font-bold text-red-600">
-              {formatCurrency(totals.expense)}
-            </p>
-            <div className="flex items-center gap-1 mt-2 text-sm text-red-600">
-              <ArrowDownRight className="h-4 w-4" />
-              <span>Saídas</span>
+        <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-red-500">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 mb-1">Despesas</p>
+              <p className="text-2xl font-bold text-red-600">
+                {formatCurrency(totals.expense)}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                {periodTransactions.filter(t => t.type === 'expense').length} transação(ões)
+              </p>
             </div>
+            <ArrowDownCircle className="h-10 w-10 text-red-500" />
           </div>
+        </div>
 
-          {/* Resultado */}
-          <div className={`border-l-4 ${totals.result >= 0 ? 'border-blue-500' : 'border-orange-500'} pl-4`}>
-            <p className="text-sm text-gray-600 mb-1">Resultado</p>
-            <p className={`text-2xl font-bold ${totals.result >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>
-              {formatCurrency(totals.result)}
-            </p>
-            <div className="flex items-center gap-1 mt-2 text-sm text-gray-600">
-              {totals.result >= 0 ? (
-                <TrendingUp className="h-4 w-4 text-green-500" />
+        <div className={`bg-white p-6 rounded-xl shadow-sm border-l-4 ${
+          totals.balance >= 0 ? 'border-blue-500' : 'border-orange-500'
+        }`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 mb-1">Saldo</p>
+              <p className={`text-2xl font-bold ${
+                totals.balance >= 0 ? 'text-blue-600' : 'text-orange-600'
+              }`}>
+                {formatCurrency(Math.abs(totals.balance))}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                {totals.balance >= 0 ? 'Superávit' : 'Déficit'}
+              </p>
+            </div>
+            {totals.balance >= 0 ? (
+              <TrendingUp className="h-10 w-10 text-blue-500" />
+            ) : (
+              <TrendingDown className="h-10 w-10 text-orange-500" />
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Lista de Transações */}
+      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+        <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+          <h3 className="text-xl font-bold text-gray-800">
+            Transações do Período ({periodTransactions.length})
+          </h3>
+          <button className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+            <Download className="h-4 w-4" />
+            <span>Exportar</span>
+          </button>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase">Data</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase">Tipo</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase">Descrição</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase">Categoria</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase">Valor</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase">Status</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase">Conta</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {periodTransactions.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                    Nenhuma transação encontrada neste período
+                  </td>
+                </tr>
               ) : (
-                <TrendingDown className="h-4 w-4 text-red-500" />
+                periodTransactions.map((transaction) => (
+                  <tr key={transaction.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {formatDate(transaction.date)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {transaction.type === 'income' ? (
+                        <span className="flex items-center text-green-600 font-medium">
+                          <ArrowUpCircle className="h-4 w-4 mr-1" />
+                          Receita
+                        </span>
+                      ) : (
+                        <span className="flex items-center text-red-600 font-medium">
+                          <ArrowDownCircle className="h-4 w-4 mr-1" />
+                          Despesa
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-900">
+                      {transaction.description}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">
+                      {transaction.category}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <span className={transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}>
+                        {formatCurrency(transaction.amount)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {getStatusBadge(transaction.status)}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">
+                      {transaction.account_name || '-'}
+                    </td>
+                  </tr>
+                ))
               )}
-              <span>{totals.result >= 0 ? 'Lucro' : 'Prejuízo'}</span>
-            </div>
-          </div>
-
-          {/* Margem */}
-          <div className="border-l-4 border-purple-500 pl-4">
-            <p className="text-sm text-gray-600 mb-1">Margem de Lucro</p>
-            <p className="text-2xl font-bold text-purple-600">
-              {totals.margin.toFixed(1)}%
-            </p>
-            <div className="flex items-center gap-1 mt-2 text-sm text-gray-600">
-              <PieChart className="h-4 w-4" />
-              <span>Rentabilidade</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Fluxo de Caixa */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-6">
-          Fluxo de Caixa
-        </h3>
-        <div className="space-y-4">
-          {/* Saldo Atual */}
-          <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <DollarSign className="h-5 w-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Saldo Atual em Contas</p>
-                <p className="text-xl font-bold text-blue-600">
-                  {formatCurrency(totalBankBalance)}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Projeção */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 border border-gray-200 rounded-lg">
-              <p className="text-sm text-gray-600 mb-1">A Receber</p>
-              <p className="text-lg font-semibold text-green-600">
-                + {formatCurrency(projection.pendingIncome)}
-              </p>
-            </div>
-            <div className="p-4 border border-gray-200 rounded-lg">
-              <p className="text-sm text-gray-600 mb-1">A Pagar</p>
-              <p className="text-lg font-semibold text-red-600">
-                - {formatCurrency(projection.pendingExpense)}
-              </p>
-            </div>
-            <div className="p-4 border border-gray-200 rounded-lg bg-purple-50">
-              <p className="text-sm text-gray-600 mb-1">Saldo Projetado</p>
-              <p className="text-lg font-semibold text-purple-600">
-                {formatCurrency(projection.projectedBalance)}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Gráficos */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Evolução Mensal */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center gap-2 mb-6">
-            <BarChart3 className="h-5 w-5 text-gray-600" />
-            <h3 className="text-lg font-semibold text-gray-900">
-              Evolução Mensal (Últimos 6 Meses)
-            </h3>
-          </div>
-          <div className="space-y-4">
-            {monthlyEvolution.map((month, index) => (
-              <div key={index}>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-700 capitalize">
-                    {month.month}
-                  </span>
-                  <span className={`text-sm font-semibold ${month.result >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {formatCurrency(month.result)}
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  {/* Barra de Receitas */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-500 w-16">Receitas</span>
-                    <div className="flex-1 bg-gray-100 rounded-full h-2">
-                      <div
-                        className="bg-green-500 h-2 rounded-full transition-all"
-                        style={{ width: `${(month.income / maxMonthlyValue) * 100}%` }}
-                      />
+            </tbody>
+            {periodTransactions.length > 0 && (
+              <tfoot className="bg-gray-50 font-bold">
+                <tr>
+                  <td colSpan={4} className="px-6 py-4 text-right text-sm text-gray-700">
+                    Total do Período:
+                  </td>
+                  <td className="px-6 py-4 text-sm">
+                    <div className={`font-bold ${
+                      totals.balance >= 0 ? 'text-blue-600' : 'text-orange-600'
+                    }`}>
+                      {formatCurrency(Math.abs(totals.balance))}
                     </div>
-                    <span className="text-xs text-gray-700 w-24 text-right">
-                      {formatCurrency(month.income)}
-                    </span>
-                  </div>
-                  {/* Barra de Despesas */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-500 w-16">Despesas</span>
-                    <div className="flex-1 bg-gray-100 rounded-full h-2">
-                      <div
-                        className="bg-red-500 h-2 rounded-full transition-all"
-                        style={{ width: `${(month.expense / maxMonthlyValue) * 100}%` }}
-                      />
+                    <div className="text-xs text-gray-500">
+                      {totals.balance >= 0 ? 'Superávit' : 'Déficit'}
                     </div>
-                    <span className="text-xs text-gray-700 w-24 text-right">
-                      {formatCurrency(month.expense)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Despesas por Centro de Custo */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center gap-2 mb-6">
-            <PieChart className="h-5 w-5 text-gray-600" />
-            <h3 className="text-lg font-semibold text-gray-900">
-              Despesas por Centro de Custo
-            </h3>
-          </div>
-          {expensesByCostCenter.length > 0 ? (
-            <div className="space-y-4">
-              {expensesByCostCenter.map((item, index) => (
-                <div key={index}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-700">
-                      {item.costCenter?.name || 'Sem Centro de Custo'}
-                    </span>
-                    <span className="text-sm font-semibold text-blue-600">
-                      {formatCurrency(item.total)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 bg-gray-100 rounded-full h-3">
-                      <div
-                        className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all"
-                        style={{ width: `${(item.total / maxCostCenterValue) * 100}%` }}
-                      />
-                    </div>
-                    <span className="text-xs text-gray-500">
-                      {((item.total / totals.expense) * 100).toFixed(1)}%
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-gray-500">
-              <PieChart className="h-12 w-12 mx-auto mb-2 opacity-50" />
-              <p>Nenhuma despesa com centro de custo no período</p>
-            </div>
-          )}
+                  </td>
+                  <td colSpan={2}></td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
         </div>
       </div>
     </div>
