@@ -1382,6 +1382,21 @@ useEffect(() => {
   }
 
   console.log('✅ [addProject] Projeto inserido:', insertedProject);
+
+     // ✅ ADICIONAR ESTA PARTE - Criar transações se for venda
+  if (data.type === 'venda') {
+    console.log('💰 Criando transações financeiras para venda...');
+    try {
+      await createTransactionsFromProject(insertedProject.id, {
+        ...insertedProject,
+        ...data
+      });
+      console.log('✅ Transações financeiras criadas com sucesso!');
+    } catch (error: any) {
+      console.error('❌ Erro ao criar transações financeiras:', error);
+      // Não bloqueia a criação do projeto, apenas avisa
+    }
+  }
     
     await loadProjects();
     return insertedProject;
