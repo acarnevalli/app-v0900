@@ -581,16 +581,6 @@ useEffect(() => {
   const discountAmount = budget * (paymentTerms.discount_percentage / 100);
   const finalValue = budget - discountAmount;
 
-  if (loading || !isInitialized.current) {
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-xl shadow-2xl p-8 flex flex-col items-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600 mb-4"></div>
-          <p className="text-gray-600">Carregando dados...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
