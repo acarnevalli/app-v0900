@@ -9,6 +9,7 @@ interface ProjectDetailsModalProps {
   onClose: () => void;
   onGeneratePDF?: (project: Project) => void;
   pdfContent?: React.ReactNode;
+  onEdit: (project: Project) => void;
 }
 
 const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ 
