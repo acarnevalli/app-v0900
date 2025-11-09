@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';  // ✅ Adicionei useRef
+import React, { useState, useEffect} from 'react';  // ✅ Adicionei useRef
 import {
   X,
   Briefcase,
@@ -26,8 +26,8 @@ interface ProjectFormModalProps {
 const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose }) => {
   const { clients, products, addProject, updateProject } = useApp();
 
-  const hasLoadedData = useRef(false);
-  const isInitialized = useRef(false);
+  //const hasLoadedData = useRef(false);
+  //const isInitialized = useRef(false);
 
   console.log("🔥 PROPS RECEBIDAS NO MODAL:", { 
     projectId: project?.id,
