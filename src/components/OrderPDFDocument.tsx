@@ -3,323 +3,619 @@ import { CompanyData } from '../types/company';
 
 interface OrderPDFDocumentProps {
   companyData: CompanyData | null;
-  orderData: any; // Substitua 'any' pelo seu tipo de pedido
+  orderData: any;
 }
 
 const styles = StyleSheet.create({
   page: {
-    padding: 40,
+    padding: 0,
     fontFamily: 'Helvetica',
     backgroundColor: '#FFFFFF',
   },
+  
+  // ========== CABEÇALHO PROFISSIONAL ==========
   header: {
-    display: 'flex',
+    backgroundColor: '#4682B4',
+    padding: 15,
     flexDirection: 'row',
-    marginBottom: 30,
-    borderBottomWidth: 2,
-    borderBottomColor: '#8B4513',
-    paddingBottom: 20,
-  },
-  logo: {
-    width: 100,
-    height: 100,
-  },
-  companyInfo: {
-    flex: 1,
-    marginLeft: 20,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#8B4513',
-    marginBottom: 5,
-  },
-  subtitle: {
-    fontSize: 11,
-    color: '#666',
-    marginBottom: 3,
-  },
-  section: {
+    alignItems: 'center',
     marginBottom: 20,
   },
-  sectionTitle: {
+  headerLogo: {
+    width: 60,
+    height: 60,
+    marginRight: 15,
+  },
+  headerCompanyInfo: {
+    flex: 1,
+  },
+  headerCompanyName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 3,
+  },
+  headerAddress: {
+    fontSize: 8,
+    color: '#FFFFFF',
+    marginBottom: 2,
+  },
+  headerContactInfo: {
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+  },
+  headerContact: {
+    fontSize: 8,
+    color: '#FFFFFF',
+    marginBottom: 2,
+  },
+  
+  // ========== TIPO DO DOCUMENTO ==========
+  documentTypeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginHorizontal: 30,
+    marginBottom: 15,
+  },
+  documentTypeBadge: {
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+  },
+  documentTypeBadgeQuote: {
+    backgroundColor: '#3B82F6',
+  },
+  documentTypeBadgeSale: {
+    backgroundColor: '#22C55E',
+  },
+  documentTypeText: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#8B4513',
-    marginBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#DDD',
-    paddingBottom: 5,
+    color: '#FFFFFF',
   },
-  text: {
+  documentNumber: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  
+  // ========== DADOS DO CLIENTE ==========
+  clientSection: {
+    backgroundColor: '#F5F5F5',
+    padding: 12,
+    marginHorizontal: 30,
+    marginBottom: 15,
+    borderRadius: 5,
+  },
+  clientTitle: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  clientInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 5,
+  },
+  clientText: {
     fontSize: 10,
     color: '#333',
-    marginBottom: 4,
   },
-  table: {
-    display: 'table',
-    width: '100%',
-    borderStyle: 'solid',
-    borderWidth: 1,
-    borderColor: '#DDD',
+  
+  // ========== DESCRIÇÃO ==========
+  descriptionSection: {
+    marginHorizontal: 30,
+    marginBottom: 15,
+  },
+  sectionTitle: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 6,
+  },
+  descriptionText: {
+    fontSize: 10,
+    color: '#555',
+    lineHeight: 1.5,
+  },
+  
+  // ========== TABELA DE PRODUTOS LIMPA ==========
+  productsSection: {
+    marginHorizontal: 30,
+    marginBottom: 15,
+  },
+  tableHeader: {
+    flexDirection: 'row',
+    backgroundColor: '#4682B4',
+    padding: 8,
+    borderRadius: 3,
+    marginBottom: 2,
+  },
+  tableHeaderText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
   },
   tableRow: {
-    display: 'table-row',
+    flexDirection: 'row',
+    padding: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5E5',
+  },
+  tableRowEven: {
+    backgroundColor: '#FAFAFA',
   },
   tableCell: {
-    padding: 8,
-    fontSize: 10,
-    borderRightWidth: 1,
-    borderRightColor: '#DDD',
-    borderBottomWidth: 1,
-    borderBottomColor: '#DDD',
-  },
-  tableCellHeader: {
-    padding: 8,
-    fontSize: 11,
-    fontWeight: 'bold',
-    backgroundColor: '#F5F5F5',
-    borderRightWidth: 1,
-    borderRightColor: '#DDD',
-    borderBottomWidth: 1,
-    borderBottomColor: '#DDD',
-  },
-  footer: {
-    marginTop: 40,
-    paddingTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#DDD',
     fontSize: 9,
-    color: '#666',
+    color: '#333',
+  },
+  tableCellName: {
+    width: '50%',
+  },
+  tableCellQty: {
+    width: '15%',
     textAlign: 'center',
   },
-  logoPlaceholder: {
-    width: 100,
-    height: 100,
+  tableCellPrice: {
+    width: '17.5%',
+    textAlign: 'right',
+  },
+  tableCellTotal: {
+    width: '17.5%',
+    textAlign: 'right',
+  },
+  
+  // ========== TOTAIS DESTACADOS ==========
+  totalsSection: {
+    marginHorizontal: 30,
+    marginBottom: 15,
+    alignItems: 'flex-end',
+  },
+  totalsSeparator: {
+    width: 200,
+    height: 2,
+    backgroundColor: '#4682B4',
+    marginBottom: 8,
+  },
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: 200,
+    marginBottom: 5,
+  },
+  totalLabel: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  totalValue: {
+    fontSize: 10,
+    color: '#333',
+  },
+  totalFinalContainer: {
+    backgroundColor: '#22C55E',
+    padding: 8,
+    borderRadius: 5,
+    width: 200,
+    marginTop: 5,
+  },
+  totalFinalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  totalFinalLabel: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  totalFinalValue: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  
+  // ========== CONDIÇÕES DE PAGAMENTO E ENTREGA ==========
+  paymentSection: {
     backgroundColor: '#F5F5F5',
-    border: '1px solid #DDD',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
+    padding: 12,
+    marginHorizontal: 30,
+    marginBottom: 10,
+    borderRadius: 5,
+  },
+  paymentTitle: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  paymentText: {
+    fontSize: 10,
+    color: '#555',
+    marginBottom: 4,
+  },
+  
+  // Tabela de parcelas
+  installmentsTable: {
+    marginTop: 8,
+  },
+  installmentTableHeader: {
+    flexDirection: 'row',
+    backgroundColor: '#4682B4',
+    padding: 6,
+    borderRadius: 3,
+    marginBottom: 2,
+  },
+  installmentHeaderText: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  installmentRow: {
+    flexDirection: 'row',
+    padding: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5E5',
+  },
+  installmentRowEven: {
+    backgroundColor: '#FFFFFF',
+  },
+  installmentCell: {
+    fontSize: 9,
+    color: '#333',
+  },
+  installmentNumber: {
+    width: '33%',
+  },
+  installmentDate: {
+    width: '34%',
+    textAlign: 'center',
+  },
+  installmentValue: {
+    width: '33%',
+    textAlign: 'right',
+  },
+  
+  deliverySection: {
+    backgroundColor: '#F5F5F5',
+    padding: 12,
+    marginHorizontal: 30,
+    marginBottom: 10,
+    borderRadius: 5,
+  },
+  
+  notesSection: {
+    marginHorizontal: 30,
+    marginBottom: 15,
+  },
+  notesText: {
+    fontSize: 9,
+    color: '#555',
+    lineHeight: 1.5,
+  },
+  
+  // ========== RODAPÉ ==========
+  footer: {
+    position: 'absolute',
+    bottom: 20,
+    left: 30,
+    right: 30,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#DDD',
+  },
+  footerText: {
+    fontSize: 8,
+    color: '#999',
+    fontStyle: 'italic',
+  },
+  footerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
 });
+
+const paymentMethodLabels: { [key: string]: string } = {
+  'dinheiro': 'Dinheiro',
+  'pix': 'PIX',
+  'cartao_credito': 'Cartão de Crédito',
+  'cartao_debito': 'Cartão de Débito',
+  'boleto': 'Boleto Bancário',
+  'transferencia': 'Transferência Bancária'
+};
 
 export function OrderPDFDocument({ companyData, orderData }: OrderPDFDocumentProps) {
   if (!companyData) {
     return null;
   }
 
-  // Renderizar header com logo (se existir) ou sem
-  const renderHeader = () => {
-    if (companyData.logoUrl) {
-      return (
-        <View style={styles.header}>
-          <Image
-            source={companyData.logoUrl}
-            style={styles.logo}
-            onError={() => {
-              console.warn('Erro ao carregar logo, usando fallback');
-            }}
-          />
-          <View style={styles.companyInfo}>
-            <Text style={styles.title}>{companyData.nomeFantasia}</Text>
-            <Text style={styles.subtitle}>{companyData.razaoSocial}</Text>
-            <Text style={styles.subtitle}>CNPJ: {companyData.cnpj}</Text>
-            <Text style={styles.subtitle}>
-              {companyData.endereco}, {companyData.numero}
-              {companyData.complemento ? ` - ${companyData.complemento}` : ''}
-            </Text>
-            <Text style={styles.subtitle}>
-              {companyData.bairro} - CEP: {companyData.cep}
-            </Text>
-            <Text style={styles.subtitle}>
-              Tel: {companyData.foneComercial} | Email: {companyData.email}
-            </Text>
-          </View>
-        </View>
-      );
-    } else {
-      // Sem logo
-      return (
-        <View style={styles.header}>
-          <View style={styles.companyInfo}>
-            <Text style={styles.title}>{companyData.nomeFantasia}</Text>
-            <Text style={styles.subtitle}>{companyData.razaoSocial}</Text>
-            <Text style={styles.subtitle}>CNPJ: {companyData.cnpj}</Text>
-            <Text style={styles.subtitle}>
-              {companyData.endereco}, {companyData.numero}
-              {companyData.complemento ? ` - ${companyData.complemento}` : ''}
-            </Text>
-            <Text style={styles.subtitle}>
-              {companyData.bairro} - CEP: {companyData.cep}
-            </Text>
-            <Text style={styles.subtitle}>
-              Tel: {companyData.foneComercial} | Email: {companyData.email}
-            </Text>
-          </View>
-        </View>
-      );
-    }
-  };
+  const isQuote = orderData?.type === 'orcamento';
+  const documentTitle = isQuote ? 'ORÇAMENTO' : 'VENDA CONCLUÍDA';
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        {/* Header */}
-        {renderHeader()}
-
-        {/* Título do Documento */}
-        <View style={{ marginBottom: 30, textAlign: 'center' }}>
-          <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#8B4513' }}>
-            {orderData?.type === 'orcamento' ? 'ORÇAMENTO' : 'VENDA'}
-          </Text>
-        </View>
-
-        {/* Informações do Pedido */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Informações do Pedido</Text>
-          <View style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between' }}>
-            <View>
-              <Text style={styles.text}>
-                <Text style={{ fontWeight: 'bold' }}>Nº:</Text> {orderData?.order_number || '-'}
+        {/* ========== CABEÇALHO PROFISSIONAL ========== */}
+        <View style={styles.header}>
+          {companyData.logoUrl && (
+            <Image
+              src={companyData.logoUrl}
+              style={styles.headerLogo}
+              onError={() => console.warn('Erro ao carregar logo')}
+            />
+          )}
+          
+          <View style={styles.headerCompanyInfo}>
+            <Text style={styles.headerCompanyName}>
+              {companyData.nomeFantasia || 'CARNEVALLI ESQUADRIAS LTDA'}
+            </Text>
+            <Text style={styles.headerAddress}>
+              {companyData.endereco}, {companyData.numero}
+              {companyData.complemento ? ` - ${companyData.complemento}` : ''}
+            </Text>
+            <Text style={styles.headerAddress}>
+              {companyData.bairro} - {companyData.cidade} - {companyData.estado} - CEP: {companyData.cep}
+            </Text>
+          </View>
+          
+          <View style={styles.headerContactInfo}>
+            <Text style={styles.headerContact}>
+              Tel: {companyData.foneComercial}
+            </Text>
+            <Text style={styles.headerContact}>
+              {companyData.email}
+            </Text>
+            <Text style={styles.headerContact}>
+              CNPJ: {companyData.cnpj}
+            </Text>
+            {companyData.inscricaoEstadual && (
+              <Text style={styles.headerContact}>
+                IE: {companyData.inscricaoEstadual}
               </Text>
-              <Text style={styles.text}>
-                <Text style={{ fontWeight: 'bold' }}>Data:</Text>{' '}
-                {new Date(orderData?.start_date).toLocaleDateString('pt-BR')}
-              </Text>
-            </View>
-            <View>
-              <Text style={styles.text}>
-                <Text style={{ fontWeight: 'bold' }}>Cliente:</Text> {orderData?.client_name || '-'}
-              </Text>
-            </View>
+            )}
           </View>
         </View>
 
-        {/* Descrição */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Descrição</Text>
-          <Text style={styles.text}>{orderData?.description || '-'}</Text>
+        {/* ========== TIPO DO DOCUMENTO ========== */}
+        <View style={styles.documentTypeContainer}>
+          <View style={[
+            styles.documentTypeBadge,
+            isQuote ? styles.documentTypeBadgeQuote : styles.documentTypeBadgeSale
+          ]}>
+            <Text style={styles.documentTypeText}>{documentTitle}</Text>
+          </View>
+          
+          <Text style={styles.documentNumber}>
+            Nº {orderData?.number?.toString().padStart(4, '0') || orderData?.order_number || '-'}
+          </Text>
         </View>
 
-        {/* Itens do Pedido */}
+        {/* ========== DADOS DO CLIENTE ========== */}
+        <View style={styles.clientSection}>
+          <Text style={styles.clientTitle}>DADOS DO CLIENTE</Text>
+          
+          <View style={styles.clientInfo}>
+            <Text style={styles.clientText}>
+              Cliente: {orderData?.client_name || 'Não identificado'}
+            </Text>
+            <Text style={styles.clientText}>
+              Data de Emissão: {new Date().toLocaleDateString('pt-BR')}
+            </Text>
+          </View>
+          
+          <View style={styles.clientInfo}>
+            {orderData?.start_date && (
+              <Text style={styles.clientText}>
+                Início: {new Date(orderData.start_date).toLocaleDateString('pt-BR')}
+              </Text>
+            )}
+            {orderData?.end_date && (
+              <Text style={styles.clientText}>
+                Prazo: {new Date(orderData.end_date).toLocaleDateString('pt-BR')}
+              </Text>
+            )}
+          </View>
+        </View>
+
+        {/* ========== DESCRIÇÃO ========== */}
+        {orderData?.description && (
+          <View style={styles.descriptionSection}>
+            <Text style={styles.sectionTitle}>DESCRIÇÃO</Text>
+            <Text style={styles.descriptionText}>{orderData.description}</Text>
+          </View>
+        )}
+
+        {/* ========== LISTA DE PRODUTOS LIMPA ========== */}
         {orderData?.products && orderData.products.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Itens do Pedido</Text>
-            <View style={styles.table}>
-              <View style={styles.tableRow}>
-                <View style={[styles.tableCellHeader, { width: '50%' }]}>
-                  <Text>Descrição</Text>
-                </View>
-                <View style={[styles.tableCellHeader, { width: '15%' }]}>
-                  <Text>Qtd</Text>
-                </View>
-                <View style={[styles.tableCellHeader, { width: '17.5%' }]}>
-                  <Text>Valor Unit.</Text>
-                </View>
-                <View style={[styles.tableCellHeader, { width: '17.5%' }]}>
-                  <Text>Total</Text>
+          <View style={styles.productsSection}>
+            <Text style={styles.sectionTitle}>PRODUTOS E SERVIÇOS</Text>
+            
+            {/* Cabeçalho da tabela */}
+            <View style={styles.tableHeader}>
+              <Text style={[styles.tableHeaderText, styles.tableCellName]}>Item</Text>
+              <Text style={[styles.tableHeaderText, styles.tableCellQty]}>Qtd</Text>
+              <Text style={[styles.tableHeaderText, styles.tableCellPrice]}>Valor Unit.</Text>
+              <Text style={[styles.tableHeaderText, styles.tableCellTotal]}>Total</Text>
+            </View>
+            
+            {/* Linhas de produtos */}
+            {orderData.products.map((product: any, index: number) => (
+              <View 
+                key={index} 
+                style={[
+                  styles.tableRow,
+                  index % 2 === 0 ? styles.tableRowEven : null
+                ]}
+              >
+                <Text style={[styles.tableCell, styles.tableCellName]}>
+                  {product.product_name}
+                </Text>
+                <Text style={[styles.tableCell, styles.tableCellQty]}>
+                  {product.quantity}
+                </Text>
+                <Text style={[styles.tableCell, styles.tableCellPrice]}>
+                  R$ {(product.unit_price || 0).toFixed(2).replace('.', ',')}
+                </Text>
+                <Text style={[styles.tableCell, styles.tableCellTotal]}>
+                  R$ {(product.total_price || (product.quantity * product.unit_price) || 0).toFixed(2).replace('.', ',')}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* ========== TOTAIS DESTACADOS ========== */}
+        <View style={styles.totalsSection}>
+          <View style={styles.totalsSeparator} />
+          
+          {/* Subtotal */}
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>Subtotal:</Text>
+            <Text style={styles.totalValue}>
+              R$ {(orderData?.budget || 0).toFixed(2).replace('.', ',')}
+            </Text>
+          </View>
+          
+          {/* Desconto (se houver) */}
+          {orderData?.payment_terms?.discount_percentage && orderData.payment_terms.discount_percentage > 0 && (
+            <>
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>
+                  Desconto ({orderData.payment_terms.discount_percentage}%):
+                </Text>
+                <Text style={styles.totalValue}>
+                  -R$ {(((orderData.budget || 0) * orderData.payment_terms.discount_percentage) / 100).toFixed(2).replace('.', ',')}
+                </Text>
+              </View>
+              
+              {/* Total com desconto */}
+              <View style={styles.totalFinalContainer}>
+                <View style={styles.totalFinalRow}>
+                  <Text style={styles.totalFinalLabel}>TOTAL:</Text>
+                  <Text style={styles.totalFinalValue}>
+                    R$ {(orderData.payment_terms.total_with_discount || 0).toFixed(2).replace('.', ',')}
+                  </Text>
                 </View>
               </View>
-
-              {orderData.products.map((product: any, idx: number) => (
-                <View key={idx} style={styles.tableRow}>
-                  <View style={[styles.tableCell, { width: '50%' }]}>
-                    <Text>{product.product_name}</Text>
-                  </View>
-                  <View style={[styles.tableCell, { width: '15%' }]}>
-                    <Text>{product.quantity}</Text>
-                  </View>
-                  <View style={[styles.tableCell, { width: '17.5%' }]}>
-                    <Text>R$ {(product.unit_price || 0).toFixed(2)}</Text>
-                  </View>
-                  <View style={[styles.tableCell, { width: '17.5%' }]}>
-                    <Text>R$ {((product.quantity || 0) * (product.unit_price || 0)).toFixed(2)}</Text>
-                  </View>
-                </View>
-              ))}
+            </>
+          )}
+          
+          {/* Total sem desconto */}
+          {(!orderData?.payment_terms?.discount_percentage || orderData.payment_terms.discount_percentage === 0) && (
+            <View style={styles.totalFinalContainer}>
+              <View style={styles.totalFinalRow}>
+                <Text style={styles.totalFinalLabel}>TOTAL:</Text>
+                <Text style={styles.totalFinalValue}>
+                  R$ {(orderData?.budget || 0).toFixed(2).replace('.', ',')}
+                </Text>
+              </View>
             </View>
-          </View>
-        )}
-
-        {/* Valores */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Valores</Text>
-          <View style={{ borderTopWidth: 1, borderTopColor: '#DDD', paddingTop: 10 }}>
-            <View style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
-              <Text style={styles.text}>
-                <Text style={{ fontWeight: 'bold' }}>Valor Total:</Text>
-              </Text>
-              <Text style={{ ...styles.text, fontWeight: 'bold' }}>
-                R$ {(orderData?.budget || 0).toFixed(2)}
-              </Text>
-            </View>
-
-            {orderData?.payment_terms?.discount_percentage && orderData.payment_terms.discount_percentage > 0 && (
-              <>
-                <View style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
-                  <Text style={styles.text}>
-                    <Text style={{ fontWeight: 'bold' }}>Desconto ({orderData.payment_terms.discount_percentage}%):</Text>
-                  </Text>
-                  <Text style={styles.text}>
-                    -R$ {(((orderData.budget || 0) * orderData.payment_terms.discount_percentage) / 100).toFixed(2)}
-                  </Text>
-                </View>
-
-                <View
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    borderTopWidth: 1,
-                    borderTopColor: '#DDD',
-                    paddingTop: 5,
-                  }}
-                >
-                  <Text style={{ ...styles.text, fontWeight: 'bold' }}>Total com Desconto:</Text>
-                  <Text style={{ ...styles.text, fontWeight: 'bold', color: '#22C55E' }}>
-                    R$ {(orderData.payment_terms.total_with_discount || 0).toFixed(2)}
-                  </Text>
-                </View>
-              </>
-            )}
-          </View>
+          )}
         </View>
 
-        {/* Condições de Pagamento */}
+        {/* ========== CONDIÇÕES DE PAGAMENTO ========== */}
         {orderData?.payment_terms && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Condições de Pagamento</Text>
-            <Text style={styles.text}>
-              <Text style={{ fontWeight: 'bold' }}>Parcelas:</Text> {orderData.payment_terms.installments}x
+          <View style={styles.paymentSection}>
+            <Text style={styles.paymentTitle}>CONDIÇÕES DE PAGAMENTO</Text>
+            
+            <Text style={styles.paymentText}>
+              Forma de Pagamento: {paymentMethodLabels[orderData.payment_terms.payment_method] || orderData.payment_terms.payment_method}
             </Text>
-            <Text style={styles.text}>
-              <Text style={{ fontWeight: 'bold' }}>Valor por Parcela:</Text> R${' '}
-              {(orderData.payment_terms.installment_value || 0).toFixed(2)}
-            </Text>
-            {orderData.payment_terms.payment_method && (
-              <Text style={styles.text}>
-                <Text style={{ fontWeight: 'bold' }}>Método:</Text> {orderData.payment_terms.payment_method}
-              </Text>
+            
+            {/* Parcelas */}
+            {orderData.payment_terms.installments > 1 ? (
+              <>
+                <Text style={styles.paymentText}>
+                  Parcelamento: {orderData.payment_terms.installments}x de R$ {(orderData.payment_terms.installment_value || 0).toFixed(2).replace('.', ',')}
+                </Text>
+                
+                {/* Tabela de parcelas */}
+                <View style={styles.installmentsTable}>
+                  <View style={styles.installmentTableHeader}>
+                    <Text style={[styles.installmentHeaderText, styles.installmentNumber]}>Parcela</Text>
+                    <Text style={[styles.installmentHeaderText, styles.installmentDate]}>Vencimento</Text>
+                    <Text style={[styles.installmentHeaderText, styles.installmentValue]}>Valor</Text>
+                  </View>
+                  
+                  {Array.from({ length: Math.min(orderData.payment_terms.installments, 6) }, (_, i) => {
+                    const installmentDate = new Date();
+                    installmentDate.setMonth(installmentDate.getMonth() + i);
+                    
+                    return (
+                      <View 
+                        key={i} 
+                        style={[
+                          styles.installmentRow,
+                          i % 2 === 0 ? styles.installmentRowEven : null
+                        ]}
+                      >
+                        <Text style={[styles.installmentCell, styles.installmentNumber]}>
+                          {i + 1}ª parcela
+                        </Text>
+                        <Text style={[styles.installmentCell, styles.installmentDate]}>
+                          {installmentDate.toLocaleDateString('pt-BR')}
+                        </Text>
+                        <Text style={[styles.installmentCell, styles.installmentValue]}>
+                          R$ {(orderData.payment_terms.installment_value || 0).toFixed(2).replace('.', ',')}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                  
+                  {orderData.payment_terms.installments > 6 && (
+                    <Text style={[styles.paymentText, { marginTop: 4, fontSize: 8, fontStyle: 'italic' }]}>
+                      ... e mais {orderData.payment_terms.installments - 6} parcelas
+                    </Text>
+                  )}
+                </View>
+              </>
+            ) : (
+              <Text style={styles.paymentText}>Pagamento à vista</Text>
             )}
           </View>
         )}
 
-        {/* Observações */}
+        {/* ========== INFORMAÇÕES DE ENTREGA ========== */}
+        <View style={styles.deliverySection}>
+          <Text style={styles.paymentTitle}>INFORMAÇÕES DE ENTREGA</Text>
+          
+          {orderData?.delivery_deadline_days && (
+            <Text style={styles.paymentText}>
+              Prazo de Entrega: {orderData.delivery_deadline_days} dias após aprovação
+            </Text>
+          )}
+          
+          {orderData?.end_date && (
+            <Text style={styles.paymentText}>
+              Data Prevista: {new Date(orderData.end_date).toLocaleDateString('pt-BR')}
+            </Text>
+          )}
+        </View>
+
+        {/* ========== OBSERVAÇÕES ========== */}
         {orderData?.notes && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Observações</Text>
-            <Text style={styles.text}>{orderData.notes}</Text>
+          <View style={styles.notesSection}>
+            <Text style={styles.sectionTitle}>OBSERVAÇÕES</Text>
+            <Text style={styles.notesText}>{orderData.notes}</Text>
           </View>
         )}
 
-        {/* Footer */}
+        {/* ========== RODAPÉ ========== */}
         <View style={styles.footer}>
-          <Text>
-            Documento gerado em {new Date().toLocaleDateString('pt-BR')} às{' '}
-            {new Date().toLocaleTimeString('pt-BR')}
+          <View style={styles.footerRow}>
+            <Text style={styles.footerText}>
+              {isQuote 
+                ? 'Este orçamento tem validade de 30 dias a partir da data de emissão.' 
+                : 'Obrigado pela sua compra!'}
+            </Text>
+            <Text style={styles.footerText}>
+              Gerado em: {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR')}
+            </Text>
+          </View>
+          <Text style={[styles.footerText, { marginTop: 3 }]}>
+            Documento gerado automaticamente pelo sistema.
           </Text>
-          <Text>Sistema de Gerenciamento para Marcenaria</Text>
         </View>
       </Page>
     </Document>
