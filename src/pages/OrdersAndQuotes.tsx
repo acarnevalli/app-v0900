@@ -227,13 +227,7 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ project, onCl
         </div>
 
         <div className="sticky bottom-0 bg-gray-100 px-8 py-4 flex justify-between items-center border-t">
-            <button
-              onClick={() => generatePDF(project)}
-              className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              <span>Imprimir PDF</span>
-            </button>
+            
           <button
             onClick={onClose}
             className="px-6 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition-colors font-medium"
@@ -264,157 +258,7 @@ const OrdersAndQuotes: React.FC = () => {
 
   const { companyInfo, loading: companyLoading, error: companyError } = useCompanyInfo();
 
-  useEffect(() => {
-    if (companyError) {
-      console.error('Erro ao carregar informações da empresa:', companyError);
-    }
-  }, [companyError]);
-
-  const getStatusColor = (status: string) => {
-    const colors = {
-      orcamento: 'bg-blue-100 text-blue-800 border-blue-200',
-      aprovado: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      em_producao: 'bg-orange-100 text-orange-800 border-orange-200',
-      concluido: 'bg-green-100 text-green-800 border-green-200',
-      entregue: 'bg-purple-100 text-purple-800 border-purple-200'
-    };
-    return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800 border-gray-200';
-  };
-
-  const getStatusText = (status: string) => {
-    const texts = {
-      orcamento: 'Orçamento',
-      aprovado: 'Aprovado',
-      em_producao: 'Em Produção',
-      concluido: 'Concluído',
-      entregue: 'Entregue'
-    };
-    return texts[status as keyof typeof texts] || status;
-  };
-
-  const getDateRange = () => {
-    const date = new Date(currentDate);
-    let startDate: Date, endDate: Date;
-
-    switch (dateFilterType) {
-      case 'week':
-        const dayOfWeek = date.getDay();
-        startDate = new Date(date);
-        startDate.setDate(date.getDate() - dayOfWeek);
-        startDate.setHours(0, 0, 0, 0);
-        endDate = new Date(startDate);
-        endDate.setDate(startDate.getDate() + 6);
-        endDate.setHours(23, 59, 59, 999);
-        break;
-
-      case 'biweekly':
-        const dayOfMonth = date.getDate();
-        if (dayOfMonth <= 15) {
-          startDate = new Date(date.getFullYear(), date.getMonth(), 1);
-          endDate = new Date(date.getFullYear(), date.getMonth(), 15, 23, 59, 59, 999);
-        } else {
-          startDate = new Date(date.getFullYear(), date.getMonth(), 16);
-          endDate = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
-        }
-        break;
-
-      case 'year':
-        startDate = new Date(date.getFullYear(), 0, 1);
-        endDate = new Date(date.getFullYear(), 11, 31, 23, 59, 59, 999);
-        break;
-
-      case 'custom':
-        if (customStartDate && customEndDate) {
-          startDate = new Date(customStartDate);
-          endDate = new Date(customEndDate);
-          endDate.setHours(23, 59, 59, 999);
-        } else {
-          return null;
-        }
-        break;
-
-      case 'month':
-      default:
-        startDate = new Date(date.getFullYear(), date.getMonth(), 1);
-        endDate = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
-        break;
-    }
-
-    return { startDate, endDate };
-  };
-
-  const getDateRangeLabel = () => {
-    const date = new Date(currentDate);
-    const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-
-    switch (dateFilterType) {
-      case 'week':
-        const range = getDateRange();
-        if (range) {
-          return `${range.startDate.getDate()}/${range.startDate.getMonth() + 1} - ${range.endDate.getDate()}/${range.endDate.getMonth() + 1}/${range.endDate.getFullYear()}`;
-        }
-        return '';
-
-      case 'biweekly':
-        const dayOfMonth = date.getDate();
-        const quinzena = dayOfMonth <= 15 ? '1ª Quinzena' : '2ª Quinzena';
-        return `${quinzena} - ${months[date.getMonth()]} ${date.getFullYear()}`;
-
-      case 'year':
-        return `${date.getFullYear()}`;
-
-      case 'custom':
-        if (customStartDate && customEndDate) {
-          return `${new Date(customStartDate).toLocaleDateString('pt-BR')} - ${new Date(customEndDate).toLocaleDateString('pt-BR')}`;
-        }
-        return 'Selecione as datas';
-
-      case 'month':
-      default:
-        return `${months[date.getMonth()]} ${date.getFullYear()}`;
-    }
-  };
-
-  const navigateDate = (direction: 'prev' | 'next') => {
-    const newDate = new Date(currentDate);
-
-    switch (dateFilterType) {
-      case 'week':
-        newDate.setDate(newDate.getDate() + (direction === 'next' ? 7 : -7));
-        break;
-
-      case 'biweekly':
-        const dayOfMonth = newDate.getDate();
-        if (direction === 'next') {
-          if (dayOfMonth <= 15) {
-            newDate.setDate(16);
-          } else {
-            newDate.setMonth(newDate.getMonth() + 1, 1);
-          }
-        } else {
-          if (dayOfMonth > 15) {
-            newDate.setDate(1);
-          } else {
-            newDate.setMonth(newDate.getMonth() - 1, 16);
-          }
-        }
-        break;
-
-      case 'year':
-        newDate.setFullYear(newDate.getFullYear() + (direction === 'next' ? 1 : -1));
-        break;
-
-      case 'month':
-      default:
-        newDate.setMonth(newDate.getMonth() + (direction === 'next' ? 1 : -1));
-        break;
-    }
-
-    setCurrentDate(newDate);
-  };
-
-// ========== FUNÇÃO GENERATEPDF CORRIGIDA ==========
+  // ========== FUNÇÃO GENERATEPDF CORRIGIDA ==========
   const generatePDF = async (project: Project) => {
     try {
       const { jsPDF } = await import('jspdf');
@@ -938,6 +782,156 @@ const OrdersAndQuotes: React.FC = () => {
     }
   };
   // ========== FIM DA FUNÇÃO GENERATEPDF ==========
+
+  useEffect(() => {
+    if (companyError) {
+      console.error('Erro ao carregar informações da empresa:', companyError);
+    }
+  }, [companyError]);
+
+  const getStatusColor = (status: string) => {
+    const colors = {
+      orcamento: 'bg-blue-100 text-blue-800 border-blue-200',
+      aprovado: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+      em_producao: 'bg-orange-100 text-orange-800 border-orange-200',
+      concluido: 'bg-green-100 text-green-800 border-green-200',
+      entregue: 'bg-purple-100 text-purple-800 border-purple-200'
+    };
+    return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800 border-gray-200';
+  };
+
+  const getStatusText = (status: string) => {
+    const texts = {
+      orcamento: 'Orçamento',
+      aprovado: 'Aprovado',
+      em_producao: 'Em Produção',
+      concluido: 'Concluído',
+      entregue: 'Entregue'
+    };
+    return texts[status as keyof typeof texts] || status;
+  };
+
+  const getDateRange = () => {
+    const date = new Date(currentDate);
+    let startDate: Date, endDate: Date;
+
+    switch (dateFilterType) {
+      case 'week':
+        const dayOfWeek = date.getDay();
+        startDate = new Date(date);
+        startDate.setDate(date.getDate() - dayOfWeek);
+        startDate.setHours(0, 0, 0, 0);
+        endDate = new Date(startDate);
+        endDate.setDate(startDate.getDate() + 6);
+        endDate.setHours(23, 59, 59, 999);
+        break;
+
+      case 'biweekly':
+        const dayOfMonth = date.getDate();
+        if (dayOfMonth <= 15) {
+          startDate = new Date(date.getFullYear(), date.getMonth(), 1);
+          endDate = new Date(date.getFullYear(), date.getMonth(), 15, 23, 59, 59, 999);
+        } else {
+          startDate = new Date(date.getFullYear(), date.getMonth(), 16);
+          endDate = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
+        }
+        break;
+
+      case 'year':
+        startDate = new Date(date.getFullYear(), 0, 1);
+        endDate = new Date(date.getFullYear(), 11, 31, 23, 59, 59, 999);
+        break;
+
+      case 'custom':
+        if (customStartDate && customEndDate) {
+          startDate = new Date(customStartDate);
+          endDate = new Date(customEndDate);
+          endDate.setHours(23, 59, 59, 999);
+        } else {
+          return null;
+        }
+        break;
+
+      case 'month':
+      default:
+        startDate = new Date(date.getFullYear(), date.getMonth(), 1);
+        endDate = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
+        break;
+    }
+
+    return { startDate, endDate };
+  };
+
+  const getDateRangeLabel = () => {
+    const date = new Date(currentDate);
+    const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+    switch (dateFilterType) {
+      case 'week':
+        const range = getDateRange();
+        if (range) {
+          return `${range.startDate.getDate()}/${range.startDate.getMonth() + 1} - ${range.endDate.getDate()}/${range.endDate.getMonth() + 1}/${range.endDate.getFullYear()}`;
+        }
+        return '';
+
+      case 'biweekly':
+        const dayOfMonth = date.getDate();
+        const quinzena = dayOfMonth <= 15 ? '1ª Quinzena' : '2ª Quinzena';
+        return `${quinzena} - ${months[date.getMonth()]} ${date.getFullYear()}`;
+
+      case 'year':
+        return `${date.getFullYear()}`;
+
+      case 'custom':
+        if (customStartDate && customEndDate) {
+          return `${new Date(customStartDate).toLocaleDateString('pt-BR')} - ${new Date(customEndDate).toLocaleDateString('pt-BR')}`;
+        }
+        return 'Selecione as datas';
+
+      case 'month':
+      default:
+        return `${months[date.getMonth()]} ${date.getFullYear()}`;
+    }
+  };
+
+  const navigateDate = (direction: 'prev' | 'next') => {
+    const newDate = new Date(currentDate);
+
+    switch (dateFilterType) {
+      case 'week':
+        newDate.setDate(newDate.getDate() + (direction === 'next' ? 7 : -7));
+        break;
+
+      case 'biweekly':
+        const dayOfMonth = newDate.getDate();
+        if (direction === 'next') {
+          if (dayOfMonth <= 15) {
+            newDate.setDate(16);
+          } else {
+            newDate.setMonth(newDate.getMonth() + 1, 1);
+          }
+        } else {
+          if (dayOfMonth > 15) {
+            newDate.setDate(1);
+          } else {
+            newDate.setMonth(newDate.getMonth() - 1, 16);
+          }
+        }
+        break;
+
+      case 'year':
+        newDate.setFullYear(newDate.getFullYear() + (direction === 'next' ? 1 : -1));
+        break;
+
+      case 'month':
+      default:
+        newDate.setMonth(newDate.getMonth() + (direction === 'next' ? 1 : -1));
+        break;
+    }
+
+    setCurrentDate(newDate);
+  };
   
   const stats = useMemo(() => {
     const dateRange = getDateRange();
@@ -1333,6 +1327,15 @@ const OrdersAndQuotes: React.FC = () => {
                       >
                         <Eye className="h-4 w-4" />
                       </button>
+
+                       <button
+                          onClick={() => generatePDF(project)}
+                          className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                        >
+                          <Download className="w-4 h-4" />
+                          <span>Imprimir PDF</span>
+                        </button>
+                      
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
