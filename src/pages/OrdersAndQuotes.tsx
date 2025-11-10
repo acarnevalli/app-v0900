@@ -24,8 +24,6 @@ import {
 import { useApp, Project } from '../contexts/AppContext';
 import { formatCurrency, formatDate } from '../lib/utils';
 import ProjectFormModal from '../components/ProjectFormModal';
-import { PDFDownloadLink } from '@react-pdf/renderer';
-import { OrderPDFDocument } from '../components/OrderPDFDocument';
 import { useCompanyInfo } from '../hooks/useCompanyInfo';
 
 interface ProjectDetailsModalProps {
@@ -228,25 +226,13 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ project, onCl
         </div>
 
         <div className="sticky bottom-0 bg-gray-100 px-8 py-4 flex justify-between items-center border-t">
-          <PDFDownloadLink
-            document={<OrderPDFDocument companyData={safeCompanyData} orderData={project} />}
-            fileName={`${project.type}-${project.order_number}-${Date.now()}.pdf`}
-            className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-          >
-            {({ loading }) =>
-              loading ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  <span>Preparando PDF...</span>
-                </>
-              ) : (
-                <>
-                  <Printer size={18} />
-                  <span>Imprimir PDF</span>
-                </>
-              )
-            }
-          </PDFDownloadLink>
+            <button
+              onClick={() => generatePDF(project)}
+              className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              <span>Imprimir PDF</span>
+            </button>
           <button
             onClick={onClose}
             className="px-6 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition-colors font-medium"
@@ -258,6 +244,507 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ project, onCl
     </div>
   );
 };
+
+// ========== ADICIONE A FUNÇÃO GENERATEPDF AQUI ==========
+  const generatePDF = async (project: Project) => {
+    const { jsPDF } = await import('jspdf');
+    const doc = new jsPDF();
+
+    const companyInfo = {
+      name: companySettings.basic.name || 'CARNEVALLI ESQUADRIAS LTDA',
+      address: `${companySettings.address.street}, ${companySettings.address.number}${companySettings.address.complement ? ' - ' + companySettings.address.complement : ''} - ${companySettings.address.neighborhood}`,
+      city: `${companySettings.address.city} - ${companySettings.address.state} - CEP: ${companySettings.address.zipCode}`,
+      phone: companySettings.basic.phone,
+      email: companySettings.basic.email,
+      cnpj: companySettings.fiscal.cnpj,
+      ie: companySettings.fiscal.ie
+    };
+
+    // Função auxiliar para converter hex em RGB
+    const hexToRgb = (hex: string) => {
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+      } : { r: 70, g: 130, b: 180 };
+    };
+
+    // ==================== MARCA D'ÁGUA ====================
+    if (pdfSettings.watermark.enabled) {
+      try {
+        const logoImg = new Image();
+        logoImg.crossOrigin = 'anonymous';
+        logoImg.src = '/logo.svg';
+
+        await new Promise((resolve) => {
+          logoImg.onload = () => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+              throw new Error('Não foi possível obter o contexto 2D do canvas');
+            }
+
+            canvas.width = logoImg.width;
+            canvas.height = logoImg.height;
+            ctx.globalAlpha = pdfSettings.watermark.opacity;
+            ctx.drawImage(logoImg, 0, 0);
+            const watermarkData = canvas.toDataURL('image/png');
+
+            const imgWidth = pdfSettings.watermark.size;
+            const imgHeight = pdfSettings.watermark.size;
+            let x = 0;
+            let y = 0;
+
+            switch (pdfSettings.watermark.position) {
+              case 'center':
+                x = (210 - imgWidth) / 2;
+                y = (297 - imgHeight) / 2;
+                break;
+              case 'top-left':
+                x = 10;
+                y = 10;
+                break;
+              case 'top-right':
+                x = 210 - imgWidth - 10;
+                y = 10;
+                break;
+              case 'bottom-left':
+                x = 10;
+                y = 297 - imgHeight - 10;
+                break;
+              case 'bottom-right':
+                x = 210 - imgWidth - 10;
+                y = 297 - imgHeight - 10;
+                break;
+            }
+
+            doc.addImage(watermarkData, 'PNG', x, y, imgWidth, imgHeight);
+            resolve(true);
+          };
+          logoImg.onerror = () => resolve(false);
+        });
+      } catch (error) {
+        console.log('Logo não encontrado, continuando sem marca d\'água');
+      }
+    }
+
+    // ==================== CABEÇALHO PROFISSIONAL ====================
+    const headerHeight = pdfSettings.header.height;
+    const headerWidth = 210;
+    const steps = 50;
+
+    // Aplicar gradiente ou cor sólida no cabeçalho
+    if (pdfSettings.header.gradient.enabled) {
+      const startColor = hexToRgb(pdfSettings.header.gradient.startColor);
+      const endColor = hexToRgb(pdfSettings.header.gradient.endColor);
+
+      for (let i = 0; i < steps; i++) {
+        const ratio = i / steps;
+        let r, g, b;
+
+        switch (pdfSettings.header.gradient.direction) {
+          case 'horizontal':
+            r = Math.round(startColor.r + (endColor.r - startColor.r) * ratio);
+            g = Math.round(startColor.g + (endColor.g - startColor.g) * ratio);
+            b = Math.round(startColor.b + (endColor.b - startColor.b) * ratio);
+            doc.setFillColor(r, g, b);
+            doc.rect((headerWidth / steps) * i, 0, headerWidth / steps, headerHeight, 'F');
+            break;
+          case 'vertical':
+            r = Math.round(startColor.r + (endColor.r - startColor.r) * ratio);
+            g = Math.round(startColor.g + (endColor.g - startColor.g) * ratio);
+            b = Math.round(startColor.b + (endColor.b - startColor.b) * ratio);
+            doc.setFillColor(r, g, b);
+            doc.rect(0, (headerHeight / steps) * i, headerWidth, headerHeight / steps, 'F');
+            break;
+          case 'diagonal-right':
+            r = Math.round(startColor.r + (endColor.r - startColor.r) * ratio);
+            g = Math.round(startColor.g + (endColor.g - startColor.g) * ratio);
+            b = Math.round(startColor.b + (endColor.b - startColor.b) * ratio);
+            doc.setFillColor(r, g, b);
+            doc.rect((headerWidth / steps) * i, 0, headerWidth / steps, headerHeight, 'F');
+            break;
+          case 'diagonal-left':
+            r = Math.round(endColor.r + (startColor.r - endColor.r) * ratio);
+            g = Math.round(endColor.g + (startColor.g - endColor.g) * ratio);
+            b = Math.round(endColor.b + (startColor.b - endColor.b) * ratio);
+            doc.setFillColor(r, g, b);
+            doc.rect((headerWidth / steps) * i, 0, headerWidth / steps, headerHeight, 'F');
+            break;
+        }
+      }
+    } else {
+      const bgColor = hexToRgb(pdfSettings.header.backgroundColor);
+      doc.setFillColor(bgColor.r, bgColor.g, bgColor.b);
+      doc.rect(0, 0, headerWidth, headerHeight, 'F');
+    }
+
+    // Logo no cabeçalho
+    let logoLoaded = false;
+    try {
+      const logoImg = new Image();
+      logoImg.crossOrigin = 'anonymous';
+      logoImg.src = '/400dpiLogoCropped.png';
+
+      await new Promise((resolve) => {
+        logoImg.onload = () => {
+          doc.addImage(logoImg, 'PNG', 12, 8, 30, 30);
+          logoLoaded = true;
+          resolve(true);
+        };
+        logoImg.onerror = () => resolve(false);
+      });
+    } catch (error) {
+      console.log('Logo não encontrado no cabeçalho');
+    }
+
+    // Informações da empresa no cabeçalho
+    const textColor = hexToRgb(pdfSettings.header.companyName.color);
+    doc.setTextColor(textColor.r, textColor.g, textColor.b);
+    
+    // Nome da empresa
+    doc.setFontSize(pdfSettings.header.companyName.fontSize);
+    doc.setFont('helvetica', pdfSettings.header.companyName.fontWeight);
+    doc.text(companyInfo.name, logoLoaded ? 47 : 15, 15);
+
+    // Endereço
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text(companyInfo.address, logoLoaded ? 47 : 15, 21);
+    doc.text(companyInfo.city, logoLoaded ? 47 : 15, 25);
+
+    // Informações de contato no lado direito do cabeçalho
+    doc.setFontSize(8);
+    const rightAlign = 195;
+    doc.text(companyInfo.phone, rightAlign, 15, { align: 'right' });
+    doc.text(companyInfo.email, rightAlign, 19, { align: 'right' });
+    doc.text(`CNPJ: ${companyInfo.cnpj}`, rightAlign, 23, { align: 'right' });
+    if (companyInfo.ie) {
+      doc.text(`IE: ${companyInfo.ie}`, rightAlign, 27, { align: 'right' });
+    }
+
+    // Linha separadora após cabeçalho
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.5);
+    doc.line(15, headerHeight + 3, 195, headerHeight + 3);
+
+    // ==================== TIPO DO DOCUMENTO (ORÇAMENTO / VENDA) ====================
+    let yPosition = headerHeight + 12;
+    
+    doc.setTextColor(0, 0, 0);
+    const isQuote = project.type === 'orcamento';
+    const docTitle = isQuote ? 'ORÇAMENTO' : 'VENDA CONCLUÍDA';
+    
+    // Caixa com o tipo do documento
+    if (isQuote) {
+      doc.setFillColor(59, 130, 246); // Azul para orçamento
+    } else {
+      doc.setFillColor(34, 197, 94); // Verde para venda
+    }
+    doc.roundedRect(15, yPosition - 5, 60, 10, 2, 2, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text(docTitle, 45, yPosition + 1, { align: 'center' });
+
+    // Número do documento
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    const orderNumber = project.order_number || project.number || '-';
+    doc.text(`Nº ${orderNumber.toString().padStart(4, '0')}`, 195, yPosition + 1, { align: 'right' });
+
+    yPosition += 15;
+
+    // ==================== DADOS DO CLIENTE ====================
+    doc.setFillColor(245, 245, 245);
+    doc.roundedRect(15, yPosition, 180, 22, 2, 2, 'F');
+    
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('DADOS DO CLIENTE', 17, yPosition + 5);
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Cliente: ${project.client_name}`, 17, yPosition + 11);
+    doc.text(`Data de Emissão: ${new Date().toLocaleDateString('pt-BR')}`, 17, yPosition + 17);
+    
+    if (project.start_date) {
+      doc.text(`Início: ${new Date(project.start_date).toLocaleDateString('pt-BR')}`, 120, yPosition + 11);
+    }
+    if (project.end_date) {
+      doc.text(`Prazo: ${new Date(project.end_date).toLocaleDateString('pt-BR')}`, 120, yPosition + 17);
+    }
+
+    yPosition += 30;
+
+    // ==================== DESCRIÇÃO DO PROJETO ====================
+    if (project.description) {
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text('DESCRIÇÃO', 15, yPosition);
+      
+      yPosition += 6;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      const splitDescription = doc.splitTextToSize(project.description, 180);
+      doc.text(splitDescription, 15, yPosition);
+      yPosition += (splitDescription.length * 5) + 8;
+    }
+
+    // ==================== LISTA DE PRODUTOS/SERVIÇOS ====================
+    if (project.products && project.products.length > 0) {
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text('PRODUTOS E SERVIÇOS', 15, yPosition);
+      yPosition += 8;
+
+      // Cabeçalho da tabela
+      doc.setFillColor(70, 130, 180);
+      doc.roundedRect(15, yPosition - 5, 180, 8, 1, 1, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Item', 17, yPosition);
+      doc.text('Qtd', 125, yPosition, { align: 'center' });
+      doc.text('Valor Unit.', 150, yPosition, { align: 'right' });
+      doc.text('Total', 185, yPosition, { align: 'right' });
+
+      yPosition += 8;
+      doc.setTextColor(0, 0, 0);
+      doc.setFont('helvetica', 'normal');
+
+      // Linhas de produtos
+      project.products.forEach((product, index) => {
+        // Verificar se precisa de nova página
+        if (yPosition > 250) {
+          doc.addPage();
+          yPosition = 20;
+        }
+
+        // Linha zebrada
+        if (index % 2 === 0) {
+          doc.setFillColor(250, 250, 250);
+          doc.rect(15, yPosition - 4, 180, 10, 'F');
+        }
+
+        // Nome do produto
+        const productName = doc.splitTextToSize(product.product_name, 100);
+        doc.text(productName[0], 17, yPosition);
+        
+        // Quantidade
+        doc.text(product.quantity.toString(), 125, yPosition, { align: 'center' });
+        
+        // Valor unitário
+        doc.text(`R$ ${product.unit_price.toFixed(2).replace('.', ',')}`, 150, yPosition, { align: 'right' });
+        
+        // Total
+        doc.text(`R$ ${product.total_price.toFixed(2).replace('.', ',')}`, 185, yPosition, { align: 'right' });
+
+        yPosition += 10;
+      });
+
+      // Linha separadora antes dos totais
+      doc.setDrawColor(70, 130, 180);
+      doc.setLineWidth(0.8);
+      doc.line(125, yPosition, 195, yPosition);
+      yPosition += 8;
+
+      // Totais
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      
+      // Subtotal
+      doc.text('Subtotal:', 145, yPosition, { align: 'right' });
+      doc.text(`R$ ${project.budget.toFixed(2).replace('.', ',')}`, 185, yPosition, { align: 'right' });
+      yPosition += 6;
+
+      // Desconto (se houver)
+      if (project.payment_terms?.discount_percentage && project.payment_terms.discount_percentage > 0) {
+        doc.setFont('helvetica', 'normal');
+        const discountAmount = project.budget * (project.payment_terms.discount_percentage / 100);
+        doc.text(`Desconto (${project.payment_terms.discount_percentage}%):`, 145, yPosition, { align: 'right' });
+        doc.text(`-R$ ${discountAmount.toFixed(2).replace('.', ',')}`, 185, yPosition, { align: 'right' });
+        yPosition += 6;
+
+        // Total com desconto
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.setFillColor(34, 197, 94);
+        doc.roundedRect(125, yPosition - 4, 70, 10, 2, 2, 'F');
+        doc.setTextColor(255, 255, 255);
+        const finalValue = project.payment_terms.total_with_discount || (project.budget - discountAmount);
+        doc.text('TOTAL:', 145, yPosition + 2, { align: 'right' });
+        doc.text(`R$ ${finalValue.toFixed(2).replace('.', ',')}`, 185, yPosition + 2, { align: 'right' });
+        yPosition += 12;
+      } else {
+        // Total sem desconto
+        doc.setFontSize(12);
+        doc.setFillColor(34, 197, 94);
+        doc.roundedRect(125, yPosition - 4, 70, 10, 2, 2, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.text('TOTAL:', 145, yPosition + 2, { align: 'right' });
+        doc.text(`R$ ${project.budget.toFixed(2).replace('.', ',')}`, 185, yPosition + 2, { align: 'right' });
+        yPosition += 12;
+      }
+
+      doc.setTextColor(0, 0, 0);
+    }
+
+    // ==================== CONDIÇÕES DE PAGAMENTO E ENTREGA ====================
+    yPosition += 8;
+    
+    // Verificar se precisa de nova página
+    if (yPosition > 220) {
+      doc.addPage();
+      yPosition = 20;
+    }
+
+    doc.setFillColor(245, 245, 245);
+    doc.roundedRect(15, yPosition, 180, 8, 1, 1, 'F');
+    
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('CONDIÇÕES DE PAGAMENTO', 17, yPosition + 5);
+    yPosition += 13;
+
+    if (project.payment_terms) {
+      const paymentMethodLabels: { [key: string]: string } = {
+        'dinheiro': 'Dinheiro',
+        'pix': 'PIX',
+        'cartao_credito': 'Cartão de Crédito',
+        'cartao_debito': 'Cartão de Débito',
+        'boleto': 'Boleto Bancário',
+        'transferencia': 'Transferência Bancária'
+      };
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Forma de Pagamento: ${paymentMethodLabels[project.payment_terms.payment_method] || project.payment_terms.payment_method}`, 17, yPosition);
+      yPosition += 6;
+
+      // Parcelas
+      if (project.payment_terms.installments > 1) {
+        doc.text(`Parcelamento: ${project.payment_terms.installments}x de R$ ${project.payment_terms.installment_value?.toFixed(2).replace('.', ',')}`, 17, yPosition);
+        yPosition += 10;
+
+        // Tabela de parcelas
+        doc.setFillColor(70, 130, 180);
+        doc.roundedRect(15, yPosition - 5, 180, 7, 1, 1, 'F');
+        
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Parcela', 25, yPosition);
+        doc.text('Vencimento', 95, yPosition, { align: 'center' });
+        doc.text('Valor', 175, yPosition, { align: 'right' });
+        
+        yPosition += 7;
+        doc.setTextColor(0, 0, 0);
+        doc.setFont('helvetica', 'normal');
+
+        for (let i = 1; i <= Math.min(project.payment_terms.installments, 10); i++) {
+          if (yPosition > 270) {
+            doc.addPage();
+            yPosition = 20;
+          }
+
+          if (i % 2 === 0) {
+            doc.setFillColor(250, 250, 250);
+            doc.rect(15, yPosition - 4, 180, 7, 'F');
+          }
+
+          const installmentDate = new Date();
+          installmentDate.setMonth(installmentDate.getMonth() + (i - 1));
+          
+          doc.text(`${i}ª parcela`, 25, yPosition);
+          doc.text(installmentDate.toLocaleDateString('pt-BR'), 95, yPosition, { align: 'center' });
+          doc.text(`R$ ${(project.payment_terms.installment_value || 0).toFixed(2).replace('.', ',')}`, 175, yPosition, { align: 'right' });
+          
+          yPosition += 7;
+        }
+
+        if (project.payment_terms.installments > 10) {
+          doc.setFontSize(8);
+          doc.setFont('helvetica', 'italic');
+          doc.text(`... e mais ${project.payment_terms.installments - 10} parcelas`, 17, yPosition);
+          yPosition += 6;
+        }
+      } else {
+        doc.text(`Pagamento à vista`, 17, yPosition);
+        yPosition += 6;
+      }
+    }
+
+    yPosition += 8;
+
+    // Informações de entrega
+    doc.setFillColor(245, 245, 245);
+    doc.roundedRect(15, yPosition, 180, 8, 1, 1, 'F');
+    
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('INFORMAÇÕES DE ENTREGA', 17, yPosition + 5);
+    yPosition += 13;
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    
+    if (project.delivery_deadline_days) {
+      doc.text(`Prazo de Entrega: ${project.delivery_deadline_days} dias após aprovação`, 17, yPosition);
+      yPosition += 6;
+    }
+    
+    if (project.end_date) {
+      doc.text(`Data Prevista: ${new Date(project.end_date).toLocaleDateString('pt-BR')}`, 17, yPosition);
+      yPosition += 6;
+    }
+
+    // Observações
+    if (project.notes) {
+      yPosition += 6;
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text('OBSERVAÇÕES', 17, yPosition);
+      yPosition += 6;
+      
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      const splitNotes = doc.splitTextToSize(project.notes, 180);
+      doc.text(splitNotes, 17, yPosition);
+      yPosition += (splitNotes.length * 4);
+    }
+
+    // ==================== RODAPÉ ====================
+    const footerY = 280;
+    
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.5);
+    doc.line(15, footerY - 5, 195, footerY - 5);
+
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(100, 100, 100);
+    
+    if (isQuote) {
+      doc.text('Este orçamento tem validade de 30 dias a partir da data de emissão.', 15, footerY);
+    } else {
+      doc.text('Obrigado pela sua compra!', 15, footerY);
+    }
+    
+    doc.text('Documento gerado automaticamente pelo sistema.', 15, footerY + 4);
+    doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 195, footerY, { align: 'right' });
+
+    // Salvar o PDF
+    const docType = project.type === 'orcamento' ? 'Orcamento' : 'Venda';
+    const fileName = `${docType}_${orderNumber}_${project.client_name?.replace(/\s+/g, '_')}_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.pdf`;
+    doc.save(fileName);
+  };
+  // ========== FIM DA FUNÇÃO GENERATEPDF ==========
 
 const OrdersAndQuotes: React.FC = () => {
   const { projects, deleteProject, clients, addSale, addProject, updateProject } = useApp();
