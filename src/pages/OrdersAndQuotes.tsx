@@ -24,8 +24,7 @@ import {
 import { useApp, Project } from '../contexts/AppContext';
 import { formatCurrency, formatDate } from '../lib/utils';
 import ProjectFormModal from '../components/ProjectFormModal';
-import { PDFDownloadLink } from '@react-pdf/renderer';
-import { OrderPDFDocument } from '../components/OrderPDFDocument';
+import { useSettings } from '../contexts/SettingsContext';
 import { useCompanyInfo } from '../hooks/useCompanyInfo';
 
 interface ProjectDetailsModalProps {
