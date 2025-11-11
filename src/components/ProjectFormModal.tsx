@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';  // ✅ Adicionei useRef
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   Briefcase,
@@ -16,8 +16,8 @@ import {
   Clock,
   AlertCircle
 } from 'lucide-react';
-import ClientModal from './ClientModal';
 import { useApp, Project, ProjectProduct, ItemType } from '../contexts/AppContext';
+import ClientModal from './ClientModal';
 
 interface ProjectFormModalProps {
   project?: Project | null;
@@ -25,18 +25,12 @@ interface ProjectFormModalProps {
 }
 
 const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose }) => {
-  const { clients, products, addProject, updateProject } = useApp();
+  const { clients, products, addProject, updateProject, loading } = useApp();
 
   const hasLoadedData = useRef(false);
   const isInitialized = useRef(false);
 
-  console.log("🔥 PROPS RECEBIDAS NO MODAL:", { 
-    projectId: project?.id,
-    clientId: project?.client_id,
-    hasProducts: project?.products?.length || 0,
-    productsType: Array.isArray(project?.products) ? 'array' : typeof project?.products
-  });
-
+  // Estados do formulário
   const [formData, setFormData] = useState({
     client_id: '',
     description: '',
@@ -55,52 +49,32 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
     installments: 1,
     payment_method: 'pix' as 'dinheiro' | 'pix' | 'cartao_credito' | 'cartao_debito' | 'boleto' | 'transferencia',
     discount_percentage: 0,
-    installment_interval_days: 30
+    installment_interval: 30 // NOVO: Intervalo em dias entre parcelas
   });
 
   const [showProductSearch, setShowProductSearch] = useState(false);
-  const [showClientModal, setShowClientModal] = useState(false);
   const [productSearch, setProductSearch] = useState('');
   const [clientSearch, setClientSearch] = useState('');
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [selectedClientName, setSelectedClientName] = useState('');
   const [itemTypeToAdd, setItemTypeToAdd] = useState<ItemType>('produto');
+  const [showClientModal, setShowClientModal] = useState(false); // NOVO: Estado do modal de cliente
 
+  // Carrega dados do projeto ao editar
   useEffect(() => {
-    console.log('🔄 useEffect PRINCIPAL disparado:', { 
-      hasProject: !!project,
-      projectId: project?.id,
-      isInitialized: isInitialized.current
-    });
-
-    if (!clients.length && !products.length) {
-      console.log('⏳ Aguardando clients e products carregarem...');
-      return;
-    }
+    if (loading || !clients.length || !products.length) return;
 
     if (!project) {
-      console.log('🆕 Novo projeto: resetando formulário');
       resetForm();
       isInitialized.current = true;
       return;
     }
 
-    if (typeof project !== 'object' || !project.id) {
-      console.error("🚨 Project inválido recebido:", project);
-      return;
-    }
-
-    console.log('📝 Projeto para edição recebido:', {
-      id: project.id,
-      description: project.description,
-      products: project.products,
-      productsLength: Array.isArray(project.products) ? project.products.length : 'não é array'
-    });
+    if (typeof project !== 'object' || !project.id) return;
 
     loadProjectData(project);
     isInitialized.current = true;
-
-  }, [project, clients]);  // ✅ CORRIGIDO: Depende do project completo e clients
+  }, [project, clients, products, loading]);
 
   const resetForm = () => {
     setFormData({
@@ -119,141 +93,76 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
     setPaymentTerms({
       installments: 1,
       payment_method: 'pix',
-      discount_percentage: 0
+      discount_percentage: 0,
+      installment_interval: 30
     });
     setClientSearch('');
     setSelectedClientName('');
     hasLoadedData.current = false;
-    console.log('✅ Formulário resetado para novo projeto');
   };
 
   const loadProjectData = (project: Project) => {
-    console.log('📥 Iniciando carregamento dos dados do projeto...');
+    setFormData({
+      client_id: project.client_id || '',
+      description: project.description || '',
+      status: project.status || 'orcamento',
+      type: project.type || 'orcamento',
+      start_date: project.start_date || new Date().toISOString().split('T')[0],
+      delivery_deadline_days: project.delivery_deadline_days || 15,
+      end_date: project.end_date || '',
+      materials_cost: project.materials_cost?.toString() || '',
+      labor_cost: project.labor_cost?.toString() || '',
+      profit_margin: project.profit_margin?.toString() || '20'
+    });
 
-    try {
-      console.log('📋 Carregando dados básicos...');
-      setFormData({
-        client_id: project.client_id || '',
-        description: project.description || '',
-        status: project.status || 'orcamento',
-        type: project.type || 'orcamento',
-        start_date: project.start_date || new Date().toISOString().split('T')[0],
-        delivery_deadline_days: project.delivery_deadline_days || 15,
-        end_date: project.end_date || '',
-        materials_cost: project.materials_cost?.toString() || '',
-        labor_cost: project.labor_cost?.toString() || '',
-        profit_margin: project.profit_margin?.toString() || '20'
-      });
-
-      console.log('📦 Analisando produtos do projeto...');
-      console.log('📦 project.products RAW:', project.products);
-      console.log('📦 É array?', Array.isArray(project.products));
-      console.log('📦 Length:', project.products?.length);
-
-      const safeProducts = Array.isArray(project.products) 
-        ? project.products 
-        : [];
-
-      console.log('📦 safeProducts processados:', safeProducts);
-
-      if (safeProducts.length > 0) {
-        console.log('📦 Processando', safeProducts.length, 'produtos...');
-        
-        const validatedProducts: ProjectProduct[] = safeProducts
-          .filter(p => p && typeof p === 'object')
-          .map((p, index) => {
-            console.log(`  📦 Processando produto ${index + 1}:`, p);
-            
-            const validated = {
-              id: p.id || `temp-${Date.now()}-${Math.random()}`,
-              product_id: p.product_id || null,
-              product_name: p.product_name || p.name || 'Produto sem nome',
-              quantity: Number(p.quantity) || 1,
-              unit_price: Number(p.unit_price) || 0,
-              total_price: Number(p.total_price) || 0,
-              item_type: (p.item_type || 'produto') as ItemType,
-              item_description: p.item_description || p.description || '',
-              service_hours: p.item_type === 'servico' ? (Number(p.service_hours) || 0) : undefined,
-              hourly_rate: p.item_type === 'servico' ? (Number(p.hourly_rate) || 0) : undefined
-            };
-            
-            console.log(`  ✅ Produto ${index + 1} validado:`, validated);
-            return validated;
-          });
-        
-        console.log('✅ Total de produtos validados:', validatedProducts.length);
-        
-        setTimeout(() => {
-          setProjectProducts(validatedProducts);
-          console.log('✅ setProjectProducts executado com', validatedProducts.length, 'produtos');
-        }, 0);
-        
-      } else {
-        console.log('⚠️ Nenhum produto válido encontrado, inicializando array vazio');
-        setProjectProducts([]);
-      }
-
-      if (project.payment_terms) {
-        console.log('💳 Carregando termos de pagamento:', project.payment_terms);
-        setPaymentTerms({
-          installments: project.payment_terms.installments || 1,
-          payment_method: project.payment_terms.payment_method || 'pix',
-          discount_percentage: project.payment_terms.discount_percentage || 0
-        });
-      }
-
-      const client = clients.find(c => c.id === project.client_id);
-      if (client) {
-        console.log('👤 Cliente encontrado:', client.name);
-        setSelectedClientName(client.name);
-        setClientSearch(client.name);
-      } else {
-        console.log('⚠️ Cliente não encontrado para ID:', project.client_id);
-        setSelectedClientName('');
-        setClientSearch('');
-      }
-
-      hasLoadedData.current = true;
-      console.log('🎉 Carregamento de dados concluído com sucesso!');
-    } catch (error) {
-      console.error('❌ ERRO no carregamento dos dados:', error);
-      alert('Erro ao carregar dados do projeto. Verificar console para detalhes.');
+    const safeProducts = Array.isArray(project.products) ? project.products : [];
+    if (safeProducts.length > 0) {
+      const validatedProducts: ProjectProduct[] = safeProducts
+        .filter(p => p && typeof p === 'object')
+        .map((p) => ({
+          id: p.id || `temp-${Date.now()}-${Math.random()}`,
+          product_id: p.product_id || null,
+          product_name: p.product_name || p.name || 'Produto sem nome',
+          quantity: Number(p.quantity) || 1,
+          unit_price: Number(p.unit_price) || 0,
+          total_price: Number(p.total_price) || 0,
+          item_type: (p.item_type || 'produto') as ItemType,
+          item_description: p.item_description || p.description || '',
+          service_hours: p.item_type === 'servico' ? (Number(p.service_hours) || 0) : undefined,
+          hourly_rate: p.item_type === 'servico' ? (Number(p.hourly_rate) || 0) : undefined
+        }));
+      
+      setTimeout(() => {
+        setProjectProducts(validatedProducts);
+      }, 0);
+    } else {
+      setProjectProducts([]);
     }
+
+    if (project.payment_terms) {
+      setPaymentTerms({
+        installments: project.payment_terms.installments || 1,
+        payment_method: project.payment_terms.payment_method || 'pix',
+        discount_percentage: project.payment_terms.discount_percentage || 0,
+        installment_interval: (project.payment_terms as any).installment_interval || 30
+      });
+    }
+
+    const client = clients.find(c => c.id === project.client_id);
+    if (client) {
+      setSelectedClientName(client.name);
+      setClientSearch(client.name);
+    }
+
+    hasLoadedData.current = true;
   };
 
-  useEffect(() => {
-    console.log('🔔 [DEBUG] projectProducts STATE mudou:', {
-      length: projectProducts.length,
-      items: projectProducts.map(p => ({
-        id: p.id,
-        name: p.product_name,
-        type: p.item_type,
-        quantity: p.quantity,
-        unit_price: p.unit_price,
-        total_price: p.total_price
-      }))
-    });
-  }, [projectProducts]);
-
-// ✅ NOVO: Efeito para DEBUG - Monitorar mudanças em projectProducts
-useEffect(() => {
-  console.log('🔔 [DEBUG] projectProducts mudou:', {
-    length: projectProducts.length,
-    items: projectProducts.map(p => ({
-      id: p.id,
-      name: p.product_name,
-      type: p.item_type,
-      quantity: p.quantity
-    }))
-  });
-}, [projectProducts]);
-
+  // Calcula data de entrega automaticamente
   useEffect(() => {
     if (formData.start_date && formData.delivery_deadline_days) {
       const startDate = new Date(formData.start_date);
       const endDate = new Date(startDate);
       endDate.setDate(endDate.getDate() + formData.delivery_deadline_days);
-
       setFormData(prev => ({
         ...prev,
         end_date: endDate.toISOString().split('T')[0]
@@ -266,10 +175,8 @@ useEffect(() => {
     const materialsCost = parseFloat(formData.materials_cost) || 0;
     const laborCost = parseFloat(formData.labor_cost) || 0;
     const profitMargin = parseFloat(formData.profit_margin) || 0;
-
     const totalCosts = productsTotal + materialsCost + laborCost;
     const budget = totalCosts * (1 + profitMargin / 100);
-
     return budget;
   };
 
@@ -316,26 +223,20 @@ useEffect(() => {
         payment_method: paymentTerms.payment_method,
         discount_percentage: paymentTerms.discount_percentage,
         installment_value: installmentValue,
-        total_with_discount: finalValue
+        total_with_discount: finalValue,
+        installment_interval: paymentTerms.installment_interval // NOVO: Salva intervalo
       }
     };
 
-    console.log('💾 Dados para salvar:', projectData);
-
     try {
       if (project) {
-        console.log('🔄 EDIÇÃO: Chamando updateProject');
         await updateProject(project.id, projectData);
-        console.log('✅ Projeto atualizado com sucesso!');
       } else {
-        console.log('🔄 NOVO: Chamando addProject (válido para orçamentos E vendas)');
         await addProject(projectData);
-        console.log('✅ Projeto/Venda criado com sucesso!');
       }
-      
       onClose();
     } catch (error) {
-      console.error('❌ ERRO ao salvar:', error);
+      console.error('Erro ao salvar:', error);
       alert('Erro ao salvar pedido/venda: ' + (error as any)?.message);
     }
   };
@@ -351,7 +252,9 @@ useEffect(() => {
     const { name, value } = e.target;
     setPaymentTerms(prev => ({
       ...prev,
-      [name]: name === 'installments' || name === 'discount_percentage' ? parseInt(value) || 0 : value
+      [name]: name === 'installments' || name === 'discount_percentage' || name === 'installment_interval' 
+        ? parseInt(value) || 0 
+        : value
     }));
   };
 
@@ -373,7 +276,6 @@ useEffect(() => {
     const value = e.target.value;
     setClientSearch(value);
     setShowClientDropdown(true);
-
     const exactMatch = clients.find(c => c.name.toLowerCase() === value.toLowerCase());
     if (!exactMatch) {
       setFormData(prev => ({ ...prev, client_id: '' }));
@@ -381,43 +283,19 @@ useEffect(() => {
     }
   };
 
-  const handleClientSearchFocus = () => {
-    setShowClientDropdown(true);
-  };
-
-  const handleClientSearchBlur = () => {
-    setTimeout(() => {
-      setShowClientDropdown(false);
-    }, 200);
-  };
-
   const addProductToProject = (productId: string) => {
-    console.log('🛒 Adicionando produto:', productId);
-    
     const product = products.find(p => p.id === productId);
-    if (!product) {
-      console.error('❌ Produto não encontrado:', productId);
-      return;
-    }
-
-    console.log('✅ Produto encontrado:', product);
+    if (!product) return;
 
     setProjectProducts(prev => {
       const existingProduct = prev.find(p => p.product_id === productId);
-
       if (existingProduct) {
-        console.log('📦 Produto já existe, aumentando quantidade');
         return prev.map(p => 
           p.product_id === productId 
-            ? { 
-                ...p, 
-                quantity: p.quantity + 1, 
-                total_price: (p.quantity + 1) * p.unit_price 
-              }
+            ? { ...p, quantity: p.quantity + 1, total_price: (p.quantity + 1) * p.unit_price }
             : p
         );
       } else {
-        console.log('🆕 Novo produto sendo adicionado');
         const unitPrice = product.sale_price || product.cost_price * 1.5;
         const newProduct: ProjectProduct = {
           id: `new-${Date.now()}-${Math.random()}`,
@@ -429,8 +307,6 @@ useEffect(() => {
           item_type: 'produto',
           item_description: product.description || ''
         };
-        
-        console.log('✅ Produto criado:', newProduct);
         return [...prev, newProduct];
       }
     });
@@ -440,8 +316,6 @@ useEffect(() => {
   };
 
   const addServiceToProject = () => {
-    console.log('🔧 Adicionando novo serviço');
-    
     const newService: ProjectProduct = {
       id: `service-${Date.now()}-${Math.random()}`,
       product_id: null,
@@ -454,73 +328,44 @@ useEffect(() => {
       hourly_rate: 50,
       item_description: ''
     };
-
-    setProjectProducts(prev => {
-      console.log('🔧 Serviço adicionado:', newService);
-      return [...prev, newService];
-    });
+    setProjectProducts(prev => [...prev, newService]);
   };
 
   const updateProductQuantity = (itemId: string, quantity: number) => {
-    console.log('🔢 Atualizando quantidade:', { itemId, quantity });
-    
     if (quantity <= 0) {
       removeProduct(itemId);
       return;
     }
-
     setProjectProducts(prev => prev.map(p => {
       if (p.id === itemId) {
         const newQuantity = Math.max(1, quantity);
         let newTotal = newQuantity * p.unit_price;
-        
         if (p.item_type === 'servico' && p.service_hours && p.hourly_rate) {
           newTotal = (p.service_hours * p.hourly_rate) * newQuantity;
         }
-        
-        console.log('✅ Quantidade atualizada:', { itemId, newQuantity, newTotal });
-        
-        return { 
-          ...p, 
-          quantity: newQuantity, 
-          total_price: newTotal 
-        };
+        return { ...p, quantity: newQuantity, total_price: newTotal };
       }
       return p;
     }));
   };
 
   const updateProductPrice = (itemId: string, unitPrice: number) => {
-    console.log('💰 Atualizando preço:', { itemId, unitPrice });
-    
     setProjectProducts(prev => prev.map(p => {
       if (p.id === itemId) {
         const newPrice = Math.max(0, unitPrice);
         const newTotal = p.quantity * newPrice;
-        
-        console.log('✅ Preço atualizado:', { itemId, newPrice, newTotal });
-        
-        return {
-          ...p,
-          unit_price: newPrice,
-          total_price: newTotal
-        };
+        return { ...p, unit_price: newPrice, total_price: newTotal };
       }
       return p;
     }));
   };
 
   const updateServiceHours = (itemId: string, hours: number) => {
-    console.log('⏰ Atualizando horas de serviço:', { itemId, hours });
-    
     setProjectProducts(prev => prev.map(p => {
       if (p.id === itemId && p.item_type === 'servico') {
         const newHours = Math.max(0, hours);
         const hourlyRate = p.hourly_rate || 0;
         const unitPrice = newHours * hourlyRate;
-
-        console.log('✅ Horas atualizadas:', { itemId, newHours, unitPrice });
-
         return {
           ...p,
           service_hours: newHours,
@@ -533,16 +378,11 @@ useEffect(() => {
   };
 
   const updateHourlyRate = (itemId: string, rate: number) => {
-    console.log('💲 Atualizando valor por hora:', { itemId, rate });
-    
     setProjectProducts(prev => prev.map(p => {
       if (p.id === itemId && p.item_type === 'servico') {
         const newRate = Math.max(0, rate);
         const hours = p.service_hours || 0;
         const unitPrice = hours * newRate;
-
-        console.log('✅ Taxa horária atualizada:', { itemId, newRate, unitPrice });
-
         return {
           ...p,
           hourly_rate: newRate,
@@ -567,12 +407,7 @@ useEffect(() => {
   };
 
   const removeProduct = (itemId: string) => {
-    console.log('🗑️ Removendo produto:', itemId);
-    setProjectProducts(prev => {
-      const filtered = prev.filter(p => p.id !== itemId);
-      console.log('✅ Produto removido. Restam:', filtered.length);
-      return filtered;
-    });
+    setProjectProducts(prev => prev.filter(p => p.id !== itemId));
   };
 
   const filteredProducts = products.filter(product =>
@@ -584,6 +419,16 @@ useEffect(() => {
   const discountAmount = budget * (paymentTerms.discount_percentage / 100);
   const finalValue = budget - discountAmount;
 
+  if (loading || !isInitialized.current) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-xl shadow-2xl p-8 flex flex-col items-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600 mb-4"></div>
+          <p className="text-gray-600">Carregando dados...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -601,83 +446,78 @@ useEffect(() => {
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* SEÇÃO DE CLIENTE COM BOTÃO DE ADICIONAR */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <div className="relative">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-700">
                   <User className="h-4 w-4 inline mr-2 text-amber-600" />
                   Cliente *
                 </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={clientSearch}
-                    onChange={handleClientSearchChange}
-                    onFocus={handleClientSearchFocus}
-                    onBlur={handleClientSearchBlur}
-                    placeholder="Digite para buscar cliente..."
-                    className="w-full px-4 py-3 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                  />
-                  <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                  
-                  {formData.client_id && (
-                    <Check className="absolute right-10 top-1/2 transform -translate-y-1/2 h-5 w-5 text-green-500" />
-                  )}
-                </div>
-                
-                {showClientDropdown && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                    {filteredClients.length > 0 ? (
-                      filteredClients.map((client) => (
-                        <button
-                          key={client.id}
-                          type="button"
-                          onClick={() => handleClientSelect(client)}
-                          className={`w-full text-left px-4 py-3 hover:bg-amber-50 border-b border-gray-100 last:border-b-0 transition-colors ${
-                            formData.client_id === client.id ? 'bg-amber-50 text-amber-700' : 'text-gray-700'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <div className="font-medium">{client.name}</div>
-                              <div className="text-sm text-gray-500">
-                                {client.email} • {client.mobile}
-                              </div>
-                              {client.type === 'pj' && client.cnpj && (
-                                <div className="text-xs text-gray-400">CNPJ: {client.cnpj}</div>
-                              )}
-                              {client.type === 'pf' && client.cpf && (
-                                <div className="text-xs text-gray-400">CPF: {client.cpf}</div>
-                              )}
-                            </div>
-                            {formData.client_id === client.id && (
-                              <Check className="h-5 w-5 text-amber-600" />
-                            )}
-                          </div>
-                        </button>
-                      ))
-                    ) : (
-                      <div className="px-4 py-3 text-gray-500 text-center">
-                        <User className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                        <p>Nenhum cliente encontrado</p>
-                        <p className="text-xs">Tente ajustar a busca</p>
-                      </div>
-                    )}
-                  </div>
+                <button
+                  type="button"
+                  onClick={() => setShowClientModal(true)}
+                  className="flex items-center space-x-1 px-3 py-1 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  <Plus className="h-3 w-3" />
+                  <span>Novo Cliente</span>
+                </button>
+              </div>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={clientSearch}
+                  onChange={handleClientSearchChange}
+                  onFocus={() => setShowClientDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowClientDropdown(false), 200)}
+                  placeholder="Digite para buscar cliente..."
+                  className="w-full px-4 py-3 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                />
+                <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                {formData.client_id && (
+                  <Check className="absolute right-10 top-1/2 transform -translate-y-1/2 h-5 w-5 text-green-500" />
                 )}
               </div>
               
+              {showClientDropdown && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {filteredClients.length > 0 ? (
+                    filteredClients.map((client) => (
+                      <button
+                        key={client.id}
+                        type="button"
+                        onClick={() => handleClientSelect(client)}
+                        className={`w-full text-left px-4 py-3 hover:bg-amber-50 border-b border-gray-100 last:border-b-0 transition-colors ${
+                          formData.client_id === client.id ? 'bg-amber-50 text-amber-700' : 'text-gray-700'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium">{client.name}</div>
+                            <div className="text-sm text-gray-500">
+                              {client.email} • {client.mobile}
+                            </div>
+                          </div>
+                          {formData.client_id === client.id && <Check className="h-5 w-5 text-amber-600" />}
+                        </div>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="px-4 py-3 text-gray-500 text-center">
+                      <User className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p>Nenhum cliente encontrado</p>
+                    </div>
+                  )}
+                </div>
+              )}
+              
               {!formData.client_id && clientSearch && (
-                <p className="mt-1 text-sm text-red-600">
-                  Por favor, selecione um cliente da lista
-                </p>
+                <p className="mt-1 text-sm text-red-600">Por favor, selecione um cliente da lista</p>
               )}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Tipo *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Tipo *</label>
               <select
                 name="type"
                 value={formData.type}
@@ -704,15 +544,10 @@ useEffect(() => {
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
               placeholder="Descreva o pedido/orçamento..."
             />
-            <p className="mt-1 text-xs text-gray-500">
-              Ex: Cozinha planejada em MDF com bancada de granito
-            </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Status
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
             <select
               name="status"
               value={formData.status}
@@ -757,9 +592,6 @@ useEffect(() => {
                 required
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
               />
-              <p className="mt-1 text-xs text-gray-500">
-                Dias úteis para conclusão
-              </p>
             </div>
 
             <div>
@@ -775,12 +607,10 @@ useEffect(() => {
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-gray-50"
                 readOnly
               />
-              <p className="mt-1 text-xs text-green-600">
-                ✓ Calculado automaticamente
-              </p>
             </div>
           </div>
 
+          {/* PRODUTOS E SERVIÇOS */}
           <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-800">
@@ -814,12 +644,6 @@ useEffect(() => {
                 </button>
               </div>
             </div>
-
-            {process.env.NODE_ENV === 'development' && (
-              <div className="mb-4 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
-                <strong>DEBUG:</strong> projectProducts.length = {projectProducts.length}
-              </div>
-            )}
 
             <div className="space-y-4">
               {projectProducts.map((item, index) => (
@@ -875,9 +699,7 @@ useEffect(() => {
                   </div>
 
                   <div className="mb-3">
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                      Descrição
-                    </label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Descrição</label>
                     <textarea
                       value={item.item_description || ''}
                       onChange={(e) => updateItemDescription(item.id, e.target.value)}
@@ -890,9 +712,7 @@ useEffect(() => {
                   {item.item_type === 'produto' ? (
                     <div className="grid grid-cols-4 gap-3">
                       <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Quantidade
-                        </label>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Quantidade</label>
                         <input
                           type="number"
                           value={item.quantity}
@@ -902,9 +722,7 @@ useEffect(() => {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Preço Unit. (R$)
-                        </label>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Preço Unit. (R$)</label>
                         <input
                           type="number"
                           value={item.unit_price}
@@ -915,9 +733,7 @@ useEffect(() => {
                         />
                       </div>
                       <div className="col-span-2">
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Total
-                        </label>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Total</label>
                         <div className="w-full px-3 py-2 bg-blue-100 border border-blue-300 rounded-lg text-sm font-bold text-blue-900">
                           R$ {(item.total_price || 0).toFixed(2)}
                         </div>
@@ -927,9 +743,7 @@ useEffect(() => {
                     <div className="space-y-3">
                       <div className="grid grid-cols-3 gap-3">
                         <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">
-                            Horas *
-                          </label>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Horas *</label>
                           <input
                             type="number"
                             value={item.service_hours || 0}
@@ -939,12 +753,9 @@ useEffect(() => {
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                             placeholder="6.0"
                           />
-                          <p className="text-xs text-gray-500 mt-1">Ex: 6.0 horas</p>
                         </div>
                         <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">
-                            Valor/Hora (R$) *
-                          </label>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Valor/Hora (R$) *</label>
                           <input
                             type="number"
                             value={item.hourly_rate || 0}
@@ -954,12 +765,9 @@ useEffect(() => {
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                             placeholder="50.00"
                           />
-                          <p className="text-xs text-gray-500 mt-1">Ex: R$ 50/h</p>
                         </div>
                         <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">
-                            Quantidade
-                          </label>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Quantidade</label>
                           <input
                             type="number"
                             value={item.quantity}
@@ -967,7 +775,6 @@ useEffect(() => {
                             min="1"
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-center"
                           />
-                          <p className="text-xs text-gray-500 mt-1">Qtd de vezes</p>
                         </div>
                       </div>
                       
@@ -1054,10 +861,11 @@ useEffect(() => {
             </div>
           </div>
 
+          {/* CONDIÇÕES DE PAGAMENTO COM INTERVALO */}
           <div className="bg-blue-50 p-4 rounded-lg">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Condições de Pagamento</h3>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Forma de Pagamento
@@ -1092,22 +900,32 @@ useEffect(() => {
                 />
               </div>
 
+              {/* NOVO: INTERVALO ENTRE PARCELAS */}
               {paymentTerms.installments > 1 && (
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Intervalo entre Parcelas
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Intervalo entre Parcelas (dias)
                   </label>
                   <select
-                    value={paymentTerms.installment_interval_days}
-                    onChange={(e) => setPaymentTerms({ ...paymentTerms, installment_interval_days: parseInt(e.target.value) })}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    name="installment_interval"
+                    value={paymentTerms.installment_interval}
+                    onChange={handlePaymentChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
-                    <option value={7}>Semanal (7 dias)</option>
-                    <option value={15}>Quinzenal (15 dias)</option>
-                    <option value={30}>Mensal (30 dias)</option>
-                    <option value={60}>Bimestral (60 dias)</option>
-                    <option value={90}>Trimestral (90 dias)</option>
+                    <option value="7">Semanal (7 dias)</option>
+                    <option value="15">Quinzenal (15 dias)</option>
+                    <option value="30">Mensal (30 dias)</option>
+                    <option value="60">Bimestral (60 dias)</option>
+                    <option value="90">Trimestral (90 dias)</option>
                   </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    📅 Próximas parcelas: {Array.from({ length: Math.min(3, paymentTerms.installments - 1) }, (_, i) => {
+                      const date = new Date();
+                      date.setDate(date.getDate() + (paymentTerms.installment_interval * (i + 1)));
+                      return date.toLocaleDateString('pt-BR');
+                    }).join(', ')}
+                    {paymentTerms.installments > 4 && '...'}
+                  </p>
                 </div>
               )}
 
@@ -1170,14 +988,7 @@ useEffect(() => {
           </div>
         </form>
 
-      {showClientModal && (
-        <ClientModal
-          onClose={() => {
-            setShowClientModal(false);
-          }}
-        />
-      )}
-
+        {/* MODAL DE BUSCA DE PRODUTOS */}
         {showProductSearch && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60 p-4">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden">
@@ -1242,6 +1053,14 @@ useEffect(() => {
               </div>
             </div>
           </div>
+        )}
+
+        {/* MODAL DE NOVO CLIENTE */}
+        {showClientModal && (
+          <ClientModal
+            isOpen={showClientModal}
+            onClose={() => setShowClientModal(false)}
+          />
         )}
       </div>
     </div>
