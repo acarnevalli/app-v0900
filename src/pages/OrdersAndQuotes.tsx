@@ -1333,6 +1333,18 @@ const OrdersAndQuotes: React.FC = () => {
                       >
                         <Eye className="h-4 w-4" />
                       </button>
+                      
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          generatePDF(project);
+                        }}
+                        className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                        title="Imprimir PDF"
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
+                      
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
