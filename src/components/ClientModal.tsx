@@ -150,12 +150,11 @@ const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client }) =>
       newErrors.name = formData.type === 'pf' ? 'Nome é obrigatório' : 'Razão Social é obrigatória';
     }
 
-    // Email obrigatório e válido
-    //if (!formData.email.trim()) {
-    // newErrors.email = 'Email é obrigatório';
-    //} else 
-    if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Email inválido';
+    // Email e válido
+    if (formData.email.trim()) {
+      if (!/\S+@\S+\.\S+/.test(formData.email)) {
+        newErrors.email = 'Email inválido';
+      }
     }
 
     // Telefones obrigatórios
