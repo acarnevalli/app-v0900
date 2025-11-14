@@ -569,10 +569,10 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, o
           onClose={() => setIsSupplierModalOpen(false)}
           onSuccess={handleSupplierCreated}
         />
-      </div>
     </div>
   );
 };
 
 export default ProductModal;
+
 
