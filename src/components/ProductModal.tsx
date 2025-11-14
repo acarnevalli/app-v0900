@@ -442,7 +442,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, o
             </div>
           </div>
 
-          {/* Fornecedor - PARTE ATUALIZADA COM AUTOCOMPLETE */}
+          {/* Fornecedor - COM BOTÃO DE ADICIONAR */}
           <div className="supplier-dropdown-container">
             <label className="block text-sm font-medium text-gray-700 mb-1">Fornecedor</label>
             <div className="relative">
@@ -467,21 +467,37 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, o
                 >
                   <ChevronDown className="h-4 w-4" />
                 </button>
+                {/* ✅ NOVO: Botão para adicionar fornecedor */}
                 <button
                   type="button"
                   onClick={() => setIsSupplierModalOpen(true)}
-                  className="p-1 text-amber-600 hover:text-amber-700"
+                  className="p-1 text-green-600 hover:text-green-700 hover:bg-green-50 rounded transition-colors"
+                  title="Adicionar novo fornecedor"
                 >
                   <Plus className="h-4 w-4" />
                 </button>
               </div>
-
-              {/* Dropdown de fornecedores */}
+          
+              {/* Dropdown de fornecedores (mantido igual) */}
               {showSupplierDropdown && (
                 <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto">
                   {filteredSuppliers.length === 0 ? (
                     <div className="px-4 py-3 text-sm text-gray-500">
-                      {supplierSearchQuery ? 'Nenhum fornecedor encontrado' : 'Nenhum fornecedor cadastrado'}
+                      <div className="flex flex-col items-center space-y-2">
+                        <span>{supplierSearchQuery ? 'Nenhum fornecedor encontrado' : 'Nenhum fornecedor cadastrado'}</span>
+                        {/* Botão alternativo dentro do dropdown */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowSupplierDropdown(false);
+                            setIsSupplierModalOpen(true);
+                          }}
+                          className="text-xs text-green-600 hover:text-green-700 font-medium flex items-center space-x-1"
+                        >
+                          <Plus className="h-3 w-3" />
+                          <span>Cadastrar novo fornecedor</span>
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     filteredSuppliers.map((supplier) => (
@@ -506,7 +522,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, o
               )}
             </div>
             
-            {/* Mostra fornecedor selecionado */}
+            {/* Mostra fornecedor selecionado (mantido igual) */}
             {formData.supplier && !showSupplierDropdown && (
               <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between">
                 <span className="text-sm text-amber-800">
@@ -525,7 +541,6 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, o
               </div>
             )}
           </div>
-        </div>
 
         {/* Footer */}
         <div className="flex space-x-3 p-6 border-t border-gray-100">
@@ -560,3 +575,4 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, o
 };
 
 export default ProductModal;
+
