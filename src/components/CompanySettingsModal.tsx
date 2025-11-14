@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Building, MapPin, FileText, CreditCard, RotateCcw, Phone, Mail, Globe, Hash, Shield, Banknote } from 'lucide-react';
+import { X, Building, MapPin, FileText, CreditCard, RotateCcw, Phone, Mail, Globe, Hash, Shield, Banknote, Image } from 'lucide-react';
 import { useSettings } from '../contexts/SettingsContext';
 
 interface CompanySettingsModalProps {
@@ -9,7 +9,7 @@ interface CompanySettingsModalProps {
 
 const CompanySettingsModal: React.FC<CompanySettingsModalProps> = ({ isOpen, onClose }) => {
   const { companySettings, updateCompanySettings, resetCompanySettings } = useSettings();
-  const [activeTab, setActiveTab] = useState<'basic' | 'address' | 'fiscal' | 'banking'>('basic');
+  const [activeTab, setActiveTab] = useState<'basic' | 'address' | 'fiscal' | 'banking' | 'logo'>('basic');
 
    if (!isOpen) return null;
 
@@ -55,6 +55,15 @@ const CompanySettingsModal: React.FC<CompanySettingsModalProps> = ({ isOpen, onC
     }
   };
 
+  // Stub para upload de logo (evita erro estrutural por função ausente)
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Implementação do upload/armazenamento do logo pode ser adicionada aqui.
+    // Por ora, mantemos apenas um log para confirmar seleção.
+    console.log('Logo selecionado:', file.name);
+  };
+
   const formatCNPJ = (value: string) => {
     if (!value) return '';
     return value
@@ -87,7 +96,8 @@ const CompanySettingsModal: React.FC<CompanySettingsModalProps> = ({ isOpen, onC
     { id: 'basic', label: 'Dados Básicos', icon: Building },
     { id: 'address', label: 'Endereço', icon: MapPin },
     { id: 'fiscal', label: 'Informações Fiscais', icon: FileText },
-    { id: 'banking', label: 'Dados Bancários', icon: CreditCard }
+    { id: 'banking', label: 'Dados Bancários', icon: CreditCard },
+    { id: 'logo', label: 'Logo', icon: Image }
   ];
 
   const taxRegimeOptions = [
@@ -599,13 +609,13 @@ const CompanySettingsModal: React.FC<CompanySettingsModalProps> = ({ isOpen, onC
               </div>
             )}
 
-            //TAB para adição do Logo
-              {activeTab === 'logo' && (
+            {/* TAB para adição do Logo */}
+            {activeTab === 'logo' && (
               <div className="space-y-6">
                 <h3 className="text-xl font-bold text-gray-800 mb-4">Logo</h3>
-                
                 <input type="file" accept="image/*" onChange={handleLogoUpload} />
               </div>
+            )}
 
         <div className="flex justify-end space-x-4 p-6 border-t border-gray-200">
           <button
@@ -617,6 +627,8 @@ const CompanySettingsModal: React.FC<CompanySettingsModalProps> = ({ isOpen, onC
         </div>
       </div>
     </div>
+    </div>
+  </div>
   );
 };
 
