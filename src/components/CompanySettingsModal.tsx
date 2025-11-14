@@ -598,8 +598,14 @@ const CompanySettingsModal: React.FC<CompanySettingsModalProps> = ({ isOpen, onC
                 </div>
               </div>
             )}
-          </div>
-        </div>
+
+            //TAB para adição do Logo
+              {activeTab === 'logo' && (
+              <div className="space-y-6">
+                <h3 className="text-xl font-bold text-gray-800 mb-4">Logo</h3>
+                
+                <input type="file" accept="image/*" onChange={handleLogoUpload} />
+              </div>
 
         <div className="flex justify-end space-x-4 p-6 border-t border-gray-200">
           <button
