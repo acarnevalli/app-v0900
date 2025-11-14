@@ -10,6 +10,7 @@ import {
   Trash2,
   FileText,
   Download,
+  Printer,
   Filter,
   Package,
   TrendingUp,
@@ -231,7 +232,7 @@ const ProjectDetailsModal: React.FC<ProjectDetailsModalProps> = ({ project, onCl
               onClick={() => generatePDF(project)}
               className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
             >
-              <Download className="w-4 h-4" />
+              <Printer className="w-4 h-4" />
               <span>Imprimir PDF</span>
             </button>
           <button
@@ -1342,7 +1343,7 @@ const OrdersAndQuotes: React.FC = () => {
                         className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
                         title="Imprimir PDF"
                       >
-                        <Download className="w-4 h-4" />
+                        <Printer className="w-4 h-4" />
                       </button>
                       
                       <button
