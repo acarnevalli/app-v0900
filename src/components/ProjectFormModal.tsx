@@ -126,12 +126,6 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
       profit_margin: project.profit_margin?.toString() || '20'
     });
 
-     hasLoadedData.current = true;
-    } catch (error) {
-      console.error('❌ Erro ao carregar dados do projeto:', error);
-    }
-  };
-
     const safeProducts = Array.isArray(project.products) ? project.products : [];
     if (safeProducts.length > 0) {
       const validatedProducts: ProjectProduct[] = safeProducts
@@ -171,9 +165,12 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
       setClientSearch(client.name);
     }
 
-    hasLoadedData.current = true;
+     hasLoadedData.current = true;
+    } catch (error) {
+      console.error('❌ Erro ao carregar dados do projeto:', error);
+    }
   };
-
+  
   // Calcula data de entrega automaticamente
   useEffect(() => {
     if (formData.start_date && formData.delivery_deadline_days) {
