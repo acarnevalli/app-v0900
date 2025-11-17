@@ -1471,7 +1471,10 @@ useEffect(() => {
     // 1. Buscar o projeto para verificar se é uma venda
     const { data: project, error: fetchError } = await supabase
       .from('projects')
-      .select('type, order_number')
+      .select(`
+        *,
+        project_products (*)
+      `)
       .eq('id', id)
       .eq('user_id', user!.id)
       .single();
