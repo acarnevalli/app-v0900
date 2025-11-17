@@ -1399,7 +1399,7 @@ useEffect(() => {
     console.log('[addProject] Inserindo produtos:', projectProducts);
 
     const { error: productsError } = await supabase
-      .from('projectproducts')
+      .from('project_products')
       .insert(projectProducts);
 
     if (productsError) {
