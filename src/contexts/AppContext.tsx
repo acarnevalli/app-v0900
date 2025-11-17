@@ -1311,6 +1311,25 @@ useEffect(() => {
   // CRUD - PROJECTS
   // ============================================
 
+  const newProject = {
+    client_id: data.client_id,
+    description: data.description.trim(),
+    status: data.status,
+    type: data.type,
+    budget: budgetValue, // ✅ Usar o valor convertido
+    start_date: data.start_date,
+    end_date: data.end_date || endDate.toISOString().split('T')[0],
+    delivery_deadline_days: deliveryDeadlineDays,
+    materials_cost: data.materials_cost || 0,
+    labor_cost: data.labor_cost || 0,
+    profit_margin: data.profit_margin || 0,
+    payment_terms: data.payment_terms,
+    number: 0,
+    user_id: user!.id,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+  
   const addProject = useCallback(async (data: Omit<Project, "id" | "created_at" | "updated_at" | "number" | "order_number" | "user_id">): Promise<any> => {
   ensureUser();
   
@@ -1354,25 +1373,6 @@ useEffect(() => {
   if (isNaN(budgetValue) || budgetValue <= 0) {
     throw new Error('Valor do orçamento inválido');
   }
-
-  const newProject = {
-    client_id: data.client_id,
-    description: data.description.trim(),
-    status: data.status,
-    type: data.type,
-    budget: budgetValue, // ✅ Usar o valor convertido
-    start_date: data.start_date,
-    end_date: data.end_date || endDate.toISOString().split('T')[0],
-    delivery_deadline_days: deliveryDeadlineDays,
-    materials_cost: data.materials_cost || 0,
-    labor_cost: data.labor_cost || 0,
-    profit_margin: data.profit_margin || 0,
-    payment_terms: data.payment_terms,
-    number: 0,
-    user_id: user!.id,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  };
 
   console.log('💾 [addProject] Dados para Supabase:', newProject);
   console.log('💾 [addProject] budget final:', newProject.budget);
