@@ -1383,17 +1383,17 @@ useEffect(() => {
     // Inserir os produtos do projeto
   if (data.products && data.products.length > 0) {
     const projectProducts = data.products.map(p => ({
-      projectid: insertedProject.id,
-      productid: p.productid || null,
-      productname: p.productname || 'Produto sem nome',
+      project_id: insertedProject.id,
+      product_id: p.productid || null,
+      product_name: p.productname || 'Produto sem nome',
       quantity: Number(p.quantity) || 1,
-      unitprice: Number(p.unitprice) || 0,
-      totalprice: Number(p.totalprice) || 0,
-      itemtype: p.itemtype || 'produto',
-      itemdescription: p.itemdescription || '',
-      servicehours: p.itemtype === 'servico' ? Number(p.servicehours) || null : null,
-      hourlyrate: p.itemtype === 'servico' ? Number(p.hourlyrate) || null : null,
-      userid: user!.id
+      unit_price: Number(p.unitprice) || 0,
+      total_price: Number(p.totalprice) || 0,
+      item_type: p.itemtype || 'produto',
+      item_description: p.itemdescription || '',
+      service_hours: p.itemtype === 'servico' ? Number(p.servicehours) || null : null,
+      hourly_rate: p.itemtype === 'servico' ? Number(p.hourlyrate) || null : null,
+      user_id: user!.id
     }));
 
     console.log('[addProject] Inserindo produtos:', projectProducts);
