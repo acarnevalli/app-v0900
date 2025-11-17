@@ -1317,6 +1317,12 @@ useEffect(() => {
   console.log('📥 [addProject] Dados recebidos:', data);
   console.log('📥 [addProject] budget:', data.budget);
     console.log('🔥 CHECKPOINT 1: Antes do insert no Supabase'); // ← ADICIONE ESTE LOG
+    try {
+      const { data: insertedProject, error } = await supabase
+        .from('projects')
+        .insert(cleanUndefined(newProject))
+        .select()
+        .single();
       
   console.log('📥 [addProject] products:', data.products?.length);
   
@@ -1416,6 +1422,11 @@ useEffect(() => {
     console.log('[addProject] Produtos inseridos com sucesso!');
   }
 
+      } catch (err) {
+  console.error('🔥 ERRO CAPTURADO NO INSERT:', err);
+  throw err;
+}
+    
   // Criar transações financeiras se for venda
   if (insertedProject.type === 'venda') {
     await createTransactionsFromProject(insertedProject.id, {
