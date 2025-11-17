@@ -1317,12 +1317,7 @@ useEffect(() => {
   console.log('📥 [addProject] Dados recebidos:', data);
   console.log('📥 [addProject] budget:', data.budget);
     console.log('🔥 CHECKPOINT 1: Antes do insert no Supabase'); // ← ADICIONE ESTE LOG
-      const { data: insertedProject, error } = await supabase
-      .from('projects')
-      .insert(cleanUndefined(newProject))
-      .select()
-      .single();
-    
+      
   console.log('📥 [addProject] products:', data.products?.length);
   
   if (!data.description || data.description.trim() === '') {
