@@ -171,10 +171,14 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
   }, [formData.start_date, formData.delivery_deadline_days]);
 
   const calculateBudget = () => {
-    const productsTotal = projectProducts.reduce((sum, p) => sum + (p.total_price || 0), 0);
+     const productsTotal = projectProducts.reduce((sum, p) => {
+      const totalPrice = Number(p.total_price) || 0;
+      return sum + totalPrice;
+    }, 0);
     const materialsCost = parseFloat(formData.materials_cost) || 0;
     const laborCost = parseFloat(formData.labor_cost) || 0;
     const profitMargin = parseFloat(formData.profit_margin) || 0;
+    
     const totalCosts = productsTotal + materialsCost + laborCost;
     const budget = totalCosts * (1 + profitMargin / 100);
     return budget;
