@@ -102,6 +102,17 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
   };
 
   const loadProjectData = (project: Project) => {
+    console.log('📥 Iniciando carregamento dos dados do projeto...');
+  
+  try {
+    console.log('📋 Carregando dados básicos...');
+    
+    // Função auxiliar para formatar data
+    const formatDate = (dateString: string | undefined): string => {
+      if (!dateString) return new Date().toISOString().split('T')[0];
+      // Remove tudo após 'T' e mantém apenas yyyy-MM-dd
+      return dateString.split('T')[0];
+    };
     setFormData({
       client_id: project.client_id || '',
       description: project.description || '',
