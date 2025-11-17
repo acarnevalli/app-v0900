@@ -1316,14 +1316,6 @@ useEffect(() => {
   
   console.log('📥 [addProject] Dados recebidos:', data);
   console.log('📥 [addProject] budget:', data.budget);
-    console.log('🔥 CHECKPOINT 1: Antes do insert no Supabase'); // ← ADICIONE ESTE LOG
-    try {
-      const { data: insertedProject, error } = await supabase
-        .from('projects')
-        .insert(cleanUndefined(newProject))
-        .select()
-        .single();
-      
   console.log('📥 [addProject] products:', data.products?.length);
   
   if (!data.description || data.description.trim() === '') {
@@ -1338,7 +1330,7 @@ useEffect(() => {
     throw new Error('Adicione pelo menos um produto ou serviço');
   }
 
-  // ✅ CRÍTICO: Validar budget ANTES de enviar
+  // ✅ Validar budget
   if (!data.budget || data.budget <= 0 || isNaN(data.budget)) {
     console.error('❌ [addProject] Budget inválido:', data.budget);
     throw new Error('O valor do orçamento deve ser maior que zero');
@@ -1349,7 +1341,6 @@ useEffect(() => {
   const endDate = new Date(startDate);
   endDate.setDate(endDate.getDate() + deliveryDeadlineDays);
 
-  // ✅ GARANTIR que budget seja um número válido
   const budgetValue = Number(data.budget);
   if (isNaN(budgetValue) || budgetValue <= 0) {
     throw new Error('Valor do orçamento inválido');
@@ -1360,7 +1351,7 @@ useEffect(() => {
     description: data.description.trim(),
     status: data.status,
     type: data.type,
-    budget: budgetValue, // ✅ Usar o valor convertido
+    budget: budgetValue,
     start_date: data.start_date,
     end_date: data.end_date || endDate.toISOString().split('T')[0],
     delivery_deadline_days: deliveryDeadlineDays,
@@ -1376,23 +1367,30 @@ useEffect(() => {
 
   console.log('💾 [addProject] Dados para Supabase:', newProject);
   console.log('💾 [addProject] budget final:', newProject.budget);
+  console.log('🔥 CHECKPOINT 1: Antes do insert no Supabase');
 
-  const { data: insertedProject, error } = await supabase
-    .from("projects")
-    .insert([cleanUndefined(newProject)])
-    .select()
-    .single();
+  // ✅ BLOCO 1: Inserir projeto
+  let insertedProject;
+  {
+    const { data: projectData, error } = await supabase
+      .from("projects")
+      .insert([cleanUndefined(newProject)])
+      .select()
+      .single();
 
-    console.log('🔥 CHECKPOINT 2: Depois do insert, error:', error); // ← ADICIONE ESTE LOG
+    console.log('🔥 CHECKPOINT 2: Depois do insert, error:', error);
     
-  if (error) {
-    console.error('❌ [addProject] Erro do Supabase:', error);
-    throw error;
+    if (error) {
+      console.error('❌ [addProject] Erro do Supabase:', error);
+      throw error;
+    }
+    
+    insertedProject = projectData;
   }
 
-    // Inserir os produtos do projeto
+  // ✅ BLOCO 2: Inserir produtos
   if (data.products && data.products.length > 0) {
-    const project_Products = data.products.map(p => ({
+    const projectProducts = data.products.map(p => ({
       project_id: insertedProject.id,
       product_id: p.product_id || null,
       product_name: p.product_name || 'Produto sem nome',
@@ -1406,26 +1404,35 @@ useEffect(() => {
       user_id: user!.id
     }));
 
-    console.log('[addProject] Inserindo produtos:', project_Products);
+    console.log('[addProject] Inserindo produtos:', projectProducts);
 
     const { error: productsError } = await supabase
       .from('project_products')
-      .insert(project_Products);
+      .insert(projectProducts);
 
     if (productsError) {
       console.error('[addProject] Erro ao inserir produtos:', productsError);
-      // Opcional: deletar o projeto se falhar ao inserir produtos
       await supabase.from('projects').delete().eq('id', insertedProject.id);
       throw new Error('Erro ao salvar produtos do projeto');
     }
 
     console.log('[addProject] Produtos inseridos com sucesso!');
   }
+    
+  // Criar transações financeiras se for venda
+  if (insertedProject.type === 'venda') {
+    await createTransactionsFromProject(insertedProject.id, {
+      ...insertedProject,
+      payment_terms: data.payment_terms
+    });
+  }
 
-      } catch (err) {
-  console.error('🔥 ERRO CAPTURADO NO INSERT:', err);
-  throw err;
-}
+  console.log('✅ [addProject] Projeto criado com sucesso!');
+    
+  await loadProjects();
+  return insertedProject;
+}, [user, loadProjects, createTransactionsFromProject]);
+
     
   // Criar transações financeiras se for venda
   if (insertedProject.type === 'venda') {
