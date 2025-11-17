@@ -26,6 +26,7 @@ import { formatCurrency, formatDate } from '../lib/utils';
 import ProjectFormModal from '../components/ProjectFormModal';
 import { useSettings } from '../contexts/SettingsContext';
 import { useCompanyInfo } from '../hooks/useCompanyInfo';
+import { ProjectPDFDocument } from '../components/ProjectDetailsModal';
 
 interface ProjectDetailsModalProps {
   project: Project;
