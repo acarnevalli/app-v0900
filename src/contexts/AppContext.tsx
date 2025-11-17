@@ -1386,7 +1386,7 @@ useEffect(() => {
 
     // Inserir os produtos do projeto
   if (data.products && data.products.length > 0) {
-    const projectProducts = data.products.map(p => ({
+    const project_Products = data.products.map(p => ({
       project_id: insertedProject.id,
       product_id: p.productid || null,
       product_name: p.productname || 'Produto sem nome',
@@ -1400,11 +1400,11 @@ useEffect(() => {
       user_id: user!.id
     }));
 
-    console.log('[addProject] Inserindo produtos:', projectProducts);
+    console.log('[addProject] Inserindo produtos:', project_Products);
 
     const { error: productsError } = await supabase
-      .from('projectproducts')
-      .insert(projectProducts);
+      .from('project_products')
+      .insert(project_Products);
 
     if (productsError) {
       console.error('[addProject] Erro ao inserir produtos:', productsError);
@@ -1444,7 +1444,7 @@ useEffect(() => {
       const { error: deleteError } = await supabase.from("project_products").delete().eq("project_id", id);
       if (deleteError) throw deleteError;
       if (data.products && data.products.length > 0) {
-        const projectProducts = data.products.map(p => {
+        const project_Products = data.products.map(p => {
           if (p.item_type === 'servico') {
             if (!p.service_hours || p.service_hours <= 0) throw new Error(`Serviço precisa ter horas`);
             if (!p.hourly_rate || p.hourly_rate <= 0) throw new Error(`Serviço precisa ter valor por hora`);
@@ -1455,8 +1455,8 @@ useEffect(() => {
             service_hours: p.item_type === 'servico' ? Number(p.service_hours) : null,
             hourly_rate: p.item_type === 'servico' ? Number(p.hourly_rate) : null, user_id: user!.id };
         }).filter(p => p.quantity > 0);
-        if (projectProducts.length > 0) {
-          const { error: prodError } = await supabase.from("project_products").insert(projectProducts).select();
+        if (project_Products.length > 0) {
+          const { error: prodError } = await supabase.from("project_products").insert(project_Products).select();
           if (prodError) { alert(`Erro ao salvar produtos: ${prodError.message}`); throw prodError; }
         }
       }
