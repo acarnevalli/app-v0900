@@ -1343,7 +1343,6 @@ useEffect(() => {
 
   // ✅ GARANTIR que budget seja um número válido
   const budgetValue = Number(data.budget);
-  
   if (isNaN(budgetValue) || budgetValue <= 0) {
     throw new Error('Valor do orçamento inválido');
   }
@@ -1379,6 +1378,46 @@ useEffect(() => {
   if (error) {
     console.error('❌ [addProject] Erro do Supabase:', error);
     throw error;
+  }
+
+    // Inserir os produtos do projeto
+  if (data.products && data.products.length > 0) {
+    const projectProducts = data.products.map(p => ({
+      projectid: insertedProject.id,
+      productid: p.productid || null,
+      productname: p.productname || 'Produto sem nome',
+      quantity: Number(p.quantity) || 1,
+      unitprice: Number(p.unitprice) || 0,
+      totalprice: Number(p.totalprice) || 0,
+      itemtype: p.itemtype || 'produto',
+      itemdescription: p.itemdescription || '',
+      servicehours: p.itemtype === 'servico' ? Number(p.servicehours) || null : null,
+      hourlyrate: p.itemtype === 'servico' ? Number(p.hourlyrate) || null : null,
+      userid: user!.id
+    }));
+
+    console.log('[addProject] Inserindo produtos:', projectProducts);
+
+    const { error: productsError } = await supabase
+      .from('projectproducts')
+      .insert(projectProducts);
+
+    if (productsError) {
+      console.error('[addProject] Erro ao inserir produtos:', productsError);
+      // Opcional: deletar o projeto se falhar ao inserir produtos
+      await supabase.from('projects').delete().eq('id', insertedProject.id);
+      throw new Error('Erro ao salvar produtos do projeto');
+    }
+
+    console.log('[addProject] Produtos inseridos com sucesso!');
+  }
+
+  // Criar transações financeiras se for venda
+  if (insertedProject.type === 'venda') {
+    await createTransactionsFromProject(insertedProject.id, {
+      ...insertedProject,
+      paymentterms: data.paymentterms
+    });
   }
 
   console.log('✅ [addProject] Projeto inserido:', insertedProject);
