@@ -1316,6 +1316,13 @@ useEffect(() => {
   
   console.log('📥 [addProject] Dados recebidos:', data);
   console.log('📥 [addProject] budget:', data.budget);
+    console.log('🔥 CHECKPOINT 1: Antes do insert no Supabase'); // ← ADICIONE ESTE LOG
+      const { data: insertedProject, error } = await supabase
+      .from('projects')
+      .insert(cleanUndefined(newProject))
+      .select()
+      .single();
+    
   console.log('📥 [addProject] products:', data.products?.length);
   
   if (!data.description || data.description.trim() === '') {
@@ -1375,6 +1382,8 @@ useEffect(() => {
     .select()
     .single();
 
+    console.log('🔥 CHECKPOINT 2: Depois do insert, error:', error); // ← ADICIONE ESTE LOG
+    
   if (error) {
     console.error('❌ [addProject] Erro do Supabase:', error);
     throw error;
