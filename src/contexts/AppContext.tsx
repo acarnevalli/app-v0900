@@ -1388,15 +1388,15 @@ useEffect(() => {
   if (data.products && data.products.length > 0) {
     const project_Products = data.products.map(p => ({
       project_id: insertedProject.id,
-      product_id: p.productid || null,
-      product_name: p.productname || 'Produto sem nome',
+      product_id: p.product_id || null,
+      product_name: p.product_name || 'Produto sem nome',
       quantity: Number(p.quantity) || 1,
-      unit_price: Number(p.unitprice) || 0,
-      total_price: Number(p.totalprice) || 0,
-      item_type: p.itemtype || 'produto',
-      item_description: p.itemdescription || '',
-      service_hours: p.itemtype === 'servico' ? Number(p.servicehours) || null : null,
-      hourly_rate: p.itemtype === 'servico' ? Number(p.hourlyrate) || null : null,
+      unit_price: Number(p.unit_price) || 0,
+      total_price: Number(p.total_price) || 0,
+      item_type: p.item_type || 'produto',
+      item_description: p.item_description || '',
+      service_hours: p.item_type === 'servico' ? Number(p.service_hours) || null : null,
+      hourly_rate: p.item_type === 'servico' ? Number(p.hourly_rate) || null : null,
       user_id: user!.id
     }));
 
