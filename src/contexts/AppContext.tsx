@@ -1377,12 +1377,6 @@ useEffect(() => {
   console.log('💾 [addProject] Dados para Supabase:', newProject);
   console.log('💾 [addProject] budget final:', newProject.budget);
 
-  const { data: insertedProject, error } = await supabase
-    .from("projects")
-    .insert([cleanUndefined(newProject)])
-    .select()
-    .single();
-
     console.log('🔥 CHECKPOINT 2: Depois do insert, error:', error); // ← ADICIONE ESTE LOG
     
   if (error) {
