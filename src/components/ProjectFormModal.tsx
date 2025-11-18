@@ -198,24 +198,44 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
     return budget;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Substitua a função handleSubmit no ProjectFormModal.tsx
 
-    if (!formData.client_id) {
-      alert('Por favor, selecione um cliente');
-      return;
-    }
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
 
-    if (!formData.description.trim()) {
-      alert('Por favor, adicione uma descrição');
-      return;
-    }
+  console.log('🚀 Iniciando submit do formulário');
 
+  // Validações
+  if (!formData.client_id) {
+    alert('Por favor, selecione um cliente');
+    return;
+  }
+
+  if (!formData.description.trim()) {
+    alert('Por favor, adicione uma descrição');
+    return;
+  }
+
+  if (projectProducts.length === 0) {
+    alert('Por favor, adicione pelo menos um produto ou serviço');
+    return;
+  }
+
+  try {
+    // Calcular valores
     const budget = calculateBudget();
     const discountAmount = budget * (paymentTerms.discount_percentage / 100);
     const finalValue = budget - discountAmount;
     const installmentValue = finalValue / paymentTerms.installments;
 
+    console.log('💰 Cálculos financeiros:', {
+      budget,
+      discountAmount,
+      finalValue,
+      installmentValue
+    });
+
+    // Validar produtos
     const validatedProducts = projectProducts.map(p => ({
       ...p,
       quantity: Number(p.quantity) || 1,
@@ -223,8 +243,11 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
       total_price: Number(p.total_price) || 0
     }));
 
+    console.log('📦 Produtos validados:', validatedProducts);
+
+    // Montar objeto do projeto
     const projectData = {
-      client_id: formData.client_id,
+      client_id: formData.client_id, // ✅ Corrigido: client_id em vez de clientid
       description: formData.description,
       status: formData.status,
       type: formData.type,
@@ -241,23 +264,29 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
         payment_method: paymentTerms.payment_method,
         discount_percentage: paymentTerms.discount_percentage,
         installment_value: installmentValue,
-        total_with_discount: finalValue,
-        installment_interval: paymentTerms.installment_interval // NOVO: Salva intervalo
+        total_with_discount: finalValue
       }
     };
 
-    try {
-      if (project) {
-        await updateProject(project.id, projectData);
-      } else {
-        await addProject(projectData);
-      }
-      onClose();
-    } catch (error) {
-      console.error('Erro ao salvar:', error);
-      alert('Erro ao salvar pedido/venda: ' + (error as any)?.message);
+    console.log('📋 Dados do projeto a serem salvos:', projectData);
+
+    if (project) {
+      console.log('🔄 Atualizando projeto existente:', project.id);
+      await updateProject(project.id, projectData);
+      console.log('✅ Projeto atualizado com sucesso!');
+    } else {
+      console.log('🆕 Criando novo projeto');
+      const result = await addProject(projectData);
+      console.log('✅ Projeto criado com sucesso:', result);
     }
-  };
+    
+    // Fechar modal
+    onClose();
+  } catch (error) {
+    console.error('❌ Erro ao salvar projeto:', error);
+    alert('Erro ao salvar pedido/venda: ' + (error as any)?.message);
+  }
+};
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setFormData(prev => ({
