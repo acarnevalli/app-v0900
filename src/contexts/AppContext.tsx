@@ -1311,20 +1311,10 @@ useEffect(() => {
   // CRUD - PROJECTS
   // ============================================
 
-  const addProject = useCallback(async (data: Omit<Project, "id" | "created_at" | "updated_at" | "number" | "order_number" | "user_id">): Promise<any> => {
+  // Substitua a função addProject no AppContext.tsx por esta versão corrigida:
+
+const addProject = useCallback(async (data: Omit<Project, "id" | "created_at" | "updated_at" | "number" | "order_number" | "user_id">): Promise<any> => {
   ensureUser();
-  
-  console.log('📥 [addProject] Dados recebidos:', data);
-  console.log('📥 [addProject] budget:', data.budget);
-    console.log('🔥 CHECKPOINT 1: Antes do insert no Supabase'); // ← ADICIONE ESTE LOG
-    try {
-      const { data: insertedProject, error } = await supabase
-        .from('projects')
-        .insert(cleanUndefined(newProject))
-        .select()
-        .single();
-      
-  console.log('📥 [addProject] products:', data.products?.length);
   
   if (!data.description || data.description.trim() === '') {
     throw new Error('Descrição é obrigatória');
@@ -1338,35 +1328,23 @@ useEffect(() => {
     throw new Error('Adicione pelo menos um produto ou serviço');
   }
 
-  // ✅ CRÍTICO: Validar budget ANTES de enviar
-  if (!data.budget || data.budget <= 0 || isNaN(data.budget)) {
-    console.error('❌ [addProject] Budget inválido:', data.budget);
-    throw new Error('O valor do orçamento deve ser maior que zero');
-  }
-
   const deliveryDeadlineDays = data.delivery_deadline_days || 15;
   const startDate = new Date(data.start_date);
   const endDate = new Date(startDate);
   endDate.setDate(endDate.getDate() + deliveryDeadlineDays);
-
-  // ✅ GARANTIR que budget seja um número válido
-  const budgetValue = Number(data.budget);
-  if (isNaN(budgetValue) || budgetValue <= 0) {
-    throw new Error('Valor do orçamento inválido');
-  }
 
   const newProject = {
     client_id: data.client_id,
     description: data.description.trim(),
     status: data.status,
     type: data.type,
-    budget: budgetValue, // ✅ Usar o valor convertido
+    budget: data.budget,
     start_date: data.start_date,
     end_date: data.end_date || endDate.toISOString().split('T')[0],
     delivery_deadline_days: deliveryDeadlineDays,
-    materials_cost: data.materials_cost || 0,
-    labor_cost: data.labor_cost || 0,
-    profit_margin: data.profit_margin || 0,
+    materials_cost: data.materials_cost,
+    labor_cost: data.labor_cost,
+    profit_margin: data.profit_margin,
     payment_terms: data.payment_terms,
     number: 0,
     user_id: user!.id,
@@ -1374,8 +1352,7 @@ useEffect(() => {
     updated_at: new Date().toISOString()
   };
 
-  console.log('💾 [addProject] Dados para Supabase:', newProject);
-  console.log('💾 [addProject] budget final:', newProject.budget);
+  console.log('💾 Inserindo projeto no banco:', newProject);
 
   const { data: insertedProject, error } = await supabase
     .from("projects")
@@ -1383,63 +1360,76 @@ useEffect(() => {
     .select()
     .single();
 
-    console.log('🔥 CHECKPOINT 2: Depois do insert, error:', error); // ← ADICIONE ESTE LOG
-    
   if (error) {
-    console.error('❌ [addProject] Erro do Supabase:', error);
+    console.error('❌ Erro ao inserir projeto:', error);
     throw error;
   }
 
-    // Inserir os produtos do projeto
+  console.log('✅ Projeto inserido:', insertedProject);
+
   if (data.products && data.products.length > 0) {
-    const project_Products = data.products.map(p => ({
-      project_id: insertedProject.id,
-      product_id: p.product_id || null,
-      product_name: p.product_name || 'Produto sem nome',
-      quantity: Number(p.quantity) || 1,
-      unit_price: Number(p.unit_price) || 0,
-      total_price: Number(p.total_price) || 0,
-      item_type: p.item_type || 'produto',
-      item_description: p.item_description || '',
-      service_hours: p.item_type === 'servico' ? Number(p.service_hours) || null : null,
-      hourly_rate: p.item_type === 'servico' ? Number(p.hourly_rate) || null : null,
-      user_id: user!.id
-    }));
+    const projectProducts = data.products.map(p => {
+      if (p.item_type === 'servico') {
+        if (!p.service_hours || p.service_hours <= 0) {
+          throw new Error(`Serviço precisa ter horas`);
+        }
+        if (!p.hourly_rate || p.hourly_rate <= 0) {
+          throw new Error(`Serviço precisa ter valor por hora`);
+        }
+      }
+      
+      return {
+        project_id: insertedProject.id,
+        product_id: p.product_id || null,
+        product_name: p.product_name,
+        quantity: p.quantity,
+        unit_price: p.unit_price,
+        total_price: p.total_price,
+        item_type: p.item_type || 'produto',
+        item_description: p.item_description,
+        service_hours: p.item_type === 'servico' ? p.service_hours : null,
+        hourly_rate: p.item_type === 'servico' ? p.hourly_rate : null,
+        user_id: user!.id
+      };
+    }).filter(p => p.quantity > 0);
 
-    console.log('[addProject] Inserindo produtos:', project_Products);
+    if (projectProducts.length > 0) {
+      console.log('📦 Inserindo produtos do projeto:', projectProducts);
+      
+      const { error: prodError } = await supabase
+        .from("project_products")
+        .insert(projectProducts)
+        .select();
 
-    const { error: productsError } = await supabase
-      .from('project_products')
-      .insert(project_Products);
-
-    if (productsError) {
-      console.error('[addProject] Erro ao inserir produtos:', productsError);
-      // Opcional: deletar o projeto se falhar ao inserir produtos
-      await supabase.from('projects').delete().eq('id', insertedProject.id);
-      throw new Error('Erro ao salvar produtos do projeto');
+      if (prodError) {
+        console.error('❌ Erro ao inserir produtos:', prodError);
+        alert(`Erro ao salvar produtos: ${prodError.message}`);
+        throw prodError;
+      }
+      
+      console.log('✅ Produtos inseridos com sucesso');
     }
-
-    console.log('[addProject] Produtos inseridos com sucesso!');
   }
 
-      } catch (err) {
-  console.error('🔥 ERRO CAPTURADO NO INSERT:', err);
-  throw err;
-}
-    
-  // Criar transações financeiras se for venda
-  if (insertedProject.type === 'venda') {
-    await createTransactionsFromProject(insertedProject.id, {
-      ...insertedProject,
-      paymentterms: data.paymentterms
-    });
+  // ✅ CORREÇÃO: Agora dentro de uma função async
+  if (insertedProject && insertedProject.id && data.type === 'venda') {
+    try {
+      console.log('💰 Criando transações financeiras para a venda...');
+      await createTransactionsFromProject(insertedProject.id, {
+        ...data,
+        id: insertedProject.id,
+        order_number: insertedProject.order_number
+      } as Project);
+      console.log('✅ Transações financeiras criadas com sucesso');
+    } catch (error) {
+      console.error('❌ Erro ao criar transações financeiras:', error);
+      // Não bloqueia a criação do projeto, apenas loga o erro
+    }
   }
 
-  console.log('✅ [addProject] Projeto inserido:', insertedProject);
-    
-    await loadProjects();
-    return insertedProject;
-  }, [user, loadProjects, createTransactionsFromProject]);
+  await loadProjects();
+  return insertedProject;
+}, [user, loadProjects, createTransactionsFromProject]);
       
   const updateProject = useCallback(async (id: string, data: Partial<Project>) => {
     ensureUser();
