@@ -1432,38 +1432,72 @@ const addProject = useCallback(async (data: Omit<Project, "id" | "created_at" | 
 }, [user, loadProjects, createTransactionsFromProject]);
       
   const updateProject = useCallback(async (id: string, data: Partial<Project>) => {
-    ensureUser();
-    if (data.delivery_deadline_days && data.start_date) {
-      const startDate = new Date(data.start_date);
-      const endDate = new Date(startDate);
-      endDate.setDate(endDate.getDate() + data.delivery_deadline_days);
-      data.end_date = endDate.toISOString().split('T')[0];
+  ensureUser();
+  
+  // ✅ Remover products dos dados do projeto
+  const { products: projectProducts, ...projectData } = data;
+  
+  if (projectData.delivery_deadline_days && projectData.start_date) {
+    const startDate = new Date(projectData.start_date);
+    const endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + projectData.delivery_deadline_days);
+    projectData.end_date = endDate.toISOString().split('T')[0];
+  }
+
+  // ✅ Atualizar apenas os dados do projeto (sem products)
+  const { error } = await supabase
+    .from('projects')
+    .update({
+      ...cleanUndefined(projectData),
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', id)
+    .eq('user_id', user!.id);
+
+  if (error) {
+    throw error;
+  }
+
+  // ✅ Atualizar produtos separadamente
+  if (projectProducts !== undefined) {
+    // Deletar produtos existentes
+    const { error: deleteError } = await supabase
+      .from('project_products')
+      .delete()
+      .eq('project_id', id);
+
+    if (deleteError) {
+      throw deleteError;
     }
-    const { error } = await supabase.from("projects").update({ ...cleanUndefined(data), updated_at: new Date().toISOString() }).eq("id", id).eq("user_id", user!.id);
-    if (error) throw error;
-    if (data.products !== undefined) {
-      const { error: deleteError } = await supabase.from("project_products").delete().eq("project_id", id);
-      if (deleteError) throw deleteError;
-      if (data.products && data.products.length > 0) {
-        const project_Products = data.products.map(p => {
-          if (p.item_type === 'servico') {
-            if (!p.service_hours || p.service_hours <= 0) throw new Error(`Serviço precisa ter horas`);
-            if (!p.hourly_rate || p.hourly_rate <= 0) throw new Error(`Serviço precisa ter valor por hora`);
-          }
-          return { project_id: id, product_id: p.product_id || null, product_name: p.product_name || 'Produto sem nome',
-            quantity: Number(p.quantity) || 1, unit_price: Number(p.unit_price) || 0, total_price: Number(p.total_price) || 0,
-            item_type: p.item_type || 'produto', item_description: p.item_description || '',
-            service_hours: p.item_type === 'servico' ? Number(p.service_hours) : null,
-            hourly_rate: p.item_type === 'servico' ? Number(p.hourly_rate) : null, user_id: user!.id };
-        }).filter(p => p.quantity > 0);
-        if (project_Products.length > 0) {
-          const { error: prodError } = await supabase.from("project_products").insert(project_Products).select();
-          if (prodError) { alert(`Erro ao salvar produtos: ${prodError.message}`); throw prodError; }
-        }
+
+    // Inserir novos produtos
+    if (projectProducts && projectProducts.length > 0) {
+      const productsToInsert = projectProducts.map(p => ({
+        project_id: id,
+        product_id: p.product_id || null,
+        product_name: p.product_name || 'Produto sem nome',
+        quantity: Number(p.quantity) || 1,
+        unit_price: Number(p.unit_price) || 0,
+        total_price: Number(p.total_price) || 0,
+        item_type: p.item_type || 'produto',
+        item_description: p.item_description || '',
+        service_hours: p.item_type === 'servico' ? Number(p.service_hours) : null,
+        hourly_rate: p.item_type === 'servico' ? Number(p.hourly_rate) : null,
+        user_id: user!.id
+      }));
+
+      const { error: prodError } = await supabase
+        .from('project_products')
+        .insert(productsToInsert);
+
+      if (prodError) {
+        throw prodError;
       }
     }
-    await loadProjects();
-  }, [user, loadProjects]);
+  }
+
+  await loadProjects();
+}, [user, loadProjects]);
 
   const deleteProject = useCallback(async (id: string) => {
   ensureUser();
