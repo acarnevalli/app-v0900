@@ -874,7 +874,7 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
                 min="0"
                 step="0.1"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                placeholder="20"
+                placeholder="00"
               />
             </div>
           </div>
