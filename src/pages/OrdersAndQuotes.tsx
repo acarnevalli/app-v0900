@@ -720,6 +720,16 @@ const OrdersAndQuotes: React.FC = () => {
           // Nome do produto
           const productName = doc.splitTextToSize(product.product_name || 'Produto sem nome', 100);
           doc.text(productName[0], 17, yPosition);
+
+          // **NOVO: Descrição do item logo abaixo do nome**
+          if (product.item_description) {
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(7);
+            doc.setTextColor(100, 100, 100); // Cor cinza para a descrição
+            const descriptionLines = doc.splitTextToSize(product.item_description, 100);
+            doc.text(descriptionLines[0], 17, yPosition + 3); // Exibe primeira linha da descrição
+            doc.setTextColor(0, 0, 0); // Volta para preto
+          }
           
           // Quantidade
           doc.text((product.quantity || 0).toString(), 125, yPosition, { align: 'center' });
