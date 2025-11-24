@@ -202,6 +202,10 @@ const ProjectPDFDocument: React.FC<ProjectPDFDocumentProps> = ({ project, settin
               {project.products.map((product, index) => (
                 <View key={index} style={styles.tableRow}>
                   <Text style={styles.tableCol1}>{product.product_name}</Text>
+                  {product.details && ( // ou product.service_details ou product.descricao
+                      <Text style={{ fontSize: 8, color: '#888' }}>{item_description}</Text>
+                    )}
+                  </View>
                   <Text style={styles.tableCol2}>{product.quantity}</Text>
                   <Text style={styles.tableCol3}>
                     {product.item_type === 'produto' ? 'Produto' : 'Serviço'}
