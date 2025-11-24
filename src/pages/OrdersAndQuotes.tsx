@@ -722,26 +722,29 @@ const OrdersAndQuotes: React.FC = () => {
           doc.text(productName[0], 17, yPosition);
 
           // **NOVO: Descrição do item logo abaixo do nome**
-          if (product.item_description) {
+           if (product.item_description) {
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(7);
-            doc.setTextColor(100, 100, 100); // Cor cinza para a descrição
+            doc.setTextColor(100, 100, 100);
             const descriptionLines = doc.splitTextToSize(product.item_description, 100);
-            doc.text(descriptionLines[0], 17, yPosition + 3); // Exibe primeira linha da descrição
-            doc.setTextColor(0, 0, 0); // Volta para preto
+            
+            descriptionLines.forEach((line: string, idx: number) => {
+              doc.text(line, 17, yPosition + 3 + (idx * 3));
+            });
+            
+            doc.setTextColor(0, 0, 0);
           }
           
-          // Quantidade
+          // Quantidade, Valor Unit e Total (alinhados ao topo da linha)
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9);
           doc.text((product.quantity || 0).toString(), 125, yPosition, { align: 'center' });
-          
-          // Valor unitário
           doc.text(`R$ ${(product.unit_price || 0).toFixed(2).replace('.', ',')}`, 150, yPosition, { align: 'right' });
           
-          // Total
           const totalPrice = product.total_price || (product.quantity * product.unit_price) || 0;
           doc.text(`R$ ${totalPrice.toFixed(2).replace('.', ',')}`, 185, yPosition, { align: 'right' });
-
-          yPosition += 10;
+        
+          yPosition += lineHeight;
         });
 
         // Linha separadora antes dos totais
