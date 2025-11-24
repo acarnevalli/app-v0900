@@ -680,119 +680,139 @@ const OrdersAndQuotes: React.FC = () => {
         yPosition += (splitDescription.length * 5) + 8;
       }
 
-      // ==================== LISTA DE PRODUTOS/SERVIÇOS ====================
-      if (project.products && project.products.length > 0) {
-        doc.setFontSize(11);
-        doc.setFont('helvetica', 'bold');
-        doc.text('PRODUTOS E SERVIÇOS', 15, yPosition);
-        yPosition += 8;
+  // ==================== LISTA DE PRODUTOS/SERVIÇOS ====================
+if (project.products && project.products.length > 0) {
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.text('PRODUTOS E SERVIÇOS', 15, yPosition);
+  yPosition += 8;
 
-        // Cabeçalho da tabela
-        doc.setFillColor(70, 130, 180);
-        doc.roundedRect(15, yPosition - 5, 180, 8, 1, 1, 'F');
-        
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Item', 17, yPosition);
-        doc.text('Qtd', 125, yPosition, { align: 'center' });
-        doc.text('Valor Unit.', 150, yPosition, { align: 'right' });
-        doc.text('Total', 185, yPosition, { align: 'right' });
+  // Cabeçalho da tabela
+  doc.setFillColor(70, 130, 180);
+  doc.roundedRect(15, yPosition - 5, 180, 8, 1, 1, 'F');
+  
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Item', 17, yPosition);
+  doc.text('Qtd', 125, yPosition, { align: 'center' });
+  doc.text('Valor Unit.', 150, yPosition, { align: 'right' });
+  doc.text('Total', 185, yPosition, { align: 'right' });
 
-        yPosition += 8;
-        doc.setTextColor(0, 0, 0);
-        doc.setFont('helvetica', 'normal');
+  yPosition += 8;
+  doc.setTextColor(0, 0, 0);
+  doc.setFont('helvetica', 'normal');
 
-        // Linhas de produtos
-        project.products.forEach((product: any, index: number) => {
-          // Verificar se precisa de nova página
-          if (yPosition > 250) {
-            doc.addPage();
-            yPosition = 20;
-          }
+  // Linhas de produtos
+  project.products.forEach((product, index) => {
+    // Calcular altura dinâmica da linha considerando descrição
+    let lineHeight = 10;
+    let descriptionLines = [];
+    if (product.item_description) {
+      descriptionLines = doc.splitTextToSize(product.item_description, 100);
+      lineHeight = 10 + (descriptionLines.length * 3);
+    }
 
-          // Linha zebrada
-          if (index % 2 === 0) {
-            doc.setFillColor(250, 250, 250);
-            doc.rect(15, yPosition - 4, 180, 10, 'F');
-          }
+    // Verificar se precisa de nova página
+    if (yPosition + lineHeight > 250) {
+      doc.addPage();
+      yPosition = 20;
+    }
 
-          // Nome do produto
-          const productName = doc.splitTextToSize(product.product_name || 'Produto sem nome', 100);
-          doc.text(productName[0], 17, yPosition);
+    // Linha zebrada
+    if (index % 2 === 0) {
+      doc.setFillColor(250, 250, 250);
+      doc.rect(15, yPosition - 4, 180, lineHeight, 'F');
+    }
 
-          // **NOVO: Descrição do item logo abaixo do nome**
-           if (product.item_description) {
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(7);
-            doc.setTextColor(100, 100, 100);
-            const descriptionLines = doc.splitTextToSize(product.item_description, 100);
-            
-            descriptionLines.forEach((line: string, idx: number) => {
-              doc.text(line, 17, yPosition + 3 + (idx * 3));
-            });
-            
-            doc.setTextColor(0, 0, 0);
-          }
-          
-          // Quantidade, Valor Unit e Total (alinhados ao topo da linha)
-          doc.setFont('helvetica', 'normal');
-          doc.setFontSize(9);
-          doc.text((product.quantity || 0).toString(), 125, yPosition, { align: 'center' });
-          doc.text(`R$ ${(product.unit_price || 0).toFixed(2).replace('.', ',')}`, 150, yPosition, { align: 'right' });
-          
-          const totalPrice = product.total_price || (product.quantity * product.unit_price) || 0;
-          doc.text(`R$ ${totalPrice.toFixed(2).replace('.', ',')}`, 185, yPosition, { align: 'right' });
-        
-          yPosition += lineHeight;
-        });
+    // Nome do produto
+    const productName = doc.splitTextToSize(product.product_name || 'Produto sem nome', 100);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text(productName[0], 17, yPosition);
 
-        // Linha separadora antes dos totais
-        doc.setDrawColor(70, 130, 180);
-        doc.setLineWidth(0.8);
-        doc.line(125, yPosition, 195, yPosition);
-        yPosition += 8;
+    // Descrição do item (multi-linha, se existir)
+    if (descriptionLines.length > 0) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(100, 100, 100);
+      descriptionLines.forEach((line, idx) => {
+        doc.text(line, 17, yPosition + 3 + (idx * 3));
+      });
+      doc.setTextColor(0, 0, 0);
+    }
 
-        // Totais
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10);
-        
-        // Subtotal
-        doc.text('Subtotal:', 145, yPosition, { align: 'right' });
-        doc.text(`R$ ${(project.budget || 0).toFixed(2).replace('.', ',')}`, 185, yPosition, { align: 'right' });
-        yPosition += 6;
+    // Quantidade
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text((product.quantity || 0).toString(), 125, yPosition, { align: 'center' });
 
-        // Desconto (se houver)
-        if (project.payment_terms?.discount_percentage && project.payment_terms.discount_percentage > 0) {
-          doc.setFont('helvetica', 'normal');
-          const discountAmount = (project.budget || 0) * (project.payment_terms.discount_percentage / 100);
-          doc.text(`Desconto (${project.payment_terms.discount_percentage}%):`, 145, yPosition, { align: 'right' });
-          doc.text(`-R$ ${discountAmount.toFixed(2).replace('.', ',')}`, 185, yPosition, { align: 'right' });
-          yPosition += 6;
+    // Valor unitário
+    doc.text(
+      `R$ ${(product.unit_price || 0).toFixed(2).replace('.', ',')}`,
+      150,
+      yPosition,
+      { align: 'right' }
+    );
+    // Total
+    const totalPrice =
+      product.total_price || (product.quantity * product.unit_price) || 0;
+    doc.text(
+      `R$ ${totalPrice.toFixed(2).replace('.', ',')}`,
+      185,
+      yPosition,
+      { align: 'right' }
+    );
 
-          // Total com desconto
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(12);
-          doc.setFillColor(34, 197, 94);
-          doc.roundedRect(125, yPosition - 4, 70, 10, 2, 2, 'F');
-          doc.setTextColor(255, 255, 255);
-          const finalValue = project.payment_terms.total_with_discount || ((project.budget || 0) - discountAmount);
-          doc.text('TOTAL:', 145, yPosition + 2, { align: 'right' });
-          doc.text(`R$ ${finalValue.toFixed(2).replace('.', ',')}`, 185, yPosition + 2, { align: 'right' });
-          yPosition += 12;
-        } else {
-          // Total sem desconto
-          doc.setFontSize(12);
-          doc.setFillColor(34, 197, 94);
-          doc.roundedRect(125, yPosition - 4, 70, 10, 2, 2, 'F');
-          doc.setTextColor(255, 255, 255);
-          doc.text('TOTAL:', 145, yPosition + 2, { align: 'right' });
-          doc.text(`R$ ${(project.budget || 0).toFixed(2).replace('.', ',')}`, 185, yPosition + 2, { align: 'right' });
-          yPosition += 12;
-        }
+    yPosition += lineHeight;
+  });
 
-        doc.setTextColor(0, 0, 0);
-      }
+  // Linha separadora antes dos totais
+  doc.setDrawColor(70, 130, 180);
+  doc.setLineWidth(0.8);
+  doc.line(125, yPosition, 195, yPosition);
+  yPosition += 8;
+
+  // Totais
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  
+  // Subtotal
+  doc.text('Subtotal:', 145, yPosition, { align: 'right' });
+  doc.text(`R$ ${(project.budget || 0).toFixed(2).replace('.', ',')}`, 185, yPosition, { align: 'right' });
+  yPosition += 6;
+
+  // Desconto (se houver)
+  if (project.payment_terms?.discount_percentage && project.payment_terms.discount_percentage > 0) {
+    doc.setFont('helvetica', 'normal');
+    const discountAmount = (project.budget || 0) * (project.payment_terms.discount_percentage / 100);
+    doc.text(`Desconto (${project.payment_terms.discount_percentage}%):`, 145, yPosition, { align: 'right' });
+    doc.text(`-R$ ${discountAmount.toFixed(2).replace('.', ',')}`, 185, yPosition, { align: 'right' });
+    yPosition += 6;
+
+    // Total com desconto
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setFillColor(34, 197, 94);
+    doc.roundedRect(125, yPosition - 4, 70, 10, 2, 2, 'F');
+    doc.setTextColor(255, 255, 255);
+    const finalValue = project.payment_terms.total_with_discount || ((project.budget || 0) - discountAmount);
+    doc.text('TOTAL:', 145, yPosition + 2, { align: 'right' });
+    doc.text(`R$ ${finalValue.toFixed(2).replace('.', ',')}`, 185, yPosition + 2, { align: 'right' });
+    yPosition += 12;
+  } else {
+    // Total sem desconto
+    doc.setFontSize(12);
+    doc.setFillColor(34, 197, 94);
+    doc.roundedRect(125, yPosition - 4, 70, 10, 2, 2, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.text('TOTAL:', 145, yPosition + 2, { align: 'right' });
+    doc.text(`R$ ${(project.budget || 0).toFixed(2).replace('.', ',')}`, 185, yPosition + 2, { align: 'right' });
+    yPosition += 12;
+  }
+
+  doc.setTextColor(0, 0, 0);
+}
 
       // ==================== CONDIÇÕES DE PAGAMENTO E ENTREGA ====================
       yPosition += 8;
