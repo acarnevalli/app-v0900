@@ -23,10 +23,16 @@ export const useCompanyInfo = () => {
   const [error, setError] = useState<string | null>(null);
 
   const loadCompanyInfo = async () => {
+    console.log('🟡 [useCompanyInfo] Iniciando loadCompanyInfo...');
+
     if (!user) {
+      console.warn('⚠️ [useCompanyInfo] Nenhum usuário autenticado. Encerrando loadCompanyInfo.');
       setLoading(false);
+      setCompanyInfo(null);
       return;
     }
+
+    console.log('🔍 [useCompanyInfo] Buscando company_info para user:', user.id);
 
     try {
       const { data, error } = await supabase
@@ -35,9 +41,19 @@ export const useCompanyInfo = () => {
         .eq('user_id', user.id)
         .single();
 
+      console.log('📦 [useCompanyInfo] Resposta Supabase loadCompanyInfo:', { data, error });
+
       if (error) {
-        // Se não existe, retornar dados padrão
+        console.error('❌ [useCompanyInfo] Erro Supabase em loadCompanyInfo:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+        });
+
+        // Se não existe registro, usar dados padrão
         if (error.code === 'PGRST116') {
+          console.warn('⚠️ [useCompanyInfo] Nenhum company_info encontrado. Usando dados padrão.');
           setCompanyInfo({
             company_name: 'Sua Empresa',
             cnpj: '00.000.000/0000-00',
@@ -51,58 +67,107 @@ export const useCompanyInfo = () => {
           throw error;
         }
       } else {
+        console.log('✅ [useCompanyInfo] Company info carregado:', data);
         setCompanyInfo(data);
       }
     } catch (err: any) {
-      console.error('Erro ao carregar informações da empresa:', err);
+      console.error('💥 [useCompanyInfo] Erro ao carregar informações da empresa:', err);
       setError(err.message);
+      // Não bloquear o app; apenas mantém companyInfo como está ou null
     } finally {
+      console.log('🔚 [useCompanyInfo] Finalizando loadCompanyInfo.');
       setLoading(false);
     }
   };
 
   const updateCompanyInfo = async (data: Partial<CompanyInfo>) => {
-    if (!user) throw new Error('Usuário não autenticado');
+    if (!user) {
+      console.error('❌ [useCompanyInfo] Tentativa de updateCompanyInfo sem usuário autenticado.');
+      throw new Error('Usuário não autenticado');
+    }
+
+    console.log('🟡 [useCompanyInfo] Iniciando updateCompanyInfo para user:', user.id);
+    console.log('✏️ [useCompanyInfo] Dados recebidos para update:', data);
 
     try {
       setLoading(true);
 
-      // Verificar se já existe registro
-      const { data: existing } = await supabase
+      console.log('🔍 [useCompanyInfo] Verificando se já existe company_info para user:', user.id);
+      const { data: existing, error: existingError } = await supabase
         .from('company_info')
         .select('id')
         .eq('user_id', user.id)
         .single();
 
+      console.log('📦 [useCompanyInfo] Resposta Supabase (verificação existente):', {
+        existing,
+        existingError,
+      });
+
+      if (existingError && existingError.code !== 'PGRST116') {
+        console.error('❌ [useCompanyInfo] Erro ao verificar registro existente:', {
+          code: existingError.code,
+          message: existingError.message,
+          details: existingError.details,
+          hint: existingError.hint,
+        });
+        throw existingError;
+      }
+
       if (existing) {
-        // Update
+        console.log('🔄 [useCompanyInfo] Registro existente encontrado. Atualizando...');
         const { error } = await supabase
           .from('company_info')
           .update(data)
           .eq('user_id', user.id);
 
-        if (error) throw error;
+        if (error) {
+          console.error('❌ [useCompanyInfo] Erro ao atualizar company_info:', {
+            code: error.code,
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+          });
+          throw error;
+        }
+
+        console.log('✅ [useCompanyInfo] company_info atualizado com sucesso.');
       } else {
-        // Insert
+        console.log('🆕 [useCompanyInfo] Nenhum registro existente. Inserindo novo company_info...');
+        const payload = { ...data, user_id: user.id };
+        console.log('📤 [useCompanyInfo] Payload de inserção:', payload);
+
         const { error } = await supabase
           .from('company_info')
-          .insert([{ ...data, user_id: user.id }]);
+          .insert([payload]);
 
-        if (error) throw error;
+        if (error) {
+          console.error('❌ [useCompanyInfo] Erro ao inserir company_info:', {
+            code: error.code,
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+          });
+          throw error;
+        }
+
+        console.log('✅ [useCompanyInfo] company_info inserido com sucesso.');
       }
 
-      // Recarregar dados
+      console.log('🔁 [useCompanyInfo] Recarregando dados após update/insert...');
       await loadCompanyInfo();
     } catch (err: any) {
-      console.error('Erro ao salvar informações da empresa:', err);
+      console.error('💥 [useCompanyInfo] Erro ao salvar informações da empresa:', err);
       setError(err.message);
       throw err;
     } finally {
+      console.log('🔚 [useCompanyInfo] Finalizando updateCompanyInfo.');
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    console.log('🧩 [useCompanyInfo] useEffect disparado. user:', user?.id);
     loadCompanyInfo();
   }, [user]);
 
