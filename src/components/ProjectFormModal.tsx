@@ -176,13 +176,26 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
     if (formData.start_date && formData.delivery_deadline_days) {
       const startDate = new Date(formData.start_date);
       const endDate = new Date(startDate);
-      endDate.setDate(endDate.getDate() + formData.delivery_deadline_days);
-      setFormData(prev => ({
-        ...prev,
-        end_date: endDate.toISOString().split('T')[0]
-      }));
+      
+      // ✅ IMPORTANTE: Converter para número para evitar concatenação de strings
+      const daysToAdd = Number(formData.delivery_deadline_days);
+      
+      // ✅ Validar se é um número válido
+      if (!isNaN(daysToAdd) && daysToAdd > 0) {
+        endDate.setDate(endDate.getDate() + daysToAdd);
+        
+        const calculatedEndDate = endDate.toISOString().split('T')[0];
+        
+        // ✅ Só atualiza se a data calculada for diferente da atual
+        if (calculatedEndDate !== formData.end_date) {
+          setFormData(prev => ({
+            ...prev,
+            end_date: calculatedEndDate
+          }));
+        }
+      }
     }
-  }, [formData.start_date, formData.delivery_deadline_days]);
+  }, [formData.start_date, formData.delivery_deadline_days]); // Mantém as dependências
 
   const calculateBudget = () => {
      const productsTotal = projectProducts.reduce((sum, p) => {
