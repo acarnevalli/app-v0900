@@ -658,10 +658,10 @@ const OrdersAndQuotes: React.FC = () => {
       doc.text(`Data de Emissão: ${new Date().toLocaleDateString('pt-BR')}`, 17, yPosition + 17);
       
       if (project.start_date) {
-        doc.text(`Início: ${new Date(project.start_date).toLocaleDateString('pt-BR')}`, 120, yPosition + 11);
+        doc.text(`Início: ${new Date(project.start_date).toLocaleDateString('pt-BR')}`, 150, yPosition + 11);
       }
       if (project.end_date) {
-        doc.text(`Prazo: ${new Date(project.end_date).toLocaleDateString('pt-BR')}`, 120, yPosition + 17);
+        doc.text(`Prazo: ${new Date(project.end_date).toLocaleDateString('pt-BR')}`, 150, yPosition + 17);
       }
 
       yPosition += 30;
