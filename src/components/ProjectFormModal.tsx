@@ -214,17 +214,34 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.client_id) {
-      alert('Por favor, selecione um cliente');
-      return;
-    }
-
-    if (!formData.description.trim()) {
-      alert('Por favor, adicione uma descrição');
-      return;
-    }
+      console.log('🚀 [ProjectFormModal] handleSubmit chamado!');
+      console.log('📋 [ProjectFormModal] formData:', formData);
+      console.log('📦 [ProjectFormModal] projectProducts:', projectProducts);
+      console.log('💳 [ProjectFormModal] paymentTerms:', paymentTerms);
+    
+      if (!formData.client_id) {
+        console.error('❌ [ProjectFormModal] Cliente não selecionado!');
+        alert('Por favor, selecione um cliente');
+        return;
+      }
+    
+      if (!formData.description.trim()) {
+        console.error('❌ [ProjectFormModal] Descrição vazia!');
+        alert('Por favor, adicione uma descrição');
+        return;
+      }
+    
+      if (projectProducts.length === 0) {
+        console.error('❌ [ProjectFormModal] Nenhum produto adicionado!');
+        alert('Por favor, adicione pelo menos um produto ou serviço');
+        return;
+      }
+    
+    console.log('✅ [ProjectFormModal] Validações iniciais passaram!');
 
     const budget = calculateBudget();
+       console.log('💰 [ProjectFormModal] Budget calculado:', budget);
+
     const discountAmount = budget * (paymentTerms.discount_percentage / 100);
     const finalValue = budget - discountAmount;
     const installmentValue = finalValue / paymentTerms.installments;
@@ -259,18 +276,27 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
       }
     };
 
-    try {
-      if (project) {
-        await updateProject(project.id, projectData);
-      } else {
-        await addProject(projectData);
+       console.log('📤 [ProjectFormModal] Dados finais para enviar:', projectData);
+
+     try {
+        if (project) {
+          console.log('🔄 [ProjectFormModal] Atualizando projeto:', project.id);
+          await updateProject(project.id, projectData);
+          console.log('✅ [ProjectFormModal] Projeto atualizado!');
+        } else {
+          console.log('➕ [ProjectFormModal] Criando novo projeto...');
+          await addProject(projectData);
+          console.log('✅ [ProjectFormModal] Projeto criado!');
+        }
+        
+        console.log('🎉 [ProjectFormModal] Fechando modal...');
+        onClose();
+      } catch (error) {
+        console.error('💥 [ProjectFormModal] Erro ao salvar:', error);
+        console.error('💥 [ProjectFormModal] Stack:', error.stack);
+        alert('Erro ao salvar pedido/venda: ' + (error as any)?.message);
       }
-      onClose();
-    } catch (error) {
-      console.error('Erro ao salvar:', error);
-      alert('Erro ao salvar pedido/venda: ' + (error as any)?.message);
-    }
-  };
+    };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setFormData(prev => ({
@@ -1012,6 +1038,9 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
             </button>
             <button
               type="submit"
+                onClick={(e) => {
+                  console.log('🖱️ [ProjectFormModal] Botão "Criar Pedido" clicado!');
+                }}
               className="flex-1 px-6 py-3 bg-gradient-to-r from-amber-600 to-orange-600 text-white rounded-lg hover:from-amber-700 hover:to-orange-700 font-medium transition-all duration-200 shadow-lg hover:shadow-xl"
             >
               {project ? 'Atualizar' : 'Criar'} Pedido
