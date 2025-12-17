@@ -25,7 +25,7 @@ interface ProjectFormModalProps {
 }
 
 const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose }) => {
-  const { clients, products, addProject, updateProject, loading } = useApp();
+  const { clients, products, addProject, updateProject, loading, refreshData } = useApp();
 
   const hasLoadedData = useRef(false);
   const isInitialized = useRef(false);
@@ -290,6 +290,11 @@ const ProjectFormModal: React.FC<ProjectFormModalProps> = ({ project, onClose })
         }
         
         console.log('🎉 [ProjectFormModal] Fechando modal...');
+
+       console.log('🔄 [ProjectFormModal] Recarregando dados...');
+        await refreshData();
+        console.log('✅ [ProjectFormModal] Dados recarregados!');
+       
         onClose();
       } catch (error) {
         console.error('💥 [ProjectFormModal] Erro ao salvar:', error);
